@@ -1,0 +1,35 @@
+{
+  "name": "cargotrack-pro",
+  "version": "1.0.0",
+  "description": "CargoTrack Pro - Real-time cargo tracking landing page and monitoring dashboard",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve .",
+    "dev": "npx serve . -l 3000",
+    "deploy": "vercel --prod",
+    "deploy:preview": "vercel",
+    "watch": "node watch-deploy.js",
+    "watch:preview": "VERCEL_PREVIEW=true node watch-deploy.js",
+    "watch:dev": "npm run watch:preview & npm run dev",
+    "gateway": "node gateway/codec8-gateway.js"
+  },
+  "keywords": [
+    "cargo-tracking",
+    "iot",
+    "lte",
+    "4g",
+    "gps-tracking",
+    "dashboard"
+  ],
+  "author": "CargoTrack Pro",
+  "license": "MIT",
+  "devDependencies": {
+    "chokidar": "^4.0.3",
+    "chokidar-cli": "^3.0.0",
+    "serve": "^14.2.1",
+    "vercel": "^48.10.11"
+  },
+  "dependencies": {
+    "@vercel/kv": "^3.0.0"
+  }
+}

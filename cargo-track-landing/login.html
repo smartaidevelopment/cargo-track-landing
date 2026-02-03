@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Login to CargoTrack Pro Dashboard">
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
+    <link rel="shortcut icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
+    <title>Login - CargoTrack Pro Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="dashboard.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        // Check if using file:// protocol (won't work properly)
+        if (window.location.protocol === 'file:') {
+            document.write(`
+                <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 99999; display: flex; align-items: center; justify-content: center; font-family: Arial, sans-serif;">
+                    <div style="text-align: center; max-width: 600px; padding: 2rem;">
+                        <div style="font-size: 4rem; margin-bottom: 1rem;">⚠️</div>
+                        <h1 style="color: #ef4444; margin-bottom: 1rem;">Cannot Use File Protocol</h1>
+                        <p style="font-size: 1.1rem; margin-bottom: 1.5rem; color: #333;">
+                            This application requires a web server. Use <strong>http://localhost:8000</strong> instead.
+                        </p>
+                        <div style="background: #3b82f6; color: white; padding: 1rem 2rem; border-radius: 0.5rem; display: inline-block; font-size: 1.2rem; font-weight: bold; margin-top: 1rem;">
+                            <a href="http://localhost:8000" style="color: white; text-decoration: none;">Click here to open → http://localhost:8000</a>
+                        </div>
+                    </div>
+                </div>
+            `);
+        }
+    </script>
+    <style>
+        /* Prevent flicker during login */
+        #loginLoadingOverlay {
+            transition: opacity 0.2s ease-in-out;
+        }
+        .login-container {
+            transition: opacity 0.2s ease-in-out;
+        }
+        body.logging-in .login-container {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="login-brand">
+                    <i class="fas fa-satellite-dish"></i>
+                    <h1>CargoTrack Pro</h1>
+                </div>
+                <p>Access your monitoring dashboard</p>
+            </div>
+            
+            <form id="loginForm" class="login-form">
+                <div class="form-group">
+                    <label for="loginEmail">
+                        <i class="fas fa-envelope"></i> Email Address
+                    </label>
+                    <input type="email" id="loginEmail" name="email" required placeholder="your@email.com">
+                </div>
+                
+                <div class="form-group">
+                    <label for="loginPassword">
+                        <i class="fas fa-lock"></i> Password
+                    </label>
+                    <input type="password" id="loginPassword" name="password" required placeholder="Enter your password">
+                </div>
+                
+                <div class="form-group checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="rememberMe">
+                        <span>Remember me</span>
+                    </label>
+                    <a href="#" class="forgot-password">Forgot password?</a>
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-large">
+                    <i class="fas fa-sign-in-alt"></i> Sign In
+                </button>
+                
+                <div class="login-footer">
+                    <p>Don't have an account? <a href="index.html#order">Purchase a package</a></p>
+                </div>
+            </form>
+            
+            <div id="loginError" class="error-message" style="display: none;"></div>
+            
+            <!-- Test Credentials Helper -->
+            <div style="margin-top: 1.5rem; padding: 1rem; background: #f3f4f6; border-radius: 0.5rem; border-left: 4px solid #3b82f6;">
+                <p style="margin: 0 0 0.5rem 0; font-size: 0.875rem; font-weight: 600; color: #1f2937;">
+                    <i class="fas fa-info-circle"></i> Test Credentials:
+                </p>
+                <p style="margin: 0; font-size: 0.875rem; color: #4b5563;">
+                    <strong>Email:</strong> test@cargotrackpro.com<br>
+                    <strong>Password:</strong> test123456
+                </p>
+                <button onclick="createTestUserNow()" style="margin-top: 0.5rem; padding: 0.5rem 1rem; background: #3b82f6; color: white; border: none; border-radius: 0.25rem; cursor: pointer; font-size: 0.875rem;">
+                    <i class="fas fa-user-plus"></i> Create Test User
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="auth.js"></script>
+    <script>
+        // Function to create test user (can be called manually)
+        window.createTestUserNow = function() {
+            try {
+                if (typeof createUser === 'undefined' || typeof getUsers === 'undefined') {
+                    alert('Auth functions not loaded. Please refresh the page.');
+                    return;
+                }
+                
+                const users = getUsers();
+                const testUser = users.find(u => u.email === 'test@cargotrackpro.com');
+                
+                if (testUser) {
+                    alert('Test user already exists!\n\nEmail: test@cargotrackpro.com\nPassword: test123456');
+                    return;
+                }
+                
+                const result = createUser({
+                    email: 'test@cargotrackpro.com',
+                    password: 'test123456',
+                    company: 'Test Company',
+                    phone: '+1 (555) 123-4567',
+                    package: 'professional',
+                    devices: 5
+                });
+                
+                if (result.success) {
+                    alert('✅ Test user created successfully!\n\nEmail: test@cargotrackpro.com\nPassword: test123456\n\nYou can now login with these credentials.');
+                    // Auto-fill the form
+                    document.getElementById('loginEmail').value = 'test@cargotrackpro.com';
+                    document.getElementById('loginPassword').value = 'test123456';
+                } else {
+                    alert('Failed to create test user: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Error creating test user:', error);
+                alert('Error: ' + error.message);
+            }
+        };
+        
+        // Ensure test user exists automatically
+        (function() {
+            function ensureTestUser() {
+                try {
+                    if (typeof createUser === 'undefined' || typeof getUsers === 'undefined') {
+                        setTimeout(ensureTestUser, 200);
+                        return;
+                    }
+                    
+                    const users = getUsers();
+                    const testUser = users.find(u => u.email === 'test@cargotrackpro.com');
+                    
+                    if (!testUser) {
+                        console.log('Auto-creating test user...');
+                        const result = createUser({
+                            email: 'test@cargotrackpro.com',
+                            password: 'test123456',
+                            company: 'Test Company',
+                            phone: '+1 (555) 123-4567',
+                            package: 'professional',
+                            devices: 5
+                        });
+                        
+                        if (result.success) {
+                            console.log('✅ Test user auto-created!');
+                            console.log('Email: test@cargotrackpro.com');
+                            console.log('Password: test123456');
+                        } else {
+                            console.log('Test user creation result:', result);
+                        }
+                    } else {
+                        console.log('✅ Test user already exists');
+                    }
+                } catch (error) {
+                    console.error('Error ensuring test user:', error);
+                }
+            }
+            
+            // Try multiple times to ensure it works
+            ensureTestUser();
+            setTimeout(ensureTestUser, 500);
+            setTimeout(ensureTestUser, 1000);
+        })();
+    </script>
+    <script src="login.js"></script>
+</body>
+</html>
+

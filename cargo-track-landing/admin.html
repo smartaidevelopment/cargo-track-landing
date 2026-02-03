@@ -1,0 +1,1377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Admin Dashboard - CargoTrack Pro">
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
+    <link rel="shortcut icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
+    <title>Admin Dashboard - CargoTrack Pro</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="dashboard.css">
+    <link rel="stylesheet" href="admin.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body class="dashboard">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-brand">
+                <i class="fas fa-shield-alt"></i>
+                <span>Admin Panel</span>
+            </div>
+        </div>
+        
+        <nav class="sidebar-nav">
+            <a href="#admin-dashboard" class="nav-item active" data-section="admin-dashboard">
+                <i class="fas fa-home"></i>
+                <span>Dashboard</span>
+            </a>
+            <a href="#admin-users" class="nav-item" data-section="admin-users">
+                <i class="fas fa-users"></i>
+                <span>User Management</span>
+            </a>
+            <a href="#admin-packages" class="nav-item" data-section="admin-packages">
+                <i class="fas fa-box"></i>
+                <span>Package Management</span>
+            </a>
+            <a href="#admin-payments" class="nav-item" data-section="admin-payments">
+                <i class="fas fa-credit-card"></i>
+                <span>Payments</span>
+            </a>
+            <a href="#admin-invoices" class="nav-item" data-section="admin-invoices">
+                <i class="fas fa-file-invoice"></i>
+                <span>Invoices & Billing</span>
+            </a>
+            <a href="#admin-analytics" class="nav-item" data-section="admin-analytics">
+                <i class="fas fa-chart-line"></i>
+                <span>Financial & Analytics</span>
+            </a>
+            <a href="#admin-devices" class="nav-item" data-section="admin-devices">
+                <i class="fas fa-microchip"></i>
+                <span>All Devices</span>
+            </a>
+            <a href="#admin-security" class="nav-item" data-section="admin-security">
+                <i class="fas fa-shield-alt"></i>
+                <span>Security & Privacy</span>
+            </a>
+            <a href="#admin-settings" class="nav-item" data-section="admin-settings">
+                <i class="fas fa-cog"></i>
+                <span>Settings</span>
+            </a>
+        </nav>
+        
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <div class="user-avatar admin-avatar">
+                    <i class="fas fa-user-shield"></i>
+                </div>
+                <div class="user-details">
+                    <span class="user-name" id="adminUserName">Admin</span>
+                    <span class="user-email" id="adminUserEmail">admin@cargotrackpro.com</span>
+                </div>
+            </div>
+            <button class="btn btn-outline btn-small" id="adminLogoutBtn">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Top Bar -->
+        <header class="topbar">
+            <div class="topbar-left">
+                <h1 class="page-title" id="adminPageTitle">Admin Dashboard</h1>
+            </div>
+            <div class="topbar-right">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" placeholder="Search users, devices..." id="adminSearch">
+                </div>
+                <div class="notifications">
+                    <button class="notification-btn" id="adminNotificationBtn">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-count" id="adminNotificationCount">0</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Admin Dashboard Section -->
+        <section id="admin-dashboard" class="content-section active">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="adminTotalUsers">0</h3>
+                        <p>Total Users</p>
+                        <span class="stat-change positive">
+                            <i class="fas fa-arrow-up"></i> +5 this week
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                        <i class="fas fa-dollar-sign"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="adminTotalRevenue">$0</h3>
+                        <p>Total Revenue</p>
+                        <span class="stat-change positive">
+                            <i class="fas fa-arrow-up"></i> +12% this month
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                        <i class="fas fa-microchip"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="adminTotalDevices">0</h3>
+                        <p>Total Devices</p>
+                        <span class="stat-change positive">
+                            <i class="fas fa-arrow-up"></i> +15 this month
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="adminActiveSubscriptions">0</h3>
+                        <p>Active Subscriptions</p>
+                        <span class="stat-change positive">
+                            <i class="fas fa-arrow-up"></i> 98% active rate
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Global Live Map -->
+            <div class="dashboard-card full-width" style="margin-top: 1.5rem;">
+                <div class="card-header">
+                    <h2><i class="fas fa-globe"></i> Global Live Tracking Map - All Devices</h2>
+                    <div class="card-actions">
+                        <button class="btn btn-outline btn-small" id="refreshAdminGlobalMapBtn" title="Refresh Map">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                        <button class="btn btn-outline btn-small" id="toggleAdminMapAutoRefresh" title="Auto Refresh">
+                            <i class="fas fa-play"></i> Auto Refresh
+                        </button>
+                    </div>
+                </div>
+                <div id="adminGlobalMap" class="map-container" style="height: 500px; width: 100%; border-radius: 0.5rem; overflow: hidden;"></div>
+                <div class="map-legend" style="padding: 1rem; background: #f9fafb; border-top: 1px solid #e5e7eb;">
+                    <div style="display: flex; gap: 2rem; flex-wrap: wrap; font-size: 0.875rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <div style="width: 16px; height: 16px; background: #10b981; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></div>
+                            <span>Active Tracker</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <div style="width: 16px; height: 16px; background: #ef4444; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></div>
+                            <span>Inactive/Alert</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <div style="width: 16px; height: 16px; background: #f59e0b; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></div>
+                            <span>Warning</span>
+                        </div>
+                        <div id="adminMapStats" style="margin-left: auto; color: var(--text-light);">
+                            <span id="adminMapDeviceCount">0</span> devices tracked across all users
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-grid">
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h2>Recent Users</h2>
+                        <button class="btn-icon">
+                            <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Package</th>
+                                    <th>Joined</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recentUsersTable">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h2>Revenue Overview</h2>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="revenueChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-card full-width">
+                <div class="card-header">
+                    <h2>System Activity</h2>
+                </div>
+                <div class="activity-list" id="adminActivityList">
+                    <!-- Activity items will be populated by JS -->
+                </div>
+            </div>
+        </section>
+
+        <!-- User Management Section -->
+        <section id="admin-users" class="content-section">
+            <div class="dashboard-card full-width">
+                <div class="card-header">
+                    <h2>User Management</h2>
+                    <div class="card-actions">
+                        <button class="btn btn-outline btn-small" id="exportUsersBtn">
+                            <i class="fas fa-download"></i> Export
+                        </button>
+                        <button class="btn btn-primary btn-small" id="addUserBtn">
+                            <i class="fas fa-user-plus"></i> Add User
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="admin-filters" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; padding: 1rem; background: var(--bg-light); border-radius: 0.5rem; margin-bottom: 1rem;">
+                    <div class="filter-group" style="flex: 1; min-width: 150px;">
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-dark);">Filter by Status:</label>
+                        <select id="filterUserStatus" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.25rem;">
+                            <option value="all">All Users</option>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                            <option value="suspended">Suspended</option>
+                        </select>
+                    </div>
+                    <div class="filter-group" style="flex: 1; min-width: 150px;">
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-dark);">Filter by Package:</label>
+                        <select id="filterUserPackage" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.25rem;">
+                            <option value="all">All Packages</option>
+                            <option value="basic">Basic</option>
+                            <option value="professional">Professional</option>
+                            <option value="enterprise">Enterprise</option>
+                        </select>
+                    </div>
+                    <div class="filter-group" style="flex: 2; min-width: 200px;">
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-dark);">Search:</label>
+                        <input type="text" id="userSearchInput" placeholder="Search by email, company..." style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.25rem;">
+                    </div>
+                    <div class="filter-group" style="display: flex; align-items: flex-end;">
+                        <button class="btn btn-outline btn-small" id="clearFiltersBtn" style="height: 38px;">
+                            <i class="fas fa-times"></i> Clear Filters
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="usersStats" style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                    <div style="padding: 0.75rem 1rem; background: var(--bg-light); border-radius: 0.5rem; flex: 1; min-width: 150px;">
+                        <div style="font-size: 0.875rem; color: var(--text-light); margin-bottom: 0.25rem;">Total Users</div>
+                        <div style="font-size: 1.5rem; font-weight: 600; color: var(--primary-color);" id="totalUsersCount">0</div>
+                    </div>
+                    <div style="padding: 0.75rem 1rem; background: var(--bg-light); border-radius: 0.5rem; flex: 1; min-width: 150px;">
+                        <div style="font-size: 0.875rem; color: var(--text-light); margin-bottom: 0.25rem;">Active Users</div>
+                        <div style="font-size: 1.5rem; font-weight: 600; color: #10b981;" id="activeUsersCount">0</div>
+                    </div>
+                    <div style="padding: 0.75rem 1rem; background: var(--bg-light); border-radius: 0.5rem; flex: 1; min-width: 150px;">
+                        <div style="font-size: 0.875rem; color: var(--text-light); margin-bottom: 0.25rem;">Filtered Results</div>
+                        <div style="font-size: 1.5rem; font-weight: 600; color: var(--text-dark);" id="filteredUsersCount">0</div>
+                    </div>
+                </div>
+                
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Email</th>
+                                <th>Company</th>
+                                <th>Package</th>
+                                <th>Devices</th>
+                                <th>Status</th>
+                                <th>Joined</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersManagementTable">
+                            <!-- Table rows will be populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- User Details Modal -->
+            <div id="userDetailsModal" class="modal">
+                <div class="modal-content modal-large">
+                    <div class="modal-header">
+                        <h2 id="userDetailsTitle">User Details</h2>
+                        <button class="modal-close" id="closeUserModal">&times;</button>
+                    </div>
+                    <div class="modal-body" id="userDetailsBody">
+                        <!-- User details will be populated by JS -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Add/Edit User Modal -->
+            <div id="addUserModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 id="addUserModalTitle"><i class="fas fa-user-plus"></i> Add New User</h2>
+                        <button class="modal-close" id="closeAddUserModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="addUserForm" class="settings-form">
+                            <div class="form-group">
+                                <label for="newUserEmail">Email Address *</label>
+                                <input type="email" id="newUserEmail" name="email" required autocomplete="email" placeholder="user@example.com">
+                                <small>This will be the user's login email</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="newUserPassword">Password *</label>
+                                <input type="password" id="newUserPassword" name="password" required minlength="6" autocomplete="new-password" placeholder="Minimum 6 characters">
+                                <small>Minimum 6 characters</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="newUserCompany">Company Name</label>
+                                <input type="text" id="newUserCompany" name="company" autocomplete="organization" placeholder="Company Name">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="newUserPhone">Phone Number</label>
+                                <input type="tel" id="newUserPhone" name="phone" autocomplete="tel" placeholder="+1 (555) 123-4567">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="newUserPackage">Package *</label>
+                                <select id="newUserPackage" name="package" required>
+                                    <option value="basic">Basic - $99/month</option>
+                                    <option value="professional" selected>Professional - $249/month</option>
+                                    <option value="enterprise">Enterprise - $499/month</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="newUserDevices">Number of Devices</label>
+                                <input type="number" id="newUserDevices" name="devices" min="1" value="1" required>
+                                <small>Initial number of devices for this user</small>
+                            </div>
+                            
+                            <div class="form-group checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="newUserActive" name="isActive" checked>
+                                    <span>Account Active</span>
+                                </label>
+                                <small>Uncheck to create an inactive account</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" id="sendWelcomeEmail" checked>
+                                    <span>Send welcome email with login credentials</span>
+                                </label>
+                            </div>
+                            
+                            <div class="modal-footer" style="margin-top: 1.5rem; display: flex; gap: 1rem; justify-content: flex-end;">
+                                <button type="button" class="btn btn-outline" id="cancelAddUserBtn">Cancel</button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-user-plus"></i> Create User
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Edit User Modal -->
+            <div id="editUserModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2><i class="fas fa-user-edit"></i> Edit User</h2>
+                        <button class="modal-close" id="closeEditUserModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="editUserForm" class="settings-form">
+                            <input type="hidden" id="editUserId" name="userId">
+                            
+                            <div class="form-group">
+                                <label for="editUserEmail">Email Address *</label>
+                                <input type="email" id="editUserEmail" name="email" required autocomplete="email">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="editUserCompany">Company Name</label>
+                                <input type="text" id="editUserCompany" name="company" autocomplete="organization">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="editUserPhone">Phone Number</label>
+                                <input type="tel" id="editUserPhone" name="phone" autocomplete="tel">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="editUserPackage">Package *</label>
+                                <select id="editUserPackage" name="package" required>
+                                    <option value="basic">Basic - $99/month</option>
+                                    <option value="professional">Professional - $249/month</option>
+                                    <option value="enterprise">Enterprise - $499/month</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="editUserDevices">Number of Devices</label>
+                                <input type="number" id="editUserDevices" name="devices" min="1" value="1" required>
+                            </div>
+                            
+                            <div class="form-group checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="editUserActive" name="isActive">
+                                    <span>Account Active</span>
+                                </label>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="editUserPassword">Change Password (Optional)</label>
+                                <input type="password" id="editUserPassword" name="password" minlength="6" autocomplete="new-password" placeholder="Leave empty to keep current password">
+                                <small>Enter new password to change it</small>
+                            </div>
+                            
+                            <div class="modal-footer" style="margin-top: 1.5rem; display: flex; gap: 1rem; justify-content: flex-end;">
+                                <button type="button" class="btn btn-outline" id="cancelEditUserBtn">Cancel</button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save"></i> Save Changes
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Package Management Section -->
+        <section id="admin-packages" class="content-section">
+            <div class="dashboard-card full-width">
+                <div class="card-header">
+                    <h2><i class="fas fa-box"></i> Package Management</h2>
+                    <div class="card-actions">
+                        <button class="btn btn-primary btn-small" id="addPackageBtn">
+                            <i class="fas fa-plus"></i> Add Package
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Package Name</th>
+                                <th>Price/Month</th>
+                                <th>Max Devices</th>
+                                <th>Extra Device Price</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="packagesTable">
+                            <!-- Packages will be populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Payments Section -->
+        <section id="admin-payments" class="content-section">
+            <div class="dashboard-grid">
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h2>Payment Methods</h2>
+                    </div>
+                    <div class="payment-methods-config">
+                        <div class="payment-method-item">
+                            <div class="payment-method-header">
+                                <i class="fab fa-stripe"></i>
+                                <h3>Stripe</h3>
+                                <span class="status-badge active" id="stripeStatus">Connected</span>
+                            </div>
+                            <div class="payment-method-body">
+                                <div class="form-group">
+                                    <label>Publishable Key</label>
+                                    <input type="text" id="stripePublishableKey" placeholder="pk_live_..." readonly>
+                                    <small>Configured</small>
+                                </div>
+                                <div class="form-group">
+                                    <label>Secret Key</label>
+                                    <input type="password" id="stripeSecretKey" placeholder="sk_live_..." readonly>
+                                    <small>Hidden for security</small>
+                                </div>
+                                <button class="btn btn-outline btn-small" onclick="configurePaymentMethod('stripe')">
+                                    <i class="fas fa-edit"></i> Configure
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="payment-method-item">
+                            <div class="payment-method-header">
+                                <i class="fab fa-paypal"></i>
+                                <h3>PayPal</h3>
+                                <span class="status-badge active" id="paypalStatus">Standard Mode (Ready)</span>
+                            </div>
+                            <div class="payment-method-body">
+                                <div style="background: #e3f2fd; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem; border-left: 4px solid #2196f3;">
+                                    <h4 style="margin: 0 0 0.5rem 0; color: #1976d2; font-size: 0.875rem;">
+                                        <i class="fas fa-info-circle"></i> Easy Setup - No Developer Account Needed!
+                                    </h4>
+                                    <p style="margin: 0; font-size: 0.875rem; color: #424242; line-height: 1.5;">
+                                        Use PayPal Smart Buttons - only requires a Client ID from your PayPal Business account. 
+                                        No secret keys or developer registration needed!
+                                    </p>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label>PayPal Client ID (Optional - for Smart Buttons)</label>
+                                    <input type="text" id="paypalClientId" placeholder="Enter PayPal Client ID (optional)">
+                                    <small>
+                                        <strong>Easy Setup:</strong> Get this from your PayPal Business account → Account Settings → Website Preferences → PayPal Buttons<br>
+                                        <strong>Or leave empty</strong> to use PayPal Standard (no setup required, redirects to PayPal)
+                                    </small>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label>
+                                        <input type="checkbox" id="paypalUseSmartButtons" checked>
+                                        Use PayPal Smart Buttons (Recommended - better UX)
+                                    </label>
+                                    <small>If unchecked, uses PayPal Standard redirect (no Client ID needed)</small>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label>
+                                        <input type="checkbox" id="paypalSandboxMode">
+                                        Enable Sandbox Mode (for testing)
+                                    </label>
+                                    <small>Use PayPal sandbox for testing payments</small>
+                                </div>
+                                
+                                <div style="background: #f5f5f5; padding: 1rem; border-radius: 0.5rem; margin-top: 1rem;">
+                                    <h4 style="margin: 0 0 0.75rem 0; font-size: 0.875rem; color: var(--text-dark);">
+                                        <i class="fas fa-lightbulb"></i> Quick Setup Guide:
+                                    </h4>
+                                    <ol style="margin: 0; padding-left: 1.25rem; font-size: 0.875rem; color: var(--text-light); line-height: 1.8;">
+                                        <li><strong>Option 1 (Easiest):</strong> Leave Client ID empty - PayPal Standard will work automatically</li>
+                                        <li><strong>Option 2 (Better UX):</strong> Log into your PayPal Business account → Account Settings → Website Preferences → Copy your Client ID</li>
+                                        <li><strong>No Developer Account:</strong> You don't need to register as a developer - just use your regular PayPal Business account</li>
+                                        <li><strong>No Secret Keys:</strong> PayPal Smart Buttons don't require secret keys</li>
+                                    </ol>
+                                </div>
+                                
+                                <button class="btn btn-primary btn-small" onclick="savePayPalSettings()" style="margin-top: 1rem;">
+                                    <i class="fas fa-save"></i> Save PayPal Settings
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="payment-method-item">
+                            <div class="payment-method-header">
+                                <i class="fas fa-university"></i>
+                                <h3>Bank Transfer</h3>
+                                <span class="status-badge active">Enabled</span>
+                            </div>
+                            <div class="payment-method-body">
+                                <div class="form-group">
+                                    <label>Bank Account Details</label>
+                                    <textarea id="bankDetails" rows="4" placeholder="Enter bank account information for manual processing"></textarea>
+                                </div>
+                                <button class="btn btn-outline btn-small" onclick="saveBankDetails()">
+                                    <i class="fas fa-save"></i> Save
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h2>Payment Statistics</h2>
+                    </div>
+                    <div class="payment-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">Total Revenue</span>
+                            <span class="stat-value" id="totalRevenue">$0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">This Month</span>
+                            <span class="stat-value" id="monthlyRevenue">$0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Pending</span>
+                            <span class="stat-value" id="pendingRevenue">$0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Failed</span>
+                            <span class="stat-value" id="failedPayments">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="dashboard-card full-width">
+                <div class="card-header">
+                    <h2>Payment Transactions</h2>
+                    <div class="card-actions">
+                        <button class="btn btn-outline btn-small" id="exportPaymentsBtn">
+                            <i class="fas fa-download"></i> Export
+                        </button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Transaction ID</th>
+                                <th>User</th>
+                                <th>Package</th>
+                                <th>Amount</th>
+                                <th>Method</th>
+                                <th>Status</th>
+                                <th>Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="paymentsTable">
+                            <!-- Table rows will be populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Invoices & Billing Section -->
+        <section id="admin-invoices" class="content-section">
+            <div class="dashboard-card full-width">
+                <div class="card-header">
+                    <h2><i class="fas fa-file-invoice"></i> Invoice Management</h2>
+                    <div class="card-actions">
+                        <button class="btn btn-outline btn-small" onclick="generateAllInvoices()">
+                            <i class="fas fa-plus"></i> Generate Missing Invoices
+                        </button>
+                        <button class="btn btn-outline btn-small" id="exportInvoicesBtn">
+                            <i class="fas fa-download"></i> Export All
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="admin-filters">
+                    <div class="filter-group">
+                        <label>Filter by Status:</label>
+                        <select id="filterInvoiceStatus">
+                            <option value="all">All Invoices</option>
+                            <option value="paid">Paid</option>
+                            <option value="pending">Pending</option>
+                            <option value="overdue">Overdue</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <input type="text" id="invoiceSearchInput" placeholder="Search invoices...">
+                    </div>
+                </div>
+                
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Invoice #</th>
+                                <th>Customer</th>
+                                <th>Date</th>
+                                <th>Due Date</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Payment Method</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminInvoicesTable">
+                            <!-- Table rows will be populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="dashboard-grid">
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h2>Invoice Statistics</h2>
+                    </div>
+                    <div class="invoice-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">Total Invoices</span>
+                            <span class="stat-value" id="adminTotalInvoices">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Total Revenue</span>
+                            <span class="stat-value" id="adminInvoiceRevenue">$0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Paid Invoices</span>
+                            <span class="stat-value" id="adminPaidInvoices">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Pending</span>
+                            <span class="stat-value" id="adminPendingInvoices">0</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h2>Recent Invoices</h2>
+                    </div>
+                    <div class="recent-invoices-list" id="recentInvoicesList">
+                        <!-- Recent invoices will be populated by JS -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Financial & Analytics Section -->
+        <section id="admin-analytics" class="content-section">
+            <!-- Financial Overview -->
+            <div class="stats-grid">
+                <div class="stat-card financial">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        <i class="fas fa-dollar-sign"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="totalRevenueAnalytics">$0</h3>
+                        <p>Total Revenue</p>
+                        <span class="stat-change positive" id="revenueChange">
+                            <i class="fas fa-arrow-up"></i> +0%
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="stat-card financial">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                        <i class="fas fa-calendar-check"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="monthlyRecurringRevenue">$0</h3>
+                        <p>Monthly Recurring Revenue (MRR)</p>
+                        <span class="stat-change positive" id="mrrChange">
+                            <i class="fas fa-arrow-up"></i> +0%
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="stat-card financial">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="averageRevenuePerUser">$0</h3>
+                        <p>Average Revenue Per User (ARPU)</p>
+                        <span class="stat-change positive" id="arpuChange">
+                            <i class="fas fa-arrow-up"></i> +0%
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="stat-card financial">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                        <i class="fas fa-percentage"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="churnRate">0%</h3>
+                        <p>Churn Rate</p>
+                        <span class="stat-change negative" id="churnChange">
+                            <i class="fas fa-arrow-down"></i> -0%
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Financial Charts -->
+            <div class="dashboard-grid">
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h2>Revenue Trend</h2>
+                        <div class="card-actions">
+                            <select id="revenuePeriod" class="period-selector">
+                                <option value="7">Last 7 Days</option>
+                                <option value="30" selected>Last 30 Days</option>
+                                <option value="90">Last 90 Days</option>
+                                <option value="365">Last Year</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="revenueTrendChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h2>Revenue by Package</h2>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="revenueByPackageChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Business Metrics -->
+            <div class="dashboard-grid">
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h2>User Growth</h2>
+                        <div class="card-actions">
+                            <select id="growthPeriod" class="period-selector">
+                                <option value="7">Last 7 Days</option>
+                                <option value="30" selected>Last 30 Days</option>
+                                <option value="90">Last 90 Days</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="userGrowthChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h2>Subscription Distribution</h2>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="subscriptionDistributionChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Financial Analysis -->
+            <div class="dashboard-card full-width">
+                <div class="card-header">
+                    <h2>Financial Breakdown</h2>
+                    <div class="card-actions">
+                        <button class="btn btn-outline btn-small" id="exportFinancialReportBtn">
+                            <i class="fas fa-download"></i> Export Report
+                        </button>
+                    </div>
+                </div>
+                <div class="financial-breakdown">
+                    <div class="breakdown-grid">
+                        <div class="breakdown-section">
+                            <h3><i class="fas fa-money-bill-wave"></i> Revenue Analysis</h3>
+                            <div class="breakdown-item">
+                                <span class="breakdown-label">Total Revenue (All Time)</span>
+                                <span class="breakdown-value" id="breakdownTotalRevenue">$0</span>
+                            </div>
+                            <div class="breakdown-item">
+                                <span class="breakdown-label">This Month</span>
+                                <span class="breakdown-value" id="breakdownMonthlyRevenue">$0</span>
+                            </div>
+                            <div class="breakdown-item">
+                                <span class="breakdown-label">Last Month</span>
+                                <span class="breakdown-value" id="breakdownLastMonthRevenue">$0</span>
+                            </div>
+                            <div class="breakdown-item">
+                                <span class="breakdown-label">This Year</span>
+                                <span class="breakdown-value" id="breakdownYearlyRevenue">$0</span>
+                            </div>
+                            <div class="breakdown-item highlight">
+                                <span class="breakdown-label">Growth Rate (MoM)</span>
+                                <span class="breakdown-value positive" id="breakdownGrowthRate">0%</span>
+                            </div>
+                        </div>
+                        
+                        <div class="breakdown-section">
+                            <h3><i class="fas fa-users"></i> Customer Metrics</h3>
+                            <div class="breakdown-item">
+                                <span class="breakdown-label">Total Customers</span>
+                                <span class="breakdown-value" id="breakdownTotalCustomers">0</span>
+                            </div>
+                            <div class="breakdown-item">
+                                <span class="breakdown-label">New This Month</span>
+                                <span class="breakdown-value" id="breakdownNewCustomers">0</span>
+                            </div>
+                            <div class="breakdown-item">
+                                <span class="breakdown-label">Active Subscriptions</span>
+                                <span class="breakdown-value" id="breakdownActiveSubscriptions">0</span>
+                            </div>
+                            <div class="breakdown-item">
+                                <span class="breakdown-label">Churned This Month</span>
+                                <span class="breakdown-value negative" id="breakdownChurned">0</span>
+                            </div>
+                            <div class="breakdown-item highlight">
+                                <span class="breakdown-label">Customer Lifetime Value (CLV)</span>
+                                <span class="breakdown-value" id="breakdownCLV">$0</span>
+                            </div>
+                        </div>
+                        
+                        <div class="breakdown-section">
+                            <h3><i class="fas fa-box"></i> Package Performance</h3>
+                            <div class="breakdown-item">
+                                <span class="breakdown-label">Basic Package Revenue</span>
+                                <span class="breakdown-value" id="breakdownBasicRevenue">$0</span>
+                            </div>
+                            <div class="breakdown-item">
+                                <span class="breakdown-label">Professional Revenue</span>
+                                <span class="breakdown-value" id="breakdownProRevenue">$0</span>
+                            </div>
+                            <div class="breakdown-item">
+                                <span class="breakdown-label">Enterprise Revenue</span>
+                                <span class="breakdown-value" id="breakdownEnterpriseRevenue">$0</span>
+                            </div>
+                            <div class="breakdown-item">
+                                <span class="breakdown-label">Most Popular Package</span>
+                                <span class="breakdown-value" id="breakdownPopularPackage">-</span>
+                            </div>
+                            <div class="breakdown-item highlight">
+                                <span class="breakdown-label">Average Package Value</span>
+                                <span class="breakdown-value" id="breakdownAvgPackageValue">$0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Payment Method Analysis -->
+            <div class="dashboard-card full-width">
+                <div class="card-header">
+                    <h2>Payment Method Analysis</h2>
+                </div>
+                <div class="chart-container">
+                    <canvas id="paymentMethodChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Forecast & Projections -->
+            <div class="dashboard-grid">
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h2>Revenue Forecast</h2>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="revenueForecastChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h2>Key Performance Indicators</h2>
+                    </div>
+                    <div class="kpi-grid">
+                        <div class="kpi-item">
+                            <div class="kpi-label">Conversion Rate</div>
+                            <div class="kpi-value" id="kpiConversionRate">0%</div>
+                            <div class="kpi-change positive">+2.5%</div>
+                        </div>
+                        <div class="kpi-item">
+                            <div class="kpi-label">Retention Rate</div>
+                            <div class="kpi-value" id="kpiRetentionRate">0%</div>
+                            <div class="kpi-change positive">+1.2%</div>
+                        </div>
+                        <div class="kpi-item">
+                            <div class="kpi-label">LTV/CAC Ratio</div>
+                            <div class="kpi-value" id="kpiLTVRatio">0:1</div>
+                            <div class="kpi-change positive">+0.3</div>
+                        </div>
+                        <div class="kpi-item">
+                            <div class="kpi-label">Monthly Growth</div>
+                            <div class="kpi-value" id="kpiMonthlyGrowth">0%</div>
+                            <div class="kpi-change positive">+5.1%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- All Devices Section -->
+        <section id="admin-devices" class="content-section">
+            <div class="dashboard-card full-width">
+                <div class="card-header">
+                    <h2>All Devices (System-wide)</h2>
+                    <div class="card-actions">
+                        <button class="btn btn-outline btn-small" id="exportDevicesBtn">
+                            <i class="fas fa-download"></i> Export
+                        </button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Device ID</th>
+                                <th>Owner</th>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Status</th>
+                                <th>Network</th>
+                                <th>Last Update</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="allDevicesTable">
+                            <!-- Table rows will be populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Security & Privacy Section -->
+        <section id="admin-security" class="content-section">
+            <div class="dashboard-grid">
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-shield-alt"></i> Security Settings</h2>
+                    </div>
+                    <form class="settings-form" id="securitySettingsForm">
+                        <div class="form-group">
+                            <label>Password Policy</label>
+                            <select id="passwordPolicy">
+                                <option value="standard">Standard (6+ characters)</option>
+                                <option value="strong">Strong (8+ characters, mixed case, numbers)</option>
+                                <option value="very-strong">Very Strong (12+ characters, special chars)</option>
+                            </select>
+                        </div>
+                        <div class="form-group checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="require2FA" checked>
+                                <span>Require 2FA for Admin</span>
+                            </label>
+                        </div>
+                        <div class="form-group checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="sessionTimeout">
+                                <span>Enable Session Timeout (30 min)</span>
+                            </label>
+                        </div>
+                        <div class="form-group checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="ipWhitelist">
+                                <span>Enable IP Whitelist</span>
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label>Encryption Level</label>
+                            <select id="encryptionLevel">
+                                <option value="standard">Standard (TLS 1.2)</option>
+                                <option value="high" selected>High (TLS 1.3)</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Security Settings</button>
+                    </form>
+                </div>
+                
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-user-shield"></i> Data Privacy</h2>
+                    </div>
+                    <form class="settings-form" id="privacySettingsForm">
+                        <div class="form-group checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="gdprCompliance" checked>
+                                <span>GDPR Compliance Enabled</span>
+                            </label>
+                        </div>
+                        <div class="form-group checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="dataEncryption" checked>
+                                <span>Encrypt User Data at Rest</span>
+                            </label>
+                        </div>
+                        <div class="form-group checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="dataRetention">
+                                <span>Auto-delete Data After 90 Days (Inactive Users)</span>
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label>Data Retention Period</label>
+                            <select id="dataRetentionPeriod">
+                                <option value="30">30 days</option>
+                                <option value="90" selected>90 days</option>
+                                <option value="365">1 year</option>
+                                <option value="unlimited">Unlimited</option>
+                            </select>
+                        </div>
+                        <div class="form-group checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="userDataExport">
+                                <span>Allow Users to Export Their Data</span>
+                            </label>
+                        </div>
+                        <div class="form-group checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="userDataDeletion">
+                                <span>Allow Users to Delete Their Data</span>
+                            </label>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Privacy Settings</button>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="dashboard-card full-width">
+                <div class="card-header">
+                    <h2><i class="fas fa-list"></i> Privacy Requests</h2>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Request ID</th>
+                                <th>User</th>
+                                <th>Type</th>
+                                <th>Status</th>
+                                <th>Requested</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="privacyRequestsTable">
+                            <!-- Table rows will be populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="dashboard-card full-width">
+                <div class="card-header">
+                    <h2><i class="fas fa-file-alt"></i> Security Audit Log</h2>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Event</th>
+                                <th>User</th>
+                                <th>IP Address</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="securityAuditLog">
+                            <!-- Table rows will be populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Admin Settings Section -->
+        <section id="admin-settings" class="content-section">
+            <div class="dashboard-grid">
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h2>Application Settings</h2>
+                    </div>
+                    <form class="settings-form" id="appSettingsForm">
+                        <div class="form-group">
+                            <label>Application Name</label>
+                            <input type="text" id="appName" value="CargoTrack Pro">
+                        </div>
+                        <div class="form-group">
+                            <label>Support Email</label>
+                            <input type="email" id="supportEmail" value="support@cargotrackpro.com">
+                        </div>
+                        <div class="form-group">
+                            <label>Support Phone</label>
+                            <input type="tel" id="supportPhone" value="+1 (555) 123-4567">
+                        </div>
+                        <div class="form-group">
+                            <label>Maintenance Mode</label>
+                            <select id="maintenanceMode">
+                                <option value="off">Off</option>
+                                <option value="on">On</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Settings</button>
+                    </form>
+                </div>
+                
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h2>Admin Account</h2>
+                    </div>
+                    <form class="settings-form" id="adminAccountForm">
+                        <div class="form-group">
+                            <label>Admin Email</label>
+                            <input type="email" id="adminAccountEmail" value="admin@cargotrackpro.com">
+                        </div>
+                        <div class="form-group">
+                            <label>Change Password</label>
+                            <input type="password" id="adminNewPassword" placeholder="Enter new password">
+                        </div>
+                        <div class="form-group">
+                            <label>Confirm Password</label>
+                            <input type="password" id="adminConfirmPassword" placeholder="Confirm new password">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Update Account</button>
+                    </form>
+                </div>
+                
+                <!-- LTE Tracker Configuration -->
+                <div class="dashboard-card full-width">
+                    <div class="card-header">
+                        <h2><i class="fas fa-signal"></i> LTE Tracker Configuration</h2>
+                    </div>
+                    <form class="settings-form" id="lteSettingsForm">
+                        <div class="form-group">
+                            <label for="lteDefaultCarrier">Default Carrier</label>
+                            <input type="text" id="lteDefaultCarrier" name="lteDefaultCarrier" placeholder="Carrier name (e.g., AT&T, Vodafone)" autocomplete="off">
+                            <small>
+                                Optional default carrier name applied to new tracker connections.
+                            </small>
+                        </div>
+                        <div class="form-group">
+                            <label for="lteDefaultApn">Default APN</label>
+                            <input type="text" id="lteDefaultApn" name="lteDefaultApn" placeholder="APN (e.g., internet, iot)" autocomplete="off">
+                            <small>Optional APN default for LTE SIMs.</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="lteIngestEndpoint">Data Ingest Endpoint (Optional)</label>
+                            <input type="url" id="lteIngestEndpoint" name="lteIngestEndpoint" placeholder="https://api.yourdomain.com/lte/ingest" autocomplete="off">
+                            <small>Optional backend endpoint for LTE tracker data ingestion.</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="lteProviderApiKey">Provider API Key (Optional)</label>
+                            <input type="password" id="lteProviderApiKey" name="lteProviderApiKey" placeholder="Provider API key" autocomplete="off">
+                            <small>Store a provider API key if your LTE carrier requires it.</small>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="allowUserApiKeys" checked>
+                                Allow users to generate their own API keys for integrations
+                            </label>
+                            <small>When enabled, users can generate API keys to connect their ERPs or external systems</small>
+                        </div>
+                        <div id="lteValidationStatus" style="display: none; margin-bottom: 1rem; padding: 0.75rem; border-radius: 0.5rem;"></div>
+                        <div style="display: flex; gap: 1rem; align-items: center;">
+                            <button type="button" id="testLteConnection" class="btn btn-outline">
+                                <i class="fas fa-plug"></i> Test Connection
+                            </button>
+                            <button type="submit" class="btn btn-primary">Save LTE Settings</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Package Form Modal -->
+    <div id="packageFormModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="packageFormTitle">Add Package</h2>
+                <button class="modal-close" id="closePackageModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="packageForm">
+                    <div class="form-group">
+                        <label>Package ID *</label>
+                        <input type="text" id="packageId" name="packageId" required placeholder="e.g., basic, professional, enterprise">
+                        <small>Unique identifier (lowercase, no spaces)</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Package Name *</label>
+                        <input type="text" id="packageName" name="packageName" required placeholder="e.g., Basic, Professional">
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <input type="text" id="packageDescription" name="packageDescription" placeholder="e.g., Basic - $99/month">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Monthly Price ($) *</label>
+                            <input type="number" id="packagePrice" name="packagePrice" required min="0" step="0.01" placeholder="99.00">
+                        </div>
+                        <div class="form-group">
+                            <label>Max Devices *</label>
+                            <input type="number" id="packageMaxDevices" name="packageMaxDevices" required min="1" placeholder="10">
+                            <small>Use 0 for unlimited</small>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Extra Device Price ($) *</label>
+                        <input type="number" id="packageExtraDevicePrice" name="packageExtraDevicePrice" required min="0" step="0.01" placeholder="10.00">
+                        <small>Price per device when exceeding max devices</small>
+                    </div>
+                    <div class="form-group checkbox-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="packageActive" checked>
+                            <span>Active (visible to customers)</span>
+                        </label>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-outline" onclick="closePackageModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Package</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Configuration Modal -->
+    <div id="paymentConfigModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="paymentConfigTitle">Configure Payment Method</h2>
+                <button class="modal-close" id="closePaymentModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="paymentConfigForm">
+                    <div class="form-group">
+                        <label id="paymentKey1Label">API Key</label>
+                        <input type="text" id="paymentKey1" placeholder="Enter API key">
+                    </div>
+                    <div class="form-group">
+                        <label id="paymentKey2Label">Secret Key</label>
+                        <input type="password" id="paymentKey2" placeholder="Enter secret key">
+                    </div>
+                    <div class="form-group checkbox-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="useTestModePayment">
+                            <span>Use Test Mode</span>
+                        </label>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-outline" onclick="closePaymentConfigModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Configuration</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="auth.js"></script>
+    <script src="admin-auth.js"></script>
+    <script src="data-protection.js"></script>
+    <script src="invoice.js"></script>
+    <script src="admin.js"></script>
+    <link rel="stylesheet" href="support-bot.css">
+    <script src="support-bot.js"></script>
+</body>
+</html>
+
