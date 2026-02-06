@@ -9,6 +9,7 @@ let mapAutoRefreshInterval = null;
 let mapAutoRefreshEnabled = false;
 let liveLocationInterval = null;
 const LIVE_LOCATION_POLL_MS = 5000;
+const DASHBOARD_LAYOUT_KEY = 'cargotrack_dashboard_layout_v1';
 const STALE_DEVICE_MS = 2 * 60 * 1000;
 
 // Helper function to safely get current user
@@ -323,6 +324,116 @@ function renderNotificationDropdown(alerts) {
 // Dashboard initialization
 function initDashboard() {
     // Activity list will be populated by loadDashboardData
+    initDashboardLayout();
+}
+
+function initDashboardLayout() {
+    const layoutContainer = document.getElementById('dashboardLayout');
+    const toggleBtn = document.getElementById('toggleDashboardLayout');
+    if (!layoutContainer || !toggleBtn) return;
+
+    const cards = Array.from(layoutContainer.querySelectorAll('.dashboard-card[data-layout-id]'));
+    const savedOrder = getSavedDashboardLayout();
+    if (savedOrder.length) {
+        applyDashboardLayout(layoutContainer, cards, savedOrder);
+    }
+
+    toggleBtn.addEventListener('click', () => {
+        const dashboardSection = document.getElementById('dashboard');
+        const isEditing = dashboardSection.classList.toggle('layout-editing');
+        toggleBtn.innerHTML = isEditing
+            ? '<i class="fas fa-check"></i> Done'
+            : '<i class="fas fa-sliders-h"></i> Modify Layout';
+        setDashboardDragState(layoutContainer, isEditing);
+    });
+
+    setDashboardDragState(layoutContainer, false);
+}
+
+function setDashboardDragState(layoutContainer, enabled) {
+    const cards = Array.from(layoutContainer.querySelectorAll('.dashboard-card[data-layout-id]'));
+    cards.forEach(card => {
+        card.draggable = enabled;
+        card.removeEventListener('dragstart', handleDashboardDragStart);
+        card.removeEventListener('dragover', handleDashboardDragOver);
+        card.removeEventListener('dragend', handleDashboardDragEnd);
+        card.removeEventListener('drop', handleDashboardDrop);
+
+        if (enabled) {
+            card.addEventListener('dragstart', handleDashboardDragStart);
+            card.addEventListener('dragover', handleDashboardDragOver);
+            card.addEventListener('dragend', handleDashboardDragEnd);
+            card.addEventListener('drop', handleDashboardDrop);
+        } else {
+            card.classList.remove('dragging');
+        }
+    });
+}
+
+function getSavedDashboardLayout() {
+    try {
+        const raw = localStorage.getItem(DASHBOARD_LAYOUT_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+        return [];
+    }
+}
+
+function applyDashboardLayout(container, cards, order) {
+    const cardMap = new Map(cards.map(card => [card.dataset.layoutId, card]));
+    order.forEach(id => {
+        const card = cardMap.get(id);
+        if (card) container.appendChild(card);
+    });
+    cards.forEach(card => {
+        if (!order.includes(card.dataset.layoutId)) {
+            container.appendChild(card);
+        }
+    });
+}
+
+function handleDashboardDragStart(event) {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', event.currentTarget.dataset.layoutId);
+    event.currentTarget.classList.add('dragging');
+}
+
+function handleDashboardDragOver(event) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+
+    const target = event.currentTarget;
+    const dragging = document.querySelector('#dashboardLayout .dashboard-card.dragging');
+    if (!dragging || dragging === target) return;
+
+    const rect = target.getBoundingClientRect();
+    const isAfter = event.clientY > rect.top + rect.height / 2;
+    const container = target.parentElement;
+    if (isAfter) {
+        container.insertBefore(dragging, target.nextSibling);
+    } else {
+        container.insertBefore(dragging, target);
+    }
+}
+
+function handleDashboardDrop(event) {
+    event.preventDefault();
+    saveDashboardLayout();
+}
+
+function handleDashboardDragEnd(event) {
+    event.currentTarget.classList.remove('dragging');
+    saveDashboardLayout();
+}
+
+function saveDashboardLayout() {
+    const layoutContainer = document.getElementById('dashboardLayout');
+    if (!layoutContainer) return;
+    const order = Array.from(
+        layoutContainer.querySelectorAll('.dashboard-card[data-layout-id]')
+    ).map(card => card.dataset.layoutId);
+    localStorage.setItem(DASHBOARD_LAYOUT_KEY, JSON.stringify(order));
 }
 
 // Load dashboard data

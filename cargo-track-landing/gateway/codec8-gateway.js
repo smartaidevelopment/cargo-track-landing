@@ -273,6 +273,7 @@ const server = net.createServer(socket => {
             buffer = frame.rest;
 
             let recordCount = 0;
+            let parseFailed = false;
             try {
                 const parsed = parseAvlRecords(frame.data);
                 recordCount = parsed.recordCount;
@@ -299,6 +300,12 @@ const server = net.createServer(socket => {
                 }
             } catch (error) {
                 console.error('Failed to process AVL data:', error);
+                parseFailed = true;
+            }
+
+            if (parseFailed) {
+                socket.destroy();
+                return;
             }
 
             const ack = Buffer.alloc(4);

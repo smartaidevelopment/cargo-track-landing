@@ -308,10 +308,26 @@
                 </div>
             </div>
 
-            <div class="dashboard-grid">
-                <div class="dashboard-card">
+            <div class="dashboard-toolbar">
+                <div class="dashboard-toolbar-left">
+                    <span class="dashboard-hint">Drag cards to reorder your dashboard.</span>
+                </div>
+                <div class="dashboard-toolbar-right">
+                    <button class="btn btn-outline btn-small" id="toggleDashboardLayout">
+                        <i class="fas fa-sliders-h"></i> Modify Layout
+                    </button>
+                </div>
+            </div>
+
+            <div class="dashboard-layout" id="dashboardLayout">
+                <div class="dashboard-card" data-layout-id="recent-activity">
                     <div class="card-header">
-                        <h2>Recent Activity</h2>
+                        <div class="card-title">
+                            <h2>Recent Activity</h2>
+                            <span class="card-drag-handle" aria-hidden="true">
+                                <i class="fas fa-grip-vertical"></i>
+                            </span>
+                        </div>
                         <button class="btn-icon">
                             <i class="fas fa-ellipsis-v"></i>
                         </button>
@@ -321,9 +337,14 @@
                     </div>
                 </div>
                 
-                <div class="dashboard-card">
+                <div class="dashboard-card" data-layout-id="temperature-monitoring">
                     <div class="card-header">
-                        <h2>Temperature Monitoring</h2>
+                        <div class="card-title">
+                            <h2>Temperature Monitoring</h2>
+                            <span class="card-drag-handle" aria-hidden="true">
+                                <i class="fas fa-grip-vertical"></i>
+                            </span>
+                        </div>
                         <button class="btn-icon">
                             <i class="fas fa-ellipsis-v"></i>
                         </button>
@@ -333,9 +354,14 @@
                     </div>
                 </div>
 
-                <div class="dashboard-card">
+                <div class="dashboard-card" data-layout-id="humidity-monitoring">
                     <div class="card-header">
-                        <h2>Humidity Monitoring</h2>
+                        <div class="card-title">
+                            <h2>Humidity Monitoring</h2>
+                            <span class="card-drag-handle" aria-hidden="true">
+                                <i class="fas fa-grip-vertical"></i>
+                            </span>
+                        </div>
                         <button class="btn-icon">
                             <i class="fas fa-ellipsis-v"></i>
                         </button>
@@ -344,36 +370,41 @@
                         <canvas id="humidityChart"></canvas>
                     </div>
                 </div>
-            </div>
 
-            <div class="dashboard-card full-width">
-                <div class="card-header">
-                    <h2>Device Status Overview</h2>
-                    <div class="card-actions">
-                        <button class="btn btn-outline btn-small">
-                            <i class="fas fa-filter"></i> Filter
-                        </button>
-                        <button class="btn btn-outline btn-small">
-                            <i class="fas fa-download"></i> Export
-                        </button>
+                <div class="dashboard-card full-width" data-layout-id="device-status">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <h2>Device Status Overview</h2>
+                            <span class="card-drag-handle" aria-hidden="true">
+                                <i class="fas fa-grip-vertical"></i>
+                            </span>
+                        </div>
+                        <div class="card-actions">
+                            <button class="btn btn-outline btn-small">
+                                <i class="fas fa-filter"></i> Filter
+                            </button>
+                            <button class="btn btn-outline btn-small">
+                                <i class="fas fa-download"></i> Export
+                            </button>
+                        </div>
                     </div>
-                </div>
-                <div class="table-container">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Device ID</th>
-                                <th>Status</th>
-                                <th>Location</th>
-                                <th>Temperature</th>
-                                <th>Last Update</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="devicesTableBody">
-                            <!-- Table rows will be populated by JS -->
-                        </tbody>
-                    </table>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Device ID</th>
+                                    <th>Status</th>
+                                    <th>Location</th>
+                                    <th>Temperature</th>
+                                    <th>Last Update</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="devicesTableBody">
+                                <!-- Table rows will be populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </section>
