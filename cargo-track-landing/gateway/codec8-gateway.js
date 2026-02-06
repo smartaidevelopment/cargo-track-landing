@@ -9,6 +9,9 @@ const INGEST_TOKEN = process.env.LTE_INGEST_TOKEN || '';
 const IO_MAP = process.env.TELTONIKA_IO_MAP
     ? JSON.parse(process.env.TELTONIKA_IO_MAP)
     : {};
+const LOG_IO = process.env.LOG_IO === '1';
+const LOG_IO_ONCE = process.env.LOG_IO_ONCE !== '0';
+const loggedImeis = new Set();
 
 if (!INGEST_URL) {
     console.error('Missing INGEST_URL (e.g. https://<domain>/api/ingest)');
@@ -25,6 +28,7 @@ function parseImeIFrame(buffer) {
     if (buffer.length < 2 + imeiLength) return null;
     const imei = buffer.slice(2, 2 + imeiLength).toString('utf8');
     const rest = buffer.slice(2 + imeiLength);
+    console.log(`Tracker connected: IMEI ${imei}`);
     return { imei, rest };
 }
 
@@ -174,9 +178,19 @@ function parseAvlRecords(data) {
         });
     }
 
-    assertReadable(data, cursor, 1, 'record count end');
-    const recordCountEnd = data.readUInt8(cursor);
+    let recordCountEnd = recordCount;
+    if (cursor + 1 <= data.length) {
+        recordCountEnd = data.readUInt8(cursor);
+    }
     return { codecId, recordCount, recordCountEnd, records };
+}
+
+function scaleIoValue(field, value) {
+    if (typeof value !== 'number') return value;
+    if (field === 'temperature' || field === 'humidity') {
+        return value / 10;
+    }
+    return value;
 }
 
 function mapIoToPayload(io) {
@@ -184,7 +198,7 @@ function mapIoToPayload(io) {
     Object.entries(IO_MAP).forEach(([key, field]) => {
         const id = parseInt(key, 10);
         if (!Number.isNaN(id) && io[id] !== undefined) {
-            mapped[field] = io[id];
+            mapped[field] = scaleIoValue(field, io[id]);
         }
     });
     return mapped;
@@ -208,8 +222,18 @@ function postToIngest(payload) {
                 }
             },
             res => {
-                res.on('data', () => {});
-                res.on('end', () => resolve(res.statusCode));
+                let responseBody = '';
+                res.on('data', chunk => {
+                    if (responseBody.length < 512) {
+                        responseBody += chunk.toString('utf8');
+                    }
+                });
+                res.on('end', () => {
+                    if (res.statusCode && res.statusCode >= 300) {
+                        console.warn(`Ingest responded ${res.statusCode}: ${responseBody}`);
+                    }
+                    resolve(res.statusCode);
+                });
             }
         );
         req.on('error', reject);
@@ -252,8 +276,13 @@ const server = net.createServer(socket => {
             try {
                 const parsed = parseAvlRecords(frame.data);
                 recordCount = parsed.recordCount;
+                console.log(`AVL records received: ${recordCount}`);
                 for (const record of parsed.records) {
                     const ioMapped = mapIoToPayload(record.io);
+                    if (LOG_IO && (!LOG_IO_ONCE || !loggedImeis.has(imei))) {
+                        console.log(`IO snapshot for ${imei}:`, record.io);
+                        loggedImeis.add(imei);
+                    }
                     const payload = {
                         deviceId: imei,
                         imei,

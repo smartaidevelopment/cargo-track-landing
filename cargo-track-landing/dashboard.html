@@ -308,41 +308,6 @@
                 </div>
             </div>
 
-            <!-- Global Live Map -->
-            <div class="dashboard-card full-width" style="margin-top: 1.5rem;">
-                <div class="card-header">
-                    <h2><i class="fas fa-globe"></i> Global Live Tracking Map</h2>
-                    <div class="card-actions">
-                        <button class="btn btn-outline btn-small" id="refreshGlobalMapBtn" title="Refresh Map">
-                            <i class="fas fa-sync-alt"></i> Refresh
-                        </button>
-                        <button class="btn btn-outline btn-small" id="toggleMapAutoRefresh" title="Auto Refresh">
-                            <i class="fas fa-play"></i> Auto Refresh
-                        </button>
-                    </div>
-                </div>
-                <div id="globalMap" class="map-container" style="height: 500px; width: 100%; border-radius: 0.5rem; overflow: hidden;"></div>
-                <div class="map-legend" style="padding: 1rem; background: #f9fafb; border-top: 1px solid #e5e7eb;">
-                    <div style="display: flex; gap: 2rem; flex-wrap: wrap; font-size: 0.875rem;">
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <div style="width: 16px; height: 16px; background: #10b981; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></div>
-                            <span>Active Tracker</span>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <div style="width: 16px; height: 16px; background: #ef4444; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></div>
-                            <span>Inactive/Alert</span>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <div style="width: 16px; height: 16px; background: #f59e0b; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></div>
-                            <span>Warning</span>
-                        </div>
-                        <div id="mapStats" style="margin-left: auto; color: var(--text-light);">
-                            <span id="mapDeviceCount">0</span> devices tracked
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <div class="dashboard-grid">
                 <div class="dashboard-card">
                     <div class="card-header">
@@ -365,6 +330,18 @@
                     </div>
                     <div class="chart-container">
                         <canvas id="temperatureChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h2>Humidity Monitoring</h2>
+                        <button class="btn-icon">
+                            <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="humidityChart"></canvas>
                     </div>
                 </div>
             </div>

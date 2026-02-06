@@ -360,8 +360,9 @@ function loadDashboardData() {
     // Update devices table
     updateDevicesTable(devices);
     
-    // Update temperature chart
+    // Update monitoring charts
     updateTemperatureChart();
+    updateHumidityChart();
 }
 
 // Live Tracking
@@ -1189,28 +1190,31 @@ function initCharts() {
     }
 }
 
-function updateTemperatureChart() {
-    const ctx = document.getElementById('temperatureChart');
-    if (!ctx) return;
-    
-    if (charts.temperature) {
-        charts.temperature.destroy();
-    }
-    
-    const devices = getDevices();
-    const labels = devices.slice(0, 7).map(d => d.name);
-    const temperatures = devices.slice(0, 7).map(d => d.temperature);
-    
-    charts.temperature = new Chart(ctx, {
-        type: 'bar',
+function createSensorChart(canvasId, label, values, color, unit) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return null;
+
+    const ctx = canvas.getContext('2d');
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height || 300);
+    gradient.addColorStop(0, color.replace('rgb', 'rgba').replace(')', ', 0.35)'));
+    gradient.addColorStop(1, color.replace('rgb', 'rgba').replace(')', ', 0)'));
+
+    return new Chart(ctx, {
+        type: 'line',
         data: {
-            labels: labels,
+            labels: values.labels,
             datasets: [{
-                label: 'Temperature (°C)',
-                data: temperatures,
-                backgroundColor: 'rgba(37, 99, 235, 0.6)',
-                borderColor: 'rgb(37, 99, 235)',
-                borderWidth: 1
+                label: `${label} (${unit})`,
+                data: values.data,
+                borderColor: color,
+                backgroundColor: gradient,
+                borderWidth: 2,
+                tension: 0.45,
+                pointRadius: 3,
+                pointHoverRadius: 5,
+                pointBackgroundColor: color,
+                fill: true,
+                spanGaps: true
             }]
         },
         options: {
@@ -1219,15 +1223,70 @@ function updateTemperatureChart() {
             plugins: {
                 legend: {
                     display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: context => `${context.parsed.y}${unit}`
+                    }
                 }
             },
             scales: {
+                x: {
+                    grid: {
+                        display: false
+                    }
+                },
                 y: {
-                    beginAtZero: false
+                    beginAtZero: false,
+                    grid: {
+                        color: 'rgba(148, 163, 184, 0.2)'
+                    }
                 }
             }
         }
     });
+}
+
+function updateTemperatureChart() {
+    const canvas = document.getElementById('temperatureChart');
+    if (!canvas) return;
+
+    if (charts.temperature) {
+        charts.temperature.destroy();
+    }
+
+    const devices = getDevices();
+    const labels = devices.slice(0, 7).map(d => d.name);
+    const data = devices.slice(0, 7).map(d => d.temperature ?? null);
+
+    charts.temperature = createSensorChart(
+        'temperatureChart',
+        'Temperature',
+        { labels, data },
+        'rgb(244, 114, 182)',
+        '°C'
+    );
+}
+
+function updateHumidityChart() {
+    const canvas = document.getElementById('humidityChart');
+    if (!canvas) return;
+
+    if (charts.humidity) {
+        charts.humidity.destroy();
+    }
+
+    const devices = getDevices();
+    const labels = devices.slice(0, 7).map(d => d.name);
+    const data = devices.slice(0, 7).map(d => d.humidity ?? null);
+
+    charts.humidity = createSensorChart(
+        'humidityChart',
+        'Humidity',
+        { labels, data },
+        'rgb(59, 130, 246)',
+        '%'
+    );
 }
 
 // 4G LTE Tracker Connection
