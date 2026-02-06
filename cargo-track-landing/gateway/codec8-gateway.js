@@ -28,47 +28,97 @@ function parseImeIFrame(buffer) {
     return { imei, rest };
 }
 
-function parseIoElement(buffer, offset) {
-    const eventIoId = buffer.readUInt8(offset);
-    const totalIo = buffer.readUInt8(offset + 1);
-    let cursor = offset + 2;
+function assertReadable(buffer, offset, length, label) {
+    if (offset + length > buffer.length) {
+        throw new RangeError(`Buffer out of range while reading ${label}`);
+    }
+}
+
+function parseIoElementWithMode(buffer, offset, isExtended) {
+    const idSize = isExtended ? 2 : 1;
+    const countSize = isExtended ? 2 : 1;
+
+    assertReadable(buffer, offset, idSize + countSize, 'IO header');
+    const eventIoId = isExtended ? buffer.readUInt16BE(offset) : buffer.readUInt8(offset);
+    const totalIo = isExtended
+        ? buffer.readUInt16BE(offset + idSize)
+        : buffer.readUInt8(offset + idSize);
+    let cursor = offset + idSize + countSize;
     const io = {};
 
     const readIoValues = (count, valueSize) => {
         for (let i = 0; i < count; i += 1) {
-            const id = buffer.readUInt8(cursor);
-            cursor += 1;
-            let value;
-            if (valueSize === 1) value = buffer.readInt8(cursor);
-            else if (valueSize === 2) value = buffer.readInt16BE(cursor);
-            else if (valueSize === 4) value = buffer.readInt32BE(cursor);
-            else value = Number(buffer.readBigInt64BE(cursor));
-            cursor += valueSize;
-            io[id] = value;
+            if (cursor + idSize + valueSize > buffer.length) {
+                cursor = buffer.length;
+                break;
+            }
+            try {
+                const id = isExtended ? buffer.readUInt16BE(cursor) : buffer.readUInt8(cursor);
+                cursor += idSize;
+                let value;
+                if (valueSize === 1) value = buffer.readInt8(cursor);
+                else if (valueSize === 2) value = buffer.readInt16BE(cursor);
+                else if (valueSize === 4) value = buffer.readInt32BE(cursor);
+                else value = Number(buffer.readBigInt64BE(cursor));
+                cursor += valueSize;
+                io[id] = value;
+            } catch (error) {
+                cursor = buffer.length;
+                break;
+            }
         }
     };
 
-    const oneByte = buffer.readUInt8(cursor);
-    cursor += 1;
-    readIoValues(oneByte, 1);
+    if (cursor + countSize <= buffer.length) {
+        const oneByte = isExtended ? buffer.readUInt16BE(cursor) : buffer.readUInt8(cursor);
+        cursor += countSize;
+        readIoValues(oneByte, 1);
+    } else {
+        return { eventIoId, totalIo, io, offset: buffer.length };
+    }
 
-    const twoByte = buffer.readUInt8(cursor);
-    cursor += 1;
-    readIoValues(twoByte, 2);
+    if (cursor + countSize <= buffer.length) {
+        const twoByte = isExtended ? buffer.readUInt16BE(cursor) : buffer.readUInt8(cursor);
+        cursor += countSize;
+        readIoValues(twoByte, 2);
+    } else {
+        return { eventIoId, totalIo, io, offset: buffer.length };
+    }
 
-    const fourByte = buffer.readUInt8(cursor);
-    cursor += 1;
-    readIoValues(fourByte, 4);
+    if (cursor + countSize <= buffer.length) {
+        const fourByte = isExtended ? buffer.readUInt16BE(cursor) : buffer.readUInt8(cursor);
+        cursor += countSize;
+        readIoValues(fourByte, 4);
+    } else {
+        return { eventIoId, totalIo, io, offset: buffer.length };
+    }
 
-    const eightByte = buffer.readUInt8(cursor);
-    cursor += 1;
-    readIoValues(eightByte, 8);
+    if (cursor + countSize <= buffer.length) {
+        const eightByte = isExtended ? buffer.readUInt16BE(cursor) : buffer.readUInt8(cursor);
+        cursor += countSize;
+        readIoValues(eightByte, 8);
+    } else {
+        return { eventIoId, totalIo, io, offset: buffer.length };
+    }
 
     return { eventIoId, totalIo, io, offset: cursor };
 }
 
+function parseIoElement(buffer, offset, codecId) {
+    const isExtended = codecId === 0x8e;
+    try {
+        return parseIoElementWithMode(buffer, offset, isExtended);
+    } catch (error) {
+        if (!isExtended) {
+            throw error;
+        }
+        return parseIoElementWithMode(buffer, offset, false);
+    }
+}
+
 function parseAvlRecords(data) {
     let cursor = 0;
+    assertReadable(data, cursor, 2, 'codec id + record count');
     const codecId = data.readUInt8(cursor);
     cursor += 1;
     const recordCount = data.readUInt8(cursor);
@@ -76,6 +126,8 @@ function parseAvlRecords(data) {
     const records = [];
 
     for (let i = 0; i < recordCount; i += 1) {
+        if (cursor + 24 > data.length) break;
+        assertReadable(data, cursor, 8 + 1 + 4 + 4 + 2 + 2 + 1 + 2, 'AVL record header');
         const timestampMs = Number(data.readBigInt64BE(cursor));
         cursor += 8;
         const priority = data.readUInt8(cursor);
@@ -94,8 +146,18 @@ function parseAvlRecords(data) {
         const speed = data.readUInt16BE(cursor);
         cursor += 2;
 
-        const { eventIoId, totalIo, io, offset } = parseIoElement(data, cursor);
-        cursor = offset;
+        let eventIoId = null;
+        let totalIo = null;
+        let io = {};
+        try {
+            const parsed = parseIoElement(data, cursor, codecId);
+            eventIoId = parsed.eventIoId;
+            totalIo = parsed.totalIo;
+            io = parsed.io;
+            cursor = parsed.offset;
+        } catch (error) {
+            cursor = data.length;
+        }
 
         records.push({
             timestamp: new Date(timestampMs).toISOString(),
@@ -112,6 +174,7 @@ function parseAvlRecords(data) {
         });
     }
 
+    assertReadable(data, cursor, 1, 'record count end');
     const recordCountEnd = data.readUInt8(cursor);
     return { codecId, recordCount, recordCountEnd, records };
 }
@@ -185,9 +248,11 @@ const server = net.createServer(socket => {
             if (!frame) break;
             buffer = frame.rest;
 
+            let recordCount = 0;
             try {
-                const { recordCount, records } = parseAvlRecords(frame.data);
-                for (const record of records) {
+                const parsed = parseAvlRecords(frame.data);
+                recordCount = parsed.recordCount;
+                for (const record of parsed.records) {
                     const ioMapped = mapIoToPayload(record.io);
                     const payload = {
                         deviceId: imei,
@@ -203,14 +268,13 @@ const server = net.createServer(socket => {
                     };
                     await postToIngest(payload);
                 }
-
-                const ack = Buffer.alloc(4);
-                ack.writeUInt32BE(recordCount, 0);
-                socket.write(ack);
             } catch (error) {
                 console.error('Failed to process AVL data:', error);
-                socket.destroy();
             }
+
+            const ack = Buffer.alloc(4);
+            ack.writeUInt32BE(recordCount, 0);
+            socket.write(ack);
         }
     });
 

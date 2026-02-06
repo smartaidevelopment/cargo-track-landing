@@ -1,6 +1,6 @@
 ## Teltonika Codec 8 TCP Gateway
 
-This gateway accepts Teltonika Codec 8 TCP packets and forwards decoded data to the HTTP ingest endpoint.
+This gateway accepts Teltonika Codec 8 / Codec 8 Extended TCP packets and forwards decoded data to the HTTP ingest endpoint.
 
 ### Prerequisites
 
@@ -22,6 +22,7 @@ npm run gateway
 ### IO Mapping
 
 `TELTONIKA_IO_MAP` maps Teltonika IO element IDs to fields your app understands.
+For Codec 8 Extended, IO IDs are 2-byte values (use the decimal ID shown in your Teltonika docs).
 
 Example:
 ```json
