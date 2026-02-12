@@ -2,15 +2,151 @@
 
 let map = null;
 let globalMap = null;
+let areasMap = null;
+let areasLayerGroup = null;
+let mapAreasLayerGroup = null;
+let globalAreasLayerGroup = null;
+let areaDraftMarker = null;
+let areaDraftCircle = null;
+let areaDraftPolygonPoints = [];
+let areaDraftPolyline = null;
+let areaDraftPolygon = null;
+let areaDraftPolygonClosed = false;
+let areaDraftPolygonMarkers = [];
 let deviceMarkers = [];
 let globalDeviceMarkers = [];
 let charts = {};
+let historyRouteLayer = null;
+let historyRouteMarkers = [];
+let historyRequestId = 0;
 let mapAutoRefreshInterval = null;
 let mapAutoRefreshEnabled = false;
 let liveLocationInterval = null;
 const LIVE_LOCATION_POLL_MS = 5000;
 const DASHBOARD_LAYOUT_KEY = 'cargotrack_dashboard_layout_v1';
 const STALE_DEVICE_MS = 2 * 60 * 1000;
+const AREAS_STORAGE_KEY = 'cargotrack_areas';
+const AREA_STATE_STORAGE_KEY = 'cargotrack_area_state';
+const ASSETS_STORAGE_KEY = 'cargotrack_assets';
+const ASSET_CATEGORY_FILTER_KEY = 'cargotrack_asset_category_filter';
+const GROUPS_STORAGE_KEY = 'cargotrack_groups';
+const USERS_STORAGE_KEY = 'cargotrack_users';
+const DEVICE_REGISTRY_KEY = 'cargotrack_device_registry';
+const LOGISTICS_STATE_KEY = 'cargotrack_logistics_state';
+const SMS_NOTIFICATIONS_KEY = 'cargotrack_sms_notifications';
+const MOBILE_PUSH_NOTIFICATIONS_KEY = 'cargotrack_mobile_push_notifications';
+const ANALYTICS_SAMPLE_INTERVAL_MS = 5 * 60 * 1000;
+const ANALYTICS_REFRESH_MS = 2 * 60 * 1000;
+const ANALYTICS_SAMPLE_ENDPOINT = '/api/analytics';
+const LOGISTICS_SWEEP_INTERVAL_MS = 60 * 1000;
+const MAX_MAP_LIST_RENDER = 300;
+const CONFIG_SECTIONS = new Set([
+    'devices-management',
+    'config-areas',
+    'config-assets',
+    'config-groups',
+    'config-users'
+]);
+const DEVICE_MODEL_PRESETS = [
+    {
+        id: 'teltonika-fmc130',
+        label: 'Teltonika FMC130 (4G LTE)',
+        networks: ['4G LTE', 'GPS/GNSS'],
+        dataFormat: 'codec8',
+        dataLogFrequency: 5000
+    },
+    {
+        id: 'teltonika-fmm130',
+        label: 'Teltonika FMM130 (LTE Cat-M1)',
+        networks: ['LTE Cat-M1', 'GPS/GNSS'],
+        dataFormat: 'codec8',
+        dataLogFrequency: 5000
+    },
+    {
+        id: 'teltonika-fmb920',
+        label: 'Teltonika FMB920 (2G)',
+        networks: ['2G', 'GPS/GNSS'],
+        dataFormat: 'codec8',
+        dataLogFrequency: 10000
+    },
+    {
+        id: 'teltonika-tat140',
+        label: 'TAT140 (4G LTE Cat 1)',
+        networks: ['4G LTE', 'GPS/GNSS', 'BLE'],
+        dataFormat: 'codec8ext',
+        dataLogFrequency: 5000
+    },
+    {
+        id: 'teltonika-tat141',
+        label: 'TAT141 (LTE Cat-M1)',
+        networks: ['LTE Cat-M1', 'GPS/GNSS', 'BLE'],
+        dataFormat: 'codec8ext',
+        dataLogFrequency: 5000
+    },
+    {
+        id: 'concox-gt06n',
+        label: 'Concox GT06N (2G)',
+        networks: ['2G', 'GPS/GNSS'],
+        dataFormat: 'binary',
+        dataLogFrequency: 10000
+    },
+    {
+        id: 'meitrack-t366g',
+        label: 'Meitrack T366G (4G LTE)',
+        networks: ['4G LTE', 'GPS/GNSS'],
+        dataFormat: 'auto',
+        dataLogFrequency: 10000
+    },
+    {
+        id: 'queclink-gv300',
+        label: 'Queclink GV300 (3G)',
+        networks: ['3G', 'GPS/GNSS'],
+        dataFormat: 'auto',
+        dataLogFrequency: 10000
+    },
+    {
+        id: 'queclink-gv500',
+        label: 'Queclink GV500 (4G LTE)',
+        networks: ['4G LTE', 'GPS/GNSS'],
+        dataFormat: 'auto',
+        dataLogFrequency: 10000
+    },
+    {
+        id: 'calamp-lmu3030',
+        label: 'CalAmp LMU-3030 (4G LTE)',
+        networks: ['4G LTE', 'GPS/GNSS'],
+        dataFormat: 'auto',
+        dataLogFrequency: 10000
+    },
+    {
+        id: 'suntech-st4300',
+        label: 'Suntech ST4300 (3G)',
+        networks: ['3G', 'GPS/GNSS'],
+        dataFormat: 'auto',
+        dataLogFrequency: 10000
+    },
+    {
+        id: 'ruptela-trace5',
+        label: 'Ruptela Trace5 (4G LTE)',
+        networks: ['4G LTE', 'GPS/GNSS'],
+        dataFormat: 'auto',
+        dataLogFrequency: 10000
+    },
+    {
+        id: 'jimi-vl110',
+        label: 'Jimi VL110 (4G LTE)',
+        networks: ['4G LTE', 'GPS/GNSS'],
+        dataFormat: 'auto',
+        dataLogFrequency: 10000
+    },
+    {
+        id: 'xirgo-xt63xx',
+        label: 'Xirgo XT63xx (4G LTE)',
+        networks: ['4G LTE', 'GPS/GNSS'],
+        dataFormat: 'auto',
+        dataLogFrequency: 10000
+    }
+];
 
 // Helper function to safely get current user
 function safeGetCurrentUser() {
@@ -26,6 +162,51 @@ function safeGetCurrentUser() {
         }
     }
     return null;
+}
+
+function isSessionTokenValid(token) {
+    if (!token || typeof token !== 'string') return false;
+    const parts = token.split('.');
+    if (parts.length !== 2) return false;
+    const body = parts[0].replace(/-/g, '+').replace(/_/g, '/');
+    const pad = body.length % 4 ? '='.repeat(4 - (body.length % 4)) : '';
+    try {
+        const claims = JSON.parse(atob(body + pad));
+        if (!claims || typeof claims !== 'object') return false;
+        if (!claims.exp || Number.isNaN(Number(claims.exp))) return false;
+        const safetyWindowMs = 30 * 1000;
+        return Number(claims.exp) > (Date.now() + safetyWindowMs);
+    } catch (error) {
+        return false;
+    }
+}
+
+async function ensureApiSessionToken(currentUser, options = {}) {
+    try {
+        const { forceRefresh = false } = options || {};
+        const existingToken = localStorage.getItem('cargotrack_session_token');
+        if (!forceRefresh && isSessionTokenValid(existingToken)) return true;
+        if (!currentUser || !currentUser.email) return false;
+        if (typeof window.requestSessionToken !== 'function') return false;
+        if (typeof window.getUsers !== 'function') return false;
+
+        const users = window.getUsers();
+        const matching = Array.isArray(users)
+            ? users.find((item) => item.email === currentUser.email)
+            : null;
+        if (!matching || !matching.password) return false;
+
+        if (forceRefresh) {
+            localStorage.removeItem('cargotrack_session_token');
+        }
+        const tokenResult = await window.requestSessionToken('user', matching.email, matching.password);
+        if (!tokenResult?.success) return false;
+        const refreshedToken = localStorage.getItem('cargotrack_session_token');
+        return isSessionTokenValid(refreshedToken);
+    } catch (error) {
+        console.warn('Failed to ensure API session token:', error);
+        return false;
+    }
 }
 
 // Skip authentication check here - it's handled by dashboard.html inline script
@@ -84,9 +265,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Show content with fade in
     document.body.classList.add('auth-verified');
-    
     // Get current user (ensure function is available)
     const currentUser = safeGetCurrentUser();
+    ensureApiSessionToken(currentUser).catch(() => {});
     if (currentUser) {
         // Update user info in sidebar
         const userNameEl = document.getElementById('userName');
@@ -133,6 +314,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initNotifications();
     initAnalytics();
     initDevicesManagement();
+    initConfigurationManagement();
     initSettings();
     initLiveLocationPolling();
     
@@ -155,6 +337,26 @@ document.addEventListener('DOMContentLoaded', function() {
     loadDashboardData();
     loadDevices();
     loadAlerts();
+    runLogisticsMonitoringSweep();
+
+    // Rehydrate once after storage sync finishes to avoid "needs refresh" first-load gaps.
+    let hasRefreshedAfterStorageSync = false;
+    const refreshAfterStorageSync = () => {
+        if (hasRefreshedAfterStorageSync) return;
+        hasRefreshedAfterStorageSync = true;
+        loadDashboardData();
+        loadDevices();
+        loadAlerts();
+        runLogisticsMonitoringSweep();
+        if (document.querySelector('#analytics.content-section.active')) {
+            renderAnalyticsCharts();
+        }
+    };
+
+    window.addEventListener('cargotrack:storage-sync-complete', refreshAfterStorageSync, { once: true });
+    if (window.CargoTrackStorageSync?.hasCompletedInitialSync?.()) {
+        refreshAfterStorageSync();
+    }
     
     // Set up auto-refresh
     setInterval(() => {
@@ -163,7 +365,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         loadDashboardData();
         loadAlerts();
+        runLogisticsMonitoringSweep();
     }, 30000); // Refresh every 30 seconds
+
+    setInterval(runLogisticsMonitoringSweep, LOGISTICS_SWEEP_INTERVAL_MS);
 });
 
 // Navigation
@@ -187,16 +392,30 @@ function setActiveSection(targetSection, options = {}) {
     sections.forEach(section => section.classList.remove('active'));
     sectionEl.classList.add('active');
 
+    // Always reset scroll position when switching sections.
+    // Main content is the active scroll container in this layout.
+    const mainContent = document.querySelector('.main-content');
+    if (mainContent && typeof mainContent.scrollTo === 'function') {
+        mainContent.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    } else if (mainContent) {
+        mainContent.scrollTop = 0;
+    }
+    sectionEl.scrollTop = 0;
+
     if (updateHash) {
         window.location.hash = sectionId;
     }
 
     const titles = {
         'dashboard': 'Dashboard',
-        'devices': 'Live Tracking',
+        'devices': 'Map',
         'alerts': 'Alerts',
         'analytics': 'Analytics',
         'devices-management': 'Devices',
+        'config-areas': 'Areas',
+        'config-assets': 'Assets',
+        'config-groups': 'Groups',
+        'config-users': 'Users',
         'privacy': 'Privacy & Data',
         'billing': 'Billing & Invoices',
         'settings': 'Settings'
@@ -209,8 +428,17 @@ function setActiveSection(targetSection, options = {}) {
     if (sectionId === 'devices' && !map) {
         initMap();
     }
-    if (sectionId === 'analytics' && Object.keys(charts).length === 0) {
-        initCharts();
+    if (sectionId === 'analytics') {
+        ensureAnalyticsChartsReady();
+    }
+    if (sectionId === 'config-areas') {
+        if (!areasMap) {
+            initAreasMap();
+        }
+        if (areasMap) {
+            setTimeout(() => areasMap.invalidateSize(), 0);
+        }
+        loadAreas();
     }
     if (sectionId === 'billing') {
         loadUserInvoices();
@@ -219,17 +447,50 @@ function setActiveSection(targetSection, options = {}) {
         loadAccountSettings();
         loadNotificationSettings();
     }
+
+    const configGroup = document.getElementById('configNavGroup');
+    const configToggle = document.querySelector('.nav-item-toggle[data-toggle="config-menu"]');
+    if (configGroup) {
+        const shouldOpen = CONFIG_SECTIONS.has(sectionId);
+        configGroup.classList.toggle('is-open', shouldOpen);
+        if (configToggle) {
+            configToggle.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+        }
+    }
+}
+
+function ensureAnalyticsChartsReady() {
+    const hasShipmentChart = !!charts.shipmentTrends;
+    const hasAlertChart = !!charts.alertDistribution;
+    if (!hasShipmentChart || !hasAlertChart) {
+        initCharts();
+        return;
+    }
+    refreshAnalyticsCharts();
 }
 
 function initNavigation() {
     const navItems = document.querySelectorAll('.nav-item');
     navItems.forEach(item => {
+        if (item.classList.contains('nav-item-toggle')) {
+            return;
+        }
         item.addEventListener('click', function(e) {
             e.preventDefault();
             const targetSection = this.getAttribute('data-section');
             setActiveSection(targetSection, { updateHash: true });
         });
     });
+
+    const configToggle = document.querySelector('.nav-item-toggle[data-toggle="config-menu"]');
+    const configGroup = document.getElementById('configNavGroup');
+    if (configToggle && configGroup) {
+        configToggle.addEventListener('click', (e) => {
+            e.preventDefault();
+            const isOpen = configGroup.classList.toggle('is-open');
+            configToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        });
+    }
 
     const initialSection = window.location.hash ? window.location.hash.slice(1) : 'dashboard';
     setActiveSection(initialSection, { updateHash: false });
@@ -325,14 +586,109 @@ function renderNotificationDropdown(alerts) {
 function initDashboard() {
     // Activity list will be populated by loadDashboardData
     initDashboardLayout();
+    initDashboardActions();
+    initOverviewNavigation();
+}
+
+function initDashboardActions() {
+    const cardMenuButtons = document.querySelectorAll('.card-menu-btn');
+    cardMenuButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const label = button.getAttribute('data-card-menu') || 'this card';
+            alert(`More actions for ${label} are coming soon.`);
+        });
+    });
+
+    const filterBtn = document.getElementById('deviceStatusFilterBtn');
+    if (filterBtn) {
+        filterBtn.addEventListener('click', () => {
+            applyDeviceStatusFilter();
+        });
+    }
+
+    const exportBtn = document.getElementById('deviceStatusExportBtn');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', () => {
+            exportDeviceStatusTable();
+        });
+    }
+
+    const searchInput = document.getElementById('deviceSearchInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            deviceSearchTerm = getDeviceSearchTerm();
+            loadDevices();
+            updateDevicesTable(getDevices());
+        });
+    }
+}
+
+function initOverviewNavigation() {
+    const goToSection = (sectionId) => {
+        if (!sectionId) return;
+        setActiveSection(sectionId, { updateHash: true });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const shortcutButtons = document.querySelectorAll('.dashboard-shortcut[data-dashboard-shortcut]');
+    shortcutButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+            goToSection(button.getAttribute('data-dashboard-shortcut'));
+        });
+    });
+
+    const overviewCards = document.querySelectorAll('.mini-stat-card[data-target-section]');
+    overviewCards.forEach((card) => {
+        const targetSection = card.getAttribute('data-target-section');
+        if (!targetSection) return;
+        card.addEventListener('click', () => {
+            goToSection(targetSection);
+        });
+        card.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                goToSection(targetSection);
+            }
+        });
+    });
+}
+
+function showToast(message, tone = 'success') {
+    if (!message) return;
+
+    let container = document.getElementById('toastContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toastContainer';
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `toast-notification ${tone || 'info'}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+
+    requestAnimationFrame(() => {
+        toast.classList.add('show');
+    });
+
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => {
+            toast.remove();
+        }, 250);
+    }, 2400);
 }
 
 function initDashboardLayout() {
     const layoutContainer = document.getElementById('dashboardLayout');
     const toggleBtn = document.getElementById('toggleDashboardLayout');
+    const resetBtn = document.getElementById('resetDashboardLayout');
     if (!layoutContainer || !toggleBtn) return;
 
     const cards = Array.from(layoutContainer.querySelectorAll('.dashboard-card[data-layout-id]'));
+    const defaultOrder = cards.map((card) => card.dataset.layoutId);
     const savedOrder = getSavedDashboardLayout();
     if (savedOrder.length) {
         applyDashboardLayout(layoutContainer, cards, savedOrder);
@@ -342,10 +698,30 @@ function initDashboardLayout() {
         const dashboardSection = document.getElementById('dashboard');
         const isEditing = dashboardSection.classList.toggle('layout-editing');
         toggleBtn.innerHTML = isEditing
-            ? '<i class="fas fa-check"></i> Done'
-            : '<i class="fas fa-sliders-h"></i> Modify Layout';
+            ? '<i class="fas fa-check"></i>'
+            : '<i class="fas fa-sliders-h"></i>';
+        toggleBtn.setAttribute(
+            'aria-label',
+            isEditing ? 'Finish layout editing' : 'Modify layout'
+        );
         setDashboardDragState(layoutContainer, isEditing);
     });
+
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+            localStorage.removeItem(DASHBOARD_LAYOUT_KEY);
+            applyDashboardLayout(layoutContainer, cards, defaultOrder);
+            const dashboardSection = document.getElementById('dashboard');
+            dashboardSection.classList.remove('layout-editing');
+            toggleBtn.innerHTML = '<i class="fas fa-sliders-h"></i>';
+            toggleBtn.setAttribute('aria-label', 'Modify layout');
+            setDashboardDragState(layoutContainer, false);
+            if (globalMap) {
+                setTimeout(() => globalMap.invalidateSize(), 50);
+            }
+            showToast('Dashboard layout reset to default.', 'success');
+        });
+    }
 
     setDashboardDragState(layoutContainer, false);
 }
@@ -425,6 +801,11 @@ function handleDashboardDrop(event) {
 function handleDashboardDragEnd(event) {
     event.currentTarget.classList.remove('dragging');
     saveDashboardLayout();
+    if (globalMap) {
+        setTimeout(() => {
+            globalMap.invalidateSize();
+        }, 50);
+    }
 }
 
 function saveDashboardLayout() {
@@ -443,37 +824,50 @@ function loadDashboardData() {
     const activeDevices = devices.filter(device => (device.status || '').toLowerCase() === 'active');
     
     // Update stats
-    document.getElementById('totalDevices').textContent = activeDevices.length;
-    document.getElementById('activeShipments').textContent = activeDevices.length;
-    document.getElementById('activeAlerts').textContent = alerts.filter(a => !a.read).length;
-    document.getElementById('completedShipments').textContent = devices.filter(d => d.status === 'completed').length;
+    const totalDevicesEl = document.getElementById('totalDevices');
+    if (totalDevicesEl) totalDevicesEl.textContent = activeDevices.length;
+    const activeShipmentsEl = document.getElementById('activeShipments');
+    if (activeShipmentsEl) activeShipmentsEl.textContent = activeDevices.length;
+    const activeAlertsEl = document.getElementById('activeAlerts');
+    if (activeAlertsEl) activeAlertsEl.textContent = alerts.filter(a => !a.read).length;
+    const completedShipmentsEl = document.getElementById('completedShipments');
+    if (completedShipmentsEl) {
+        completedShipmentsEl.textContent = devices.filter(d => d.status === 'completed').length;
+    }
     
     // Update activity list
     const activityList = document.getElementById('activityList');
-    const activities = getRecentActivities();
-    if (activities.length === 0) {
-        activityList.innerHTML = '<p class="empty-state">No activity yet</p>';
-    } else {
-        activityList.innerHTML = activities.map(activity => `
-            <div class="activity-item">
-                <div class="activity-icon" style="background: ${activity.color};">
-                    <i class="${activity.icon}"></i>
+    if (activityList) {
+        const activities = getRecentActivities();
+        if (activities.length === 0) {
+            activityList.innerHTML = '<p class="empty-state">No activity yet</p>';
+        } else {
+            activityList.innerHTML = activities.map(activity => `
+                <div class="activity-item">
+                    <div class="activity-icon" style="background: ${activity.color};">
+                        <i class="${activity.icon}"></i>
+                    </div>
+                    <div class="activity-content">
+                        <h4>${activity.title}</h4>
+                        <p>${activity.description}</p>
+                    </div>
+                    <div class="activity-time">${activity.time}</div>
                 </div>
-                <div class="activity-content">
-                    <h4>${activity.title}</h4>
-                    <p>${activity.description}</p>
-                </div>
-                <div class="activity-time">${activity.time}</div>
-            </div>
-        `).join('');
+            `).join('');
+        }
     }
     
     // Update devices table
     updateDevicesTable(devices);
+    refreshHistoryDeviceOptions();
     
     // Update monitoring charts
     updateTemperatureChart();
     updateHumidityChart();
+    updateBatteryChart();
+    recordAnalyticsSample(devices, alerts);
+    updateAnalyticsMetrics(devices, alerts);
+    refreshAnalyticsCharts();
 }
 
 // Live Tracking
@@ -482,6 +876,27 @@ function initLiveTracking() {
     if (refreshBtn) {
         refreshBtn.addEventListener('click', function() {
             updateMap();
+        });
+    }
+
+    const mapSearchInput = document.getElementById('mapDeviceSearch');
+    if (mapSearchInput) {
+        mapSearchInput.addEventListener('input', () => {
+            loadDevices();
+        });
+    }
+
+    const mapStatusFilter = document.getElementById('mapDeviceStatusFilter');
+    if (mapStatusFilter) {
+        mapStatusFilter.addEventListener('change', () => {
+            loadDevices();
+        });
+    }
+
+    const mapSortSelect = document.getElementById('mapDeviceSort');
+    if (mapSortSelect) {
+        mapSortSelect.addEventListener('change', () => {
+            loadDevices();
         });
     }
 }
@@ -496,7 +911,37 @@ function initLiveLocationPolling() {
 
 async function fetchLiveLocations() {
     try {
-        const response = await fetch('/api/locations', { cache: 'no-store' });
+        const currentUser = safeGetCurrentUser();
+        const hasSession = await ensureApiSessionToken(currentUser);
+        if (!hasSession) {
+            return;
+        }
+        const registryIds = Array.from(getDeviceRegistry());
+        const knownIds = new Set(registryIds);
+        const devices = getDevices();
+        devices.forEach((device) => {
+            if (device?.id) knownIds.add(device.id);
+            if (device?.lte?.imei) knownIds.add(device.lte.imei);
+        });
+        const idsQuery = Array.from(knownIds).filter(Boolean).join(',');
+        const endpoint = idsQuery ? `/api/locations?ids=${encodeURIComponent(idsQuery)}` : '/api/locations';
+        const response = await fetch(endpoint, {
+            cache: 'no-store',
+            headers: getApiAuthHeaders()
+        });
+        if (response.status === 401) {
+            const refreshed = await ensureApiSessionToken(currentUser, { forceRefresh: true });
+            if (!refreshed) return;
+            const retryResponse = await fetch(endpoint, {
+                cache: 'no-store',
+                headers: getApiAuthHeaders()
+            });
+            if (!retryResponse.ok) return;
+            const retryData = await retryResponse.json();
+            if (!retryData || !Array.isArray(retryData.devices)) return;
+            mergeLiveLocations(retryData.devices);
+            return;
+        }
         if (!response.ok) return;
         const data = await response.json();
         if (!data || !Array.isArray(data.devices)) return;
@@ -510,11 +955,13 @@ function normalizeLivePayload(live) {
     const latitude = live.latitude ?? live.lat;
     const longitude = live.longitude ?? live.lng;
     return {
-        deviceId: live.deviceId || live.id,
+        deviceId: live.deviceId || live.id || live.imei,
         latitude: Number.isFinite(parseFloat(latitude)) ? parseFloat(latitude) : null,
         longitude: Number.isFinite(parseFloat(longitude)) ? parseFloat(longitude) : null,
         temperature: live.temperature ?? null,
         humidity: live.humidity ?? null,
+        collision: live.collision ?? live.collisionG ?? live.impact ?? null,
+        tilt: live.tilt ?? live.tiltAngle ?? null,
         battery: live.battery ?? null,
         rssi: live.rssi ?? null,
         accuracy: live.accuracy ?? null,
@@ -523,20 +970,43 @@ function normalizeLivePayload(live) {
     };
 }
 
+function updateDeviceSensorValue(device, type, value) {
+    if (!device || value === null || value === undefined) return;
+    if (!Array.isArray(device.sensors)) {
+        device.sensors = [];
+    }
+    const sensor = device.sensors.find((item) => item.type === type);
+    if (sensor) {
+        sensor.value = value;
+    } else {
+        device.sensors.push({
+            type,
+            name: type === 'temperature' ? 'Temperature Sensor' : 'Humidity Sensor',
+            unit: type === 'temperature' ? '°C' : '%',
+            description: type === 'temperature' ? 'Ambient temperature monitoring' : 'Relative humidity monitoring',
+            value
+        });
+    }
+}
+
 function mergeLiveLocations(liveDevices) {
     if (!Array.isArray(liveDevices) || liveDevices.length === 0) return;
 
-    const blockedIds = getBlockedDeviceIds();
     const devices = getDevices();
+    const currentUser = safeGetCurrentUser();
     const deviceIndex = new Map(devices.map(device => [device.id, device]));
+    const imeiIndex = new Map(
+        devices
+            .filter(device => device.lte && device.lte.imei)
+            .map(device => [device.lte.imei, device])
+    );
     let hasUpdates = false;
 
     liveDevices.forEach(live => {
         const normalized = normalizeLivePayload(live);
         if (!normalized.deviceId) return;
-        if (blockedIds.has(normalized.deviceId)) return;
 
-        let device = deviceIndex.get(normalized.deviceId);
+        let device = deviceIndex.get(normalized.deviceId) || imeiIndex.get(normalized.deviceId);
         if (!device) {
             device = {
                 id: normalized.deviceId,
@@ -547,10 +1017,20 @@ function mergeLiveLocations(liveDevices) {
                 networks: ['4G LTE', 'GPS/GNSS'],
                 sensors: [],
                 lastUpdate: null,
+                ownerId: currentUser ? currentUser.id : null,
+                lte: {
+                    imei: normalized.deviceId
+                },
                 createdAt: new Date().toISOString()
             };
             devices.push(device);
             deviceIndex.set(normalized.deviceId, device);
+            registerDeviceIds([normalized.deviceId]);
+        }
+        if (!device.lte) {
+            device.lte = { imei: normalized.deviceId };
+        } else if (!device.lte.imei) {
+            device.lte.imei = normalized.deviceId;
         }
 
         if (hasValidCoordinates(normalized.latitude, normalized.longitude)) {
@@ -559,9 +1039,17 @@ function mergeLiveLocations(liveDevices) {
         }
         if (normalized.temperature !== null && normalized.temperature !== undefined) {
             device.temperature = normalized.temperature;
+            updateDeviceSensorValue(device, 'temperature', normalized.temperature);
         }
         if (normalized.humidity !== null && normalized.humidity !== undefined) {
             device.humidity = normalized.humidity;
+            updateDeviceSensorValue(device, 'humidity', normalized.humidity);
+        }
+        if (normalized.collision !== null && normalized.collision !== undefined) {
+            device.collision = normalized.collision;
+        }
+        if (normalized.tilt !== null && normalized.tilt !== undefined) {
+            device.tilt = normalized.tilt;
         }
         if (normalized.battery !== null && normalized.battery !== undefined) {
             device.battery = normalized.battery;
@@ -579,6 +1067,10 @@ function mergeLiveLocations(liveDevices) {
         device.lastUpdate = normalized.timestamp;
         device.status = 'active';
 
+        if (currentUser && !device.ownerId) {
+            device.ownerId = currentUser.id;
+        }
+
         if (!device.tracker) {
             device.tracker = {};
         }
@@ -589,7 +1081,15 @@ function mergeLiveLocations(liveDevices) {
         if (normalized.satellites !== null && normalized.satellites !== undefined) {
             device.tracker.satellites = normalized.satellites;
         }
+        if (normalized.collision !== null && normalized.collision !== undefined) {
+            device.tracker.collision = normalized.collision;
+        }
+        if (normalized.tilt !== null && normalized.tilt !== undefined) {
+            device.tracker.tilt = normalized.tilt;
+        }
 
+        updateAreaAlerts(device);
+        evaluateDeviceLogisticsConditions(device);
         hasUpdates = true;
     });
 
@@ -606,15 +1106,29 @@ function mergeLiveLocations(liveDevices) {
     }
 }
 
+function createMapBaseLayers() {
+    return {
+        'Basic': L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '© OpenStreetMap contributors © CARTO'
+        }),
+        'Streets': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }),
+        'Topography': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors © OpenTopoMap'
+        })
+    };
+}
+
 function initMap() {
     const mapElement = document.getElementById('map');
     if (!mapElement || map) return;
     
     map = L.map('map').setView([40.7128, -74.0060], 2);
-    
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
+    const baseLayers = createMapBaseLayers();
+    baseLayers.Basic.addTo(map);
+    L.control.layers(baseLayers, null, { position: 'topright' }).addTo(map);
+    mapAreasLayerGroup = L.layerGroup().addTo(map);
     
     updateMap();
 }
@@ -626,17 +1140,17 @@ function initGlobalMap() {
     
     // Initialize global map
     globalMap = L.map('globalMap').setView([20, 0], 2);
-    
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors',
-        maxZoom: 19
-    }).addTo(globalMap);
+    const baseLayers = createMapBaseLayers();
+    baseLayers.Basic.addTo(globalMap);
+    L.control.layers(baseLayers, null, { position: 'topright' }).addTo(globalMap);
+    globalAreasLayerGroup = L.layerGroup().addTo(globalMap);
     
     // Refresh button
     const refreshBtn = document.getElementById('refreshGlobalMapBtn');
     if (refreshBtn) {
         refreshBtn.addEventListener('click', function() {
             updateGlobalMap();
+            showToast('Live map refreshed.', 'success');
         });
     }
     
@@ -650,6 +1164,7 @@ function initGlobalMap() {
     
     // Initial map update
     updateGlobalMap();
+    initHistoryControls();
 }
 
 function toggleMapAutoRefresh() {
@@ -688,6 +1203,7 @@ function updateGlobalMap() {
         });
     }
     globalDeviceMarkers = [];
+    renderAreasInLayerGroup(globalAreasLayerGroup);
     
     const getDevicesFn = window.getDevices || (typeof getDevices !== 'undefined' ? getDevices : null);
     if (!getDevicesFn) return;
@@ -756,14 +1272,237 @@ function updateGlobalMap() {
         deviceCountEl.textContent = deviceCount;
     }
     
-    // Fit map to show all markers
-    if (globalDeviceMarkers.length > 0) {
-        const group = L.featureGroup(globalDeviceMarkers);
+    // Fit map to show device markers and area overlays
+    const globalAreaLayers = globalAreasLayerGroup ? globalAreasLayerGroup.getLayers() : [];
+    const globalFitLayers = [...globalDeviceMarkers, ...globalAreaLayers];
+    if (globalFitLayers.length > 0) {
+        const group = L.featureGroup(globalFitLayers);
         globalMap.fitBounds(group.getBounds().pad(0.1));
     } else {
         // Default view if no devices
         globalMap.setView([20, 0], 2);
     }
+}
+
+function initHistoryControls() {
+    const deviceSelect = document.getElementById('historyDeviceSelect');
+    const rangeSelect = document.getElementById('historyRangeSelect');
+    const startInput = document.getElementById('historyStart');
+    const endInput = document.getElementById('historyEnd');
+    const applyBtn = document.getElementById('historyApplyBtn');
+    const clearBtn = document.getElementById('historyClearBtn');
+    if (!deviceSelect || !rangeSelect || !startInput || !endInput || !applyBtn || !clearBtn) {
+        return;
+    }
+
+    refreshHistoryDeviceOptions();
+    syncHistoryRangeInputs();
+
+    rangeSelect.addEventListener('change', () => {
+        syncHistoryRangeInputs();
+    });
+
+    applyBtn.addEventListener('click', () => {
+        applyHistoryRoute();
+    });
+
+    clearBtn.addEventListener('click', () => {
+        clearHistoryRoute();
+        setHistoryStatus('Route cleared.', 'success');
+    });
+}
+
+function refreshHistoryDeviceOptions() {
+    const deviceSelect = document.getElementById('historyDeviceSelect');
+    if (!deviceSelect) return;
+    const devices = getDevices();
+    const current = deviceSelect.value;
+    const options = devices.map(device => `
+        <option value="${device.id}">${device.name || device.id}</option>
+    `).join('');
+    deviceSelect.innerHTML = options || '<option value="">No devices</option>';
+    if (current && devices.some(device => device.id === current)) {
+        deviceSelect.value = current;
+    }
+}
+
+function syncHistoryRangeInputs() {
+    const rangeSelect = document.getElementById('historyRangeSelect');
+    const startInput = document.getElementById('historyStart');
+    const endInput = document.getElementById('historyEnd');
+    const customStart = document.getElementById('historyCustomStart');
+    const customEnd = document.getElementById('historyCustomEnd');
+    if (!rangeSelect || !startInput || !endInput || !customStart || !customEnd) {
+        return;
+    }
+
+    const range = rangeSelect.value;
+    const now = new Date();
+    let from = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    if (range === '7d') {
+        from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    } else if (range === '30d') {
+        from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    } else if (range === '90d') {
+        from = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+    }
+
+    const isCustom = range === 'custom';
+    customStart.classList.toggle('is-visible', isCustom);
+    customEnd.classList.toggle('is-visible', isCustom);
+
+    if (!isCustom) {
+        startInput.value = toLocalDatetimeValue(from);
+        endInput.value = toLocalDatetimeValue(now);
+    } else {
+        if (!startInput.value) startInput.value = toLocalDatetimeValue(from);
+        if (!endInput.value) endInput.value = toLocalDatetimeValue(now);
+    }
+}
+
+function toLocalDatetimeValue(date) {
+    const pad = value => String(value).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function setHistoryStatus(message, tone) {
+    const statusEl = document.getElementById('historyStatus');
+    if (statusEl) {
+        statusEl.textContent = '';
+        statusEl.classList.remove('error', 'success');
+    }
+    if (message) {
+        const toastTone = tone === 'error'
+            ? 'error'
+            : tone === 'success'
+                ? 'success'
+                : tone === 'warning'
+                    ? 'warning'
+                    : 'info';
+        showToast(message, toastTone);
+    }
+}
+
+function applyHistoryRoute() {
+    const deviceSelect = document.getElementById('historyDeviceSelect');
+    const rangeSelect = document.getElementById('historyRangeSelect');
+    const startInput = document.getElementById('historyStart');
+    const endInput = document.getElementById('historyEnd');
+    if (!deviceSelect || !rangeSelect || !startInput || !endInput) return;
+
+    const deviceId = deviceSelect.value;
+    if (!deviceId) {
+        setHistoryStatus('Select a device to view history.', 'error');
+        return;
+    }
+
+    let from = new Date(startInput.value);
+    let to = new Date(endInput.value);
+    if (rangeSelect.value !== 'custom') {
+        const now = new Date();
+        to = now;
+        if (rangeSelect.value === '7d') {
+            from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        } else if (rangeSelect.value === '30d') {
+            from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        } else if (rangeSelect.value === '90d') {
+            from = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+        } else {
+            from = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        }
+    }
+
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from > to) {
+        setHistoryStatus('Select a valid time range.', 'error');
+        return;
+    }
+
+    fetchHistoryRoute(deviceId, from, to);
+}
+
+async function fetchHistoryRoute(deviceId, from, to) {
+    if (!globalMap) return;
+    const requestId = ++historyRequestId;
+    setHistoryStatus('Loading route...', '');
+    try {
+        const params = new URLSearchParams({
+            deviceId,
+            from: from.toISOString(),
+            to: to.toISOString(),
+            limit: '5000'
+        });
+        const response = await fetch(`/api/history?${params.toString()}`, {
+            cache: 'no-store',
+            headers: getApiAuthHeaders()
+        });
+        if (!response.ok) {
+            setHistoryStatus('Failed to load history.', 'error');
+            return;
+        }
+        const data = await response.json();
+        if (requestId !== historyRequestId) return;
+        const points = Array.isArray(data.points) ? data.points : [];
+        if (points.length === 0) {
+            clearHistoryRoute();
+            setHistoryStatus('No history points in this range.', 'error');
+            return;
+        }
+        drawHistoryRoute(points);
+        setHistoryStatus(`Showing ${points.length} points.`, 'success');
+    } catch (error) {
+        console.warn('History fetch failed:', error);
+        setHistoryStatus('Failed to load history.', 'error');
+    }
+}
+
+function drawHistoryRoute(points) {
+    if (!globalMap || !Array.isArray(points)) return;
+    clearHistoryRoute();
+    const latLngs = points
+        .map(point => [point.latitude, point.longitude])
+        .filter(coords => hasValidCoordinates(coords[0], coords[1]));
+    if (latLngs.length === 0) {
+        setHistoryStatus('No valid coordinates in history.', 'error');
+        return;
+    }
+
+    historyRouteLayer = L.polyline(latLngs, {
+        color: '#3b82f6',
+        weight: 3,
+        opacity: 0.9
+    }).addTo(globalMap);
+
+    const startMarker = L.circleMarker(latLngs[0], {
+        radius: 6,
+        color: '#16a34a',
+        fillColor: '#16a34a',
+        fillOpacity: 0.9
+    }).addTo(globalMap);
+    const endMarker = L.circleMarker(latLngs[latLngs.length - 1], {
+        radius: 6,
+        color: '#ef4444',
+        fillColor: '#ef4444',
+        fillOpacity: 0.9
+    }).addTo(globalMap);
+    historyRouteMarkers = [startMarker, endMarker];
+
+    globalMap.fitBounds(historyRouteLayer.getBounds().pad(0.2));
+}
+
+function clearHistoryRoute() {
+    if (historyRouteLayer && globalMap) {
+        globalMap.removeLayer(historyRouteLayer);
+    }
+    historyRouteLayer = null;
+    if (historyRouteMarkers.length && globalMap) {
+        historyRouteMarkers.forEach(marker => {
+            if (marker && globalMap.hasLayer(marker)) {
+                globalMap.removeLayer(marker);
+            }
+        });
+    }
+    historyRouteMarkers = [];
 }
 
 function updateMap() {
@@ -772,6 +1511,7 @@ function updateMap() {
     // Clear existing markers
     deviceMarkers.forEach(marker => map.removeLayer(marker));
     deviceMarkers = [];
+    renderAreasInLayerGroup(mapAreasLayerGroup);
     
     const getDevicesFn = window.getDevices || (typeof getDevices !== 'undefined' ? getDevices : null);
     if (!getDevicesFn) return;
@@ -793,9 +1533,11 @@ function updateMap() {
         }
     });
     
-    // Fit map to show all markers
-    if (deviceMarkers.length > 0) {
-        const group = L.featureGroup(deviceMarkers);
+    // Fit map to show markers and area overlays
+    const liveAreaLayers = mapAreasLayerGroup ? mapAreasLayerGroup.getLayers() : [];
+    const liveFitLayers = [...deviceMarkers, ...liveAreaLayers];
+    if (liveFitLayers.length > 0) {
+        const group = L.featureGroup(liveFitLayers);
         map.fitBounds(group.getBounds().pad(0.1));
     }
 }
@@ -805,9 +1547,15 @@ let selectedDeviceId = null;
 let editingDeviceId = null;
 
 function initDevicesManagement() {
-    document.getElementById('addDeviceBtn').addEventListener('click', function() {
-        showDeviceForm();
-    });
+    const addDeviceBtn = document.getElementById('addDeviceBtn');
+    if (addDeviceBtn) {
+        addDeviceBtn.addEventListener('click', function() {
+            showDeviceForm();
+        });
+    }
+
+    initDeviceModelSelect();
+    refreshDeviceGroupOptions();
     
     // Modal close handlers
     document.getElementById('closeModal').addEventListener('click', function() {
@@ -838,48 +1586,1097 @@ function initDevicesManagement() {
     });
 }
 
+function initDeviceModelSelect() {
+    const modelInput = document.getElementById('deviceModel');
+    const modelOptions = document.getElementById('deviceModelOptions');
+    if (!modelInput || !modelOptions) return;
+
+    modelOptions.innerHTML = DEVICE_MODEL_PRESETS.map(preset => `
+        <option value="${preset.label}"></option>
+    `).join('');
+
+    modelInput.addEventListener('change', () => {
+        const preset = DEVICE_MODEL_PRESETS.find(item => item.label === modelInput.value);
+        applyDeviceModelPreset(preset ? preset.id : '');
+    });
+}
+
+// Configuration (Groups / Users)
+function initConfigurationManagement() {
+    const areaForm = document.getElementById('areaForm');
+    const assetForm = document.getElementById('assetForm');
+    const groupForm = document.getElementById('groupForm');
+    const userForm = document.getElementById('userForm');
+    const addAreaBtn = document.getElementById('addAreaBtn');
+    const addAssetBtn = document.getElementById('addAssetBtn');
+    const addGroupBtn = document.getElementById('addGroupBtn');
+    const addUserBtn = document.getElementById('addUserBtn');
+
+    if (addAreaBtn) {
+        addAreaBtn.addEventListener('click', () => {
+            const input = document.getElementById('areaName');
+            if (input) {
+                input.focus();
+            }
+        });
+    }
+
+    if (addAssetBtn) {
+        addAssetBtn.addEventListener('click', () => {
+            const input = document.getElementById('assetName');
+            if (input) {
+                input.focus();
+            }
+        });
+    }
+
+    if (addGroupBtn) {
+        addGroupBtn.addEventListener('click', () => {
+            const input = document.getElementById('groupName');
+            if (input) {
+                input.focus();
+            }
+        });
+    }
+
+    if (addUserBtn) {
+        addUserBtn.addEventListener('click', () => {
+            const input = document.getElementById('userNameInput');
+            if (input) {
+                input.focus();
+            }
+        });
+    }
+
+    if (areaForm) {
+        areaForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            saveAreaFromForm();
+        });
+    }
+    const areaRadiusInput = document.getElementById('areaRadius');
+    if (areaRadiusInput) {
+        areaRadiusInput.addEventListener('input', () => {
+            if (areaDraftMarker) {
+                updateAreaDraftCircle(areaDraftMarker.getLatLng());
+            }
+        });
+    }
+    const areaShapeSelect = document.getElementById('areaShape');
+    if (areaShapeSelect) {
+        areaShapeSelect.addEventListener('change', () => {
+            syncAreaShapeControls();
+            clearAreaDraft();
+        });
+    }
+    const polygonStartBtn = document.getElementById('polygonStartBtn');
+    if (polygonStartBtn) {
+        polygonStartBtn.addEventListener('click', () => {
+            areaDraftPolygonPoints = [];
+            areaDraftPolygonClosed = false;
+            renderPolygonDraft();
+            updateAreaCenterDisplay();
+        });
+    }
+    const polygonFinishBtn = document.getElementById('polygonFinishBtn');
+    if (polygonFinishBtn) {
+        polygonFinishBtn.addEventListener('click', () => {
+            if (areaDraftPolygonPoints.length < 3) {
+                alert('Add at least 3 points to finish the polygon.');
+                return;
+            }
+            areaDraftPolygonClosed = true;
+            renderPolygonDraft();
+            updateAreaCenterDisplay();
+        });
+    }
+    const polygonUndoBtn = document.getElementById('polygonUndoBtn');
+    if (polygonUndoBtn) {
+        polygonUndoBtn.addEventListener('click', () => {
+            if (!areaDraftPolygonPoints.length) return;
+            areaDraftPolygonPoints.pop();
+            areaDraftPolygonClosed = false;
+            renderPolygonDraft();
+            updateAreaCenterDisplay();
+        });
+    }
+    const polygonClearBtn = document.getElementById('polygonClearBtn');
+    if (polygonClearBtn) {
+        polygonClearBtn.addEventListener('click', () => {
+            clearAreaDraft();
+        });
+    }
+
+    if (assetForm) {
+        assetForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            saveAssetFromForm();
+        });
+    }
+    const assetCategoryFilter = document.getElementById('assetCategoryFilter');
+    if (assetCategoryFilter) {
+        assetCategoryFilter.addEventListener('change', () => {
+            localStorage.setItem(ASSET_CATEGORY_FILTER_KEY, assetCategoryFilter.value);
+            loadAssets();
+        });
+    }
+
+    if (groupForm) {
+        groupForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            saveGroupFromForm();
+        });
+    }
+
+    if (userForm) {
+        userForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            saveUserFromForm();
+        });
+    }
+
+    initAreasMap();
+    syncAreaShapeControls();
+    loadAreas();
+    loadAssets();
+    loadGroups();
+    loadUsers();
+}
+
+function initAreasMap() {
+    const mapElement = document.getElementById('areasMap');
+    if (!mapElement || areasMap) return;
+
+    areasMap = L.map('areasMap').setView([20, 0], 2);
+    const baseLayers = createMapBaseLayers();
+    baseLayers.Basic.addTo(areasMap);
+    L.control.layers(baseLayers, null, { position: 'topright' }).addTo(areasMap);
+    areasLayerGroup = L.layerGroup().addTo(areasMap);
+
+    areasMap.on('click', event => {
+        const shape = getAreaShape();
+        if (shape === 'polygon') {
+            areaDraftPolygonPoints.push([event.latlng.lat, event.latlng.lng]);
+            areaDraftPolygonClosed = false;
+            renderPolygonDraft();
+            updateAreaCenterDisplay();
+            return;
+        }
+        setAreaDraftCenter(event.latlng);
+    });
+}
+
+function setAreaDraftCenter(latlng) {
+    if (!areasMap) return;
+    if (areaDraftMarker) {
+        areaDraftMarker.setLatLng(latlng);
+    } else {
+        areaDraftMarker = L.marker(latlng).addTo(areasMap);
+    }
+    updateAreaDraftCircle(latlng);
+    updateAreaCenterDisplay();
+}
+
+function updateAreaDraftCircle(latlng) {
+    if (getAreaShape() !== 'circle') return;
+    const radiusInput = document.getElementById('areaRadius');
+    const radiusMeters = radiusInput ? Number(radiusInput.value) : 0;
+    if (!Number.isFinite(radiusMeters) || radiusMeters <= 0) return;
+    if (areaDraftCircle) {
+        areaDraftCircle.setLatLng(latlng);
+        areaDraftCircle.setRadius(radiusMeters);
+    } else {
+        areaDraftCircle = L.circle(latlng, {
+            radius: radiusMeters,
+            color: '#2563eb',
+            fillColor: '#3b82f6',
+            fillOpacity: 0.2
+        }).addTo(areasMap);
+    }
+}
+
+function renderPolygonDraft() {
+    if (!areasMap) return;
+    if (areaDraftPolyline) {
+        areaDraftPolyline.remove();
+        areaDraftPolyline = null;
+    }
+    if (areaDraftPolygon) {
+        areaDraftPolygon.remove();
+        areaDraftPolygon = null;
+    }
+    areaDraftPolygonMarkers.forEach(marker => marker.remove());
+    areaDraftPolygonMarkers = [];
+    if (areaDraftPolygonPoints.length === 0) return;
+    areaDraftPolygonPoints.forEach((point, index) => {
+        const marker = L.marker(point, { draggable: true }).addTo(areasMap);
+        marker.on('drag', event => {
+            const latlng = event.target.getLatLng();
+            areaDraftPolygonPoints[index] = [latlng.lat, latlng.lng];
+            renderPolygonDraft();
+            updateAreaCenterDisplay();
+        });
+        marker.on('click', () => {
+            if (index === 0 && areaDraftPolygonPoints.length >= 3) {
+                areaDraftPolygonClosed = true;
+                renderPolygonDraft();
+                updateAreaCenterDisplay();
+            }
+        });
+        areaDraftPolygonMarkers.push(marker);
+    });
+    if (areaDraftPolygonClosed) {
+        areaDraftPolygon = L.polygon(areaDraftPolygonPoints, {
+            color: '#2563eb',
+            fillColor: '#3b82f6',
+            fillOpacity: 0.2
+        }).addTo(areasMap);
+    } else {
+        areaDraftPolyline = L.polyline(areaDraftPolygonPoints, {
+            color: '#2563eb'
+        }).addTo(areasMap);
+    }
+}
+
+function updateAreaCenterDisplay() {
+    const display = document.getElementById('areaCenterDisplay');
+    if (!display) return;
+    const shape = getAreaShape();
+    if (shape === 'polygon') {
+        if (areaDraftPolygonPoints.length === 0) {
+            display.value = '';
+            return;
+        }
+        const centroid = getPolygonCentroid(areaDraftPolygonPoints);
+        display.value = `${centroid.lat.toFixed(5)}, ${centroid.lng.toFixed(5)}`;
+        return;
+    }
+    if (areaDraftMarker) {
+        const center = areaDraftMarker.getLatLng();
+        display.value = `${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}`;
+    } else {
+        display.value = '';
+    }
+}
+
+function getPolygonCentroid(points) {
+    if (!points.length) return { lat: 0, lng: 0 };
+    const sum = points.reduce(
+        (acc, point) => ({ lat: acc.lat + point[0], lng: acc.lng + point[1] }),
+        { lat: 0, lng: 0 }
+    );
+    return { lat: sum.lat / points.length, lng: sum.lng / points.length };
+}
+
+function getAreaShape() {
+    const select = document.getElementById('areaShape');
+    return select ? select.value : 'circle';
+}
+
+function syncAreaShapeControls() {
+    const shape = getAreaShape();
+    const radiusGroup = document.getElementById('areaRadiusGroup');
+    const radiusInput = document.getElementById('areaRadius');
+    const polygonControls = document.getElementById('areaPolygonControls');
+    if (radiusGroup) {
+        radiusGroup.style.display = shape === 'circle' ? 'block' : 'none';
+    }
+    if (radiusInput) {
+        radiusInput.required = shape === 'circle';
+    }
+    if (polygonControls) {
+        polygonControls.style.display = shape === 'polygon' ? 'block' : 'none';
+    }
+}
+
+function clearAreaDraft() {
+    if (areaDraftMarker) {
+        areaDraftMarker.remove();
+        areaDraftMarker = null;
+    }
+    if (areaDraftCircle) {
+        areaDraftCircle.remove();
+        areaDraftCircle = null;
+    }
+    if (areaDraftPolyline) {
+        areaDraftPolyline.remove();
+        areaDraftPolyline = null;
+    }
+    if (areaDraftPolygon) {
+        areaDraftPolygon.remove();
+        areaDraftPolygon = null;
+    }
+    areaDraftPolygonMarkers.forEach(marker => marker.remove());
+    areaDraftPolygonMarkers = [];
+    areaDraftPolygonPoints = [];
+    areaDraftPolygonClosed = false;
+    const display = document.getElementById('areaCenterDisplay');
+    if (display) display.value = '';
+}
+
+function getAreas() {
+    const stored = localStorage.getItem(AREAS_STORAGE_KEY);
+    if (!stored) return [];
+    try {
+        const parsed = JSON.parse(stored);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+        console.warn('Failed to parse areas:', error);
+        return [];
+    }
+}
+
+function saveAreas(areas) {
+    localStorage.setItem(AREAS_STORAGE_KEY, JSON.stringify(areas));
+}
+
+function getAssets() {
+    const stored = localStorage.getItem(ASSETS_STORAGE_KEY);
+    if (!stored) return [];
+    try {
+        const parsed = JSON.parse(stored);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+        console.warn('Failed to parse assets:', error);
+        return [];
+    }
+}
+
+function saveAssets(assets) {
+    localStorage.setItem(ASSETS_STORAGE_KEY, JSON.stringify(assets));
+}
+
+function refreshDeviceAssetOptions(assets = null) {
+    const deviceAssetList = document.getElementById('deviceAssetList');
+    if (!deviceAssetList) return;
+    const assetList = Array.isArray(assets) ? assets : getAssets();
+    const names = Array.from(
+        new Set(
+            assetList
+                .map(asset => (asset?.name || '').toString().trim())
+                .filter(Boolean)
+        )
+    ).sort((a, b) => a.localeCompare(b));
+    deviceAssetList.innerHTML = names
+        .map(name => `<option value="${name}"></option>`)
+        .join('');
+}
+
+function ensureAssetExists(assetName, category = '') {
+    const normalizedName = (assetName || '').toString().trim();
+    if (!normalizedName) return false;
+
+    const assets = getAssets();
+    const alreadyExists = assets.some(asset => (
+        (asset.name || '').toString().trim().toLowerCase() === normalizedName.toLowerCase()
+    ));
+    if (alreadyExists) {
+        return false;
+    }
+
+    assets.push({
+        id: `asset-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        name: normalizedName,
+        category: (category || '').toString().trim(),
+        createdAt: new Date().toISOString()
+    });
+    saveAssets(assets);
+    return true;
+}
+
+function saveAreaFromForm() {
+    const nameInput = document.getElementById('areaName');
+    const typeSelect = document.getElementById('areaType');
+    const radiusInput = document.getElementById('areaRadius');
+    if (!nameInput) return;
+
+    const name = nameInput.value.trim();
+    const type = typeSelect ? typeSelect.value : 'Custom';
+    const radiusMeters = radiusInput ? Number(radiusInput.value) : 0;
+    const shape = getAreaShape();
+    if (!name) {
+        alert('Please enter an area name.');
+        nameInput.focus();
+        return;
+    }
+    if (shape === 'circle' && !areaDraftMarker) {
+        alert('Please click on the map to set the area center.');
+        return;
+    }
+    if (shape === 'circle' && (!Number.isFinite(radiusMeters) || radiusMeters <= 0)) {
+        alert('Please enter a valid radius in meters.');
+        if (radiusInput) radiusInput.focus();
+        return;
+    }
+    if (shape === 'polygon') {
+        if (areaDraftPolygonPoints.length < 3) {
+            alert('Please add at least 3 polygon points.');
+            return;
+        }
+        if (!areaDraftPolygonClosed) {
+            alert('Click Finish to close the polygon before saving.');
+            return;
+        }
+    }
+
+    const areas = getAreas();
+    const exists = areas.some(area => area.name.toLowerCase() === name.toLowerCase());
+    if (exists) {
+        alert('An area with this name already exists.');
+        nameInput.focus();
+        return;
+    }
+
+    const center = shape === 'circle'
+        ? { lat: areaDraftMarker.getLatLng().lat, lng: areaDraftMarker.getLatLng().lng }
+        : getPolygonCentroid(areaDraftPolygonPoints);
+    areas.push({
+        id: `area-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        name,
+        type,
+        shape,
+        center,
+        radiusMeters: shape === 'circle' ? radiusMeters : null,
+        polygon: shape === 'polygon' ? areaDraftPolygonPoints : null,
+        createdAt: new Date().toISOString()
+    });
+
+    saveAreas(areas);
+    nameInput.value = '';
+    if (typeSelect) typeSelect.value = 'Warehouse';
+    if (radiusInput) radiusInput.value = '';
+    clearAreaDraft();
+    loadAreas();
+}
+
+function saveAssetFromForm() {
+    const nameInput = document.getElementById('assetName');
+    const categoryInput = document.getElementById('assetCategory');
+    if (!nameInput) return;
+
+    const name = nameInput.value.trim();
+    const category = categoryInput ? categoryInput.value.trim() : '';
+    if (!name) {
+        alert('Please enter an asset name.');
+        nameInput.focus();
+        return;
+    }
+
+    const assets = getAssets();
+    const exists = assets.some(asset => asset.name.toLowerCase() === name.toLowerCase());
+    if (exists) {
+        alert('An asset with this name already exists.');
+        nameInput.focus();
+        return;
+    }
+
+    assets.push({
+        id: `asset-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        name,
+        category,
+        createdAt: new Date().toISOString()
+    });
+
+    saveAssets(assets);
+    nameInput.value = '';
+    if (categoryInput) categoryInput.value = '';
+    loadAssets();
+}
+
+function loadAreas() {
+    const tableBody = document.getElementById('areasTableBody');
+    if (!tableBody) return;
+
+    const areas = getAreas();
+    if (areas.length === 0) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="7" class="empty-state">No areas configured yet.</td>
+            </tr>
+        `;
+        renderAreasOnMap([]);
+        renderAreasInLayerGroup(mapAreasLayerGroup, []);
+        renderAreasInLayerGroup(globalAreasLayerGroup, []);
+        populateDeviceAreaOptions();
+        return;
+    }
+
+    tableBody.innerHTML = areas.map(area => `
+        <tr>
+            <td>${area.name}</td>
+            <td>${area.type || 'Custom'}</td>
+            <td>${area.shape === 'polygon' ? 'Polygon' : 'Circle'}</td>
+            <td>${area.shape === 'polygon'
+                ? `${area.polygon ? area.polygon.length : 0} pts`
+                : (area.radiusMeters ? `${Math.round(area.radiusMeters)} m` : '—')}</td>
+            <td>${area.center ? `${area.center.lat.toFixed(4)}, ${area.center.lng.toFixed(4)}` : '—'}</td>
+            <td>${formatDate(area.createdAt)}</td>
+            <td>
+                <button class="btn btn-outline btn-small" onclick="focusAreaOnMap('${area.id}')" title="View on map">
+                    <i class="fas fa-map-marked-alt"></i>
+                </button>
+                <button class="btn btn-outline btn-small" onclick="deleteArea('${area.id}')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+
+    renderAreasOnMap(areas);
+    renderAreasInLayerGroup(mapAreasLayerGroup, areas);
+    renderAreasInLayerGroup(globalAreasLayerGroup, areas);
+    populateDeviceAreaOptions();
+}
+
+function renderAreasInLayerGroup(layerGroup, areas = null) {
+    if (!layerGroup) return;
+    const areaList = Array.isArray(areas) ? areas : getAreas();
+    layerGroup.clearLayers();
+    areaList.forEach(area => {
+        if (area.shape === 'polygon' && Array.isArray(area.polygon) && area.polygon.length >= 3) {
+            L.polygon(area.polygon, {
+                color: '#16a34a',
+                fillColor: '#22c55e',
+                fillOpacity: 0.15
+            }).addTo(layerGroup).bindPopup(`${area.name} (Polygon)`);
+            return;
+        }
+        if (!area.center || !area.radiusMeters) return;
+        L.circle(area.center, {
+            radius: area.radiusMeters,
+            color: '#16a34a',
+            fillColor: '#22c55e',
+            fillOpacity: 0.15
+        }).addTo(layerGroup).bindPopup(`${area.name} (${Math.round(area.radiusMeters)} m)`);
+    });
+}
+
+function renderAreasOnMap(areas) {
+    if (!areasMap || !areasLayerGroup) return;
+    renderAreasInLayerGroup(areasLayerGroup, areas);
+}
+
+function focusAreaOnMap(areaId) {
+    const areas = getAreas();
+    const area = areas.find(item => item.id === areaId);
+    if (!area) return;
+    if (!areasMap) {
+        initAreasMap();
+    }
+    if (!areasMap) return;
+
+    areasMap.invalidateSize();
+    if (area.shape === 'polygon' && Array.isArray(area.polygon) && area.polygon.length >= 3) {
+        const bounds = L.polygon(area.polygon).getBounds();
+        areasMap.fitBounds(bounds, { padding: [20, 20] });
+        return;
+    }
+    if (!area.center || !area.radiusMeters) return;
+    const bounds = L.circle(area.center, { radius: area.radiusMeters }).getBounds();
+    areasMap.fitBounds(bounds, { padding: [20, 20] });
+}
+
+function getAreaById(areaId) {
+    const normalizedId = (areaId || '').toString().trim();
+    if (!normalizedId) return null;
+    const areas = getAreas();
+    return areas.find(area => area.id === normalizedId) || null;
+}
+
+function getContainingAreaForCoordinates(latitude, longitude, areas = null) {
+    if (!hasValidCoordinates(latitude, longitude)) return null;
+    const areaList = Array.isArray(areas) ? areas : getAreas();
+    for (const area of areaList) {
+        let inside = false;
+        if (area.shape === 'polygon' && Array.isArray(area.polygon) && area.polygon.length >= 3) {
+            inside = isPointInPolygon({ lat: latitude, lng: longitude }, area.polygon);
+        } else if (area.center && area.radiusMeters) {
+            const distance = getDistanceMeters(
+                { lat: latitude, lng: longitude },
+                area.center
+            );
+            inside = distance <= area.radiusMeters;
+        }
+        if (inside) {
+            return area;
+        }
+    }
+    return null;
+}
+
+function populateDeviceAreaOptions({ startAreaId = '', destinationAreaId = '', device = null } = {}) {
+    const startSelect = document.getElementById('logisticsStartAreaId');
+    const destinationSelect = document.getElementById('logisticsDestinationAreaId');
+    const currentAreaInput = document.getElementById('logisticsCurrentArea');
+    if (!startSelect && !destinationSelect && !currentAreaInput) return;
+
+    const areas = getAreas();
+    const options = areas
+        .map(area => `<option value="${area.id}">${area.name}</option>`)
+        .join('');
+
+    if (startSelect) {
+        startSelect.innerHTML = `<option value="">Select start area</option>${options}`;
+        startSelect.value = areas.some(area => area.id === startAreaId) ? startAreaId : '';
+    }
+
+    if (destinationSelect) {
+        destinationSelect.innerHTML = `<option value="">Select destination area</option>${options}`;
+        destinationSelect.value = areas.some(area => area.id === destinationAreaId) ? destinationAreaId : '';
+    }
+
+    if (currentAreaInput) {
+        const currentArea = device
+            ? getContainingAreaForCoordinates(device.latitude, device.longitude, areas)
+            : null;
+        currentAreaInput.value = currentArea ? currentArea.name : 'Outside saved areas';
+    }
+}
+
+function loadAssets() {
+    const tableBody = document.getElementById('assetsTableBody');
+    const assets = getAssets();
+    refreshDeviceAssetOptions(assets);
+    if (!tableBody) return;
+    const categoryFilter = document.getElementById('assetCategoryFilter');
+    const categoryDatalist = document.getElementById('assetCategoryList');
+    const categories = Array.from(
+        new Set(
+            assets
+                .map(asset => (asset.category || '').trim())
+                .filter(category => category.length)
+        )
+    ).sort((a, b) => a.localeCompare(b));
+
+    if (categoryFilter) {
+        const savedFilter = localStorage.getItem(ASSET_CATEGORY_FILTER_KEY) || 'all';
+        categoryFilter.innerHTML = [
+            '<option value="all">All categories</option>',
+            ...categories.map(category => `<option value="${category}">${category}</option>`)
+        ].join('');
+        categoryFilter.value = categories.includes(savedFilter) ? savedFilter : 'all';
+    }
+
+    if (categoryDatalist) {
+        categoryDatalist.innerHTML = categories
+            .map(category => `<option value="${category}"></option>`)
+            .join('');
+    }
+
+    const selectedCategory = categoryFilter ? categoryFilter.value : 'all';
+    const visibleAssets = selectedCategory === 'all'
+        ? assets
+        : assets.filter(asset => (asset.category || '').trim() === selectedCategory);
+
+    if (assets.length === 0) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="4" class="empty-state">No assets configured yet.</td>
+            </tr>
+        `;
+        return;
+    }
+    if (visibleAssets.length === 0) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="4" class="empty-state">No assets in this category.</td>
+            </tr>
+        `;
+        return;
+    }
+
+    tableBody.innerHTML = visibleAssets.map(asset => `
+        <tr>
+            <td>${asset.name}</td>
+            <td>${asset.category || '—'}</td>
+            <td>${formatDate(asset.createdAt)}</td>
+            <td>
+                <button class="btn btn-outline btn-small" onclick="deleteAsset('${asset.id}')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function deleteArea(areaId) {
+    const areas = getAreas();
+    const area = areas.find(item => item.id === areaId);
+    if (!area) return;
+
+    if (!confirm(`Delete area "${area.name}"?`)) {
+        return;
+    }
+
+    const updatedAreas = areas.filter(item => item.id !== areaId);
+    saveAreas(updatedAreas);
+    loadAreas();
+    pruneAreaState(areaId);
+    populateDeviceAreaOptions();
+}
+
+function deleteAsset(assetId) {
+    const assets = getAssets();
+    const asset = assets.find(item => item.id === assetId);
+    if (!asset) return;
+
+    if (!confirm(`Delete asset "${asset.name}"?`)) {
+        return;
+    }
+
+    const updatedAssets = assets.filter(item => item.id !== assetId);
+    saveAssets(updatedAssets);
+    loadAssets();
+}
+
+function getGroups() {
+    const stored = localStorage.getItem(GROUPS_STORAGE_KEY);
+    if (!stored) return [];
+    try {
+        const parsed = JSON.parse(stored);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+        console.warn('Failed to parse groups:', error);
+        return [];
+    }
+}
+
+function saveGroups(groups) {
+    localStorage.setItem(GROUPS_STORAGE_KEY, JSON.stringify(groups));
+}
+
+function getUsers() {
+    const stored = localStorage.getItem(USERS_STORAGE_KEY);
+    if (!stored) return [];
+    try {
+        const parsed = JSON.parse(stored);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+        console.warn('Failed to parse users:', error);
+        return [];
+    }
+}
+
+function saveUsers(users) {
+    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
+}
+
+function saveGroupFromForm() {
+    const nameInput = document.getElementById('groupName');
+    const descriptionInput = document.getElementById('groupDescription');
+    if (!nameInput) return;
+
+    const name = nameInput.value.trim();
+    const description = descriptionInput ? descriptionInput.value.trim() : '';
+    if (!name) {
+        alert('Please enter a group name.');
+        nameInput.focus();
+        return;
+    }
+
+    const groups = getGroups();
+    const exists = groups.some(group => group.name.toLowerCase() === name.toLowerCase());
+    if (exists) {
+        alert('A group with this name already exists.');
+        nameInput.focus();
+        return;
+    }
+
+    groups.push({
+        id: `group-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        name,
+        description,
+        createdAt: new Date().toISOString()
+    });
+
+    saveGroups(groups);
+    if (descriptionInput) descriptionInput.value = '';
+    nameInput.value = '';
+    loadGroups();
+    loadUsers();
+}
+
+function saveUserFromForm() {
+    const nameInput = document.getElementById('userNameInput');
+    const emailInput = document.getElementById('userEmailInput');
+    const roleSelect = document.getElementById('userRole');
+    const groupSelect = document.getElementById('userGroupSelect');
+    if (!nameInput || !emailInput) return;
+
+    const name = nameInput.value.trim();
+    const email = emailInput.value.trim();
+    const role = roleSelect ? roleSelect.value : 'Viewer';
+    const groupId = groupSelect ? groupSelect.value : '';
+
+    if (!name) {
+        alert('Please enter the user name.');
+        nameInput.focus();
+        return;
+    }
+    if (!email || !email.includes('@')) {
+        alert('Please enter a valid email address.');
+        emailInput.focus();
+        return;
+    }
+
+    const users = getUsers();
+    const exists = users.some(user => user.email.toLowerCase() === email.toLowerCase());
+    if (exists) {
+        alert('A user with this email already exists.');
+        emailInput.focus();
+        return;
+    }
+
+    users.push({
+        id: `user-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        name,
+        email,
+        role,
+        groupId: groupId || '',
+        createdAt: new Date().toISOString()
+    });
+
+    saveUsers(users);
+    nameInput.value = '';
+    emailInput.value = '';
+    if (roleSelect) roleSelect.value = 'Viewer';
+    if (groupSelect) groupSelect.value = '';
+    loadUsers();
+}
+
+function loadGroups() {
+    const tableBody = document.getElementById('groupsTableBody');
+    if (!tableBody) return;
+
+    const groups = getGroups();
+    if (groups.length === 0) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="4" class="empty-state">No groups configured yet.</td>
+            </tr>
+        `;
+    } else {
+        tableBody.innerHTML = groups.map(group => `
+            <tr>
+                <td>${group.name}</td>
+                <td>${group.description || '—'}</td>
+                <td>${formatDate(group.createdAt)}</td>
+                <td>
+                    <button class="btn btn-outline btn-small" onclick="deleteGroup('${group.id}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    refreshUserGroupOptions(groups);
+    refreshDeviceGroupOptions(groups);
+}
+
+function refreshUserGroupOptions(groups = null) {
+    const select = document.getElementById('userGroupSelect');
+    if (!select) return;
+
+    const list = groups || getGroups();
+    const current = select.value;
+    select.innerHTML = `<option value="">Unassigned</option>` + list.map(group => `
+        <option value="${group.id}">${group.name}</option>
+    `).join('');
+
+    if (current) {
+        select.value = current;
+    }
+}
+
+function refreshDeviceGroupOptions(groups = null) {
+    const listEl = document.getElementById('deviceGroupOptions');
+    if (!listEl) return;
+
+    const list = groups || getGroups();
+    listEl.innerHTML = list.map(group => `
+        <option value="${group.name}"></option>
+    `).join('');
+
+    refreshAnalyticsGroupOptions(list);
+}
+
+function loadUsers() {
+    const tableBody = document.getElementById('usersTableBody');
+    if (!tableBody) return;
+
+    const users = getUsers();
+    const groups = getGroups();
+    const groupLookup = new Map(groups.map(group => [group.id, group.name]));
+
+    if (users.length === 0) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="6" class="empty-state">No users configured yet.</td>
+            </tr>
+        `;
+    } else {
+        tableBody.innerHTML = users.map(user => `
+            <tr>
+                <td>${user.name}</td>
+                <td>${user.email}</td>
+                <td>${user.role || 'Viewer'}</td>
+                <td>${groupLookup.get(user.groupId) || 'Unassigned'}</td>
+                <td>${formatDate(user.createdAt)}</td>
+                <td>
+                    <button class="btn btn-outline btn-small" onclick="deleteUser('${user.id}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+}
+
+function deleteGroup(groupId) {
+    const groups = getGroups();
+    const group = groups.find(item => item.id === groupId);
+    if (!group) return;
+
+    if (!confirm(`Delete group "${group.name}"?`)) {
+        return;
+    }
+
+    const updatedGroups = groups.filter(item => item.id !== groupId);
+    saveGroups(updatedGroups);
+
+    const users = getUsers();
+    const updatedUsers = users.map(user => (
+        user.groupId === groupId ? { ...user, groupId: '' } : user
+    ));
+    saveUsers(updatedUsers);
+
+    loadGroups();
+    loadUsers();
+}
+
+function deleteUser(userId) {
+    const users = getUsers();
+    const user = users.find(item => item.id === userId);
+    if (!user) return;
+
+    if (!confirm(`Delete user "${user.name}"?`)) {
+        return;
+    }
+
+    const updatedUsers = users.filter(item => item.id !== userId);
+    saveUsers(updatedUsers);
+    loadUsers();
+}
+
+function applyDeviceModelPreset(presetId) {
+    if (!presetId) return;
+    const preset = DEVICE_MODEL_PRESETS.find(item => item.id === presetId);
+    if (!preset) return;
+
+    if (preset.deviceType) {
+        setDeviceTypeSelect(preset.deviceType);
+    } else {
+        setDeviceTypeSelect('Tracker');
+    }
+
+    if (preset.networks && preset.networks.length) {
+        const networkCheckboxes = document.querySelectorAll('input[name="networks"]');
+        networkCheckboxes.forEach(checkbox => {
+            checkbox.checked = preset.networks.includes(checkbox.value);
+        });
+    }
+
+    if (preset.sensors && preset.sensors.length) {
+        const sensorCheckboxes = document.querySelectorAll('input[name="sensors"]');
+        sensorCheckboxes.forEach(checkbox => {
+            checkbox.checked = preset.sensors.includes(checkbox.value);
+        });
+    }
+
+    if (preset.dataFormat) {
+        document.getElementById('lteDataFormat').value = preset.dataFormat;
+    }
+    if (preset.dataLogFrequency) {
+        document.getElementById('lteDataLogFrequency').value = preset.dataLogFrequency;
+    }
+    if (preset.gpsStatus) {
+        document.getElementById('gpsStatus').value = preset.gpsStatus;
+    }
+}
+
 function loadDevices() {
     const devices = getDevices();
+    const searchedDevices = filterDevicesBySearch(devices);
+    const mapFilteredDevices = getMapFilteredDevices(searchedDevices);
+    const renderableMapDevices = mapFilteredDevices.slice(0, MAX_MAP_LIST_RENDER);
     
     // Update device list
     const deviceList = document.getElementById('deviceList');
     if (deviceList) {
-        deviceList.innerHTML = devices.map(device => {
+        if (!renderableMapDevices.length) {
+            deviceList.innerHTML = '<p class="empty-state">No devices match the current map filters.</p>';
+        } else {
+            const itemsHtml = renderableMapDevices.map(device => {
             const connection = getConnectionStatus(device);
+            const batteryValue = Number(device.battery);
+            const batteryText = Number.isFinite(batteryValue) ? `${batteryValue.toFixed(0)}%` : 'N/A';
+            const safeId = String(device.id || '').replace(/'/g, "\\'");
+            const selectedClass = selectedDeviceId === device.id ? ' selected' : '';
             return `
-            <div class="device-item" data-device-id="${device.id}" onclick="selectDevice('${device.id}')">
-                <div class="device-item-header">
-                    <span class="device-item-name">${device.name}</span>
+            <div class="device-item${selectedClass}" data-device-id="${device.id}" onclick="selectDevice('${safeId}')">
+                <div class="device-item-top">
+                    <div class="device-item-main">
+                        <span class="device-item-name">${device.name || device.id}</span>
+                        <span class="device-item-id">${device.id}</span>
+                    </div>
                     <span class="status-badge ${connection.className}">${connection.label}</span>
                 </div>
-            <div class="device-item-info">
-                <span><i class="fas fa-thermometer-half"></i> ${device.temperature !== null && device.temperature !== undefined ? device.temperature + '°C' : 'N/A'}</span>
-                <span><i class="fas fa-map-marker-alt"></i> ${device.location || 'Unknown'}</span>
-            </div>
+                <div class="device-item-info">
+                    <span><i class="fas fa-thermometer-half"></i> ${device.temperature !== null && device.temperature !== undefined ? device.temperature + '°C' : 'N/A'}</span>
+                    <span><i class="fas fa-battery-half"></i> ${batteryText}</span>
+                    <span><i class="fas fa-clock"></i> ${getLastSeenText(device)}</span>
+                </div>
+                <div class="device-item-submeta">
+                    <span><i class="fas fa-map-marker-alt"></i> ${device.location || 'Unknown'}</span>
+                    <span><i class="fas fa-layer-group"></i> ${device.group || 'Ungrouped'}</span>
+                </div>
             </div>
         `;
-        }).join('');
+            }).join('');
+
+            const overflowHint = mapFilteredDevices.length > MAX_MAP_LIST_RENDER
+                ? `<div class="device-list-overflow-hint">Showing ${MAX_MAP_LIST_RENDER} of ${mapFilteredDevices.length} devices. Narrow filters to find specific devices faster.</div>`
+                : '';
+            deviceList.innerHTML = `${itemsHtml}${overflowHint}`;
+        }
+    }
+
+    const mapCountEl = document.getElementById('mapDeviceListCount');
+    if (mapCountEl) {
+        mapCountEl.textContent = `${mapFilteredDevices.length}/${searchedDevices.length}`;
     }
     
     // Update management table
     const tableBody = document.getElementById('devicesManagementTableBody');
     if (tableBody) {
-        tableBody.innerHTML = devices.map(device => {
-            const networks = device.networks || [];
+        tableBody.innerHTML = searchedDevices.map(device => {
             const sensors = device.sensors || [];
-            const networkDisplay = networks.length > 0 ? networks.slice(0, 2).join(', ') + (networks.length > 2 ? '...' : '') : 'N/A';
             const sensorCount = sensors.length;
-            
+            const connection = getConnectionStatus(device);
+            const lastSeen = getLastSeenText(device);
+            const batteryValue = Number(device.battery);
+            const batteryText = Number.isFinite(batteryValue) ? `${batteryValue.toFixed(1)}%` : 'N/A';
+
             return `
                 <tr>
                     <td>${device.id}</td>
                     <td>${device.name}</td>
                     <td>${device.type || 'Standard'}</td>
-                    <td><span class="status-badge ${device.status}">${device.status}</span></td>
-                    <td><span class="network-badge">${networkDisplay}</span></td>
+                    <td><span class="status-badge ${connection.className}">${connection.label}</span></td>
                     <td>${sensorCount} sensor${sensorCount !== 1 ? 's' : ''}</td>
-                    <td>${(safeGetCurrentUser()?.package) || 'Professional'}</td>
-                    <td>${formatDate(device.createdAt)}</td>
+                    <td>${batteryText}</td>
+                    <td>${lastSeen}</td>
                     <td>
                         <button class="btn btn-outline btn-small" onclick="viewFullDeviceDetails('${device.id}')" title="View Details">
                             <i class="fas fa-eye"></i>
@@ -895,6 +2692,77 @@ function loadDevices() {
             `;
         }).join('');
     }
+}
+
+function getMapDeviceFilterState() {
+    const searchInput = document.getElementById('mapDeviceSearch');
+    const statusSelect = document.getElementById('mapDeviceStatusFilter');
+    const sortSelect = document.getElementById('mapDeviceSort');
+    return {
+        search: searchInput ? searchInput.value.trim().toLowerCase() : '',
+        status: statusSelect ? statusSelect.value : 'all',
+        sort: sortSelect ? sortSelect.value : 'lastSeenDesc'
+    };
+}
+
+function matchesMapDeviceFilter(device, filterState) {
+    if (!device) return false;
+    if (filterState.search && !matchesDeviceSearch(device, filterState.search)) {
+        return false;
+    }
+    if (!filterState.status || filterState.status === 'all') {
+        return true;
+    }
+    const connection = getConnectionStatus(device);
+    if (filterState.status === 'connected') {
+        return connection.label === 'Connected';
+    }
+    if (filterState.status === 'stale') {
+        return connection.label === 'Stale';
+    }
+    if (filterState.status === 'not-connected') {
+        return connection.label === 'Not connected';
+    }
+    if (filterState.status === 'warning') {
+        return connection.className === 'warning';
+    }
+    return true;
+}
+
+function getLastSeenTimestamp(device) {
+    const value = device?.lastUpdate || device?.updatedAt || device?.tracker?.lastFix || null;
+    const timestamp = new Date(value).getTime();
+    return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function getNumericDeviceValue(value, fallback = -1) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function sortMapDevices(devices, sortMode) {
+    const list = Array.isArray(devices) ? [...devices] : [];
+    if (sortMode === 'nameAsc') {
+        list.sort((a, b) => String(a.name || a.id || '').localeCompare(String(b.name || b.id || '')));
+        return list;
+    }
+    if (sortMode === 'batteryDesc') {
+        list.sort((a, b) => getNumericDeviceValue(b.battery) - getNumericDeviceValue(a.battery));
+        return list;
+    }
+    if (sortMode === 'tempDesc') {
+        list.sort((a, b) => getNumericDeviceValue(b.temperature) - getNumericDeviceValue(a.temperature));
+        return list;
+    }
+    list.sort((a, b) => getLastSeenTimestamp(b) - getLastSeenTimestamp(a));
+    return list;
+}
+
+function getMapFilteredDevices(devices) {
+    if (!Array.isArray(devices)) return [];
+    const filterState = getMapDeviceFilterState();
+    const filtered = devices.filter(device => matchesMapDeviceFilter(device, filterState));
+    return sortMapDevices(filtered, filterState.sort);
 }
 
 function selectDevice(deviceId) {
@@ -925,6 +2793,17 @@ function selectDevice(deviceId) {
     if (details) {
         const connectionStatus = getConnectionStatus(device);
         const lastSeenText = getLastSeenText(device);
+        const telemetryTemperature = toFiniteNumber(device.temperature);
+        const telemetryHumidity = getDeviceHumidityTelemetry(device);
+        const telemetryBattery = toFiniteNumber(device.battery);
+        const hasTelemetryCoordinates = hasValidCoordinates(device.latitude, device.longitude);
+        const telemetryLocationText = hasTelemetryCoordinates
+            ? `${Number(device.latitude).toFixed(5)}, ${Number(device.longitude).toFixed(5)}`
+            : 'Not reported by tracker';
+        const telemetryTimestamp = device.lastUpdate || device.updatedAt || device?.tracker?.lastFix || null;
+        const telemetryLastUpdateText = telemetryTimestamp
+            ? formatTime(telemetryTimestamp)
+            : 'Not reported by tracker';
         details.innerHTML = `
             <div class="detail-item">
                 <span class="detail-label">Device ID:</span>
@@ -948,23 +2827,23 @@ function selectDevice(deviceId) {
             </div>
             <div class="detail-item">
                 <span class="detail-label">Temperature:</span>
-                <span class="detail-value">${device.temperature !== null && device.temperature !== undefined ? device.temperature + '°C' : 'N/A'}</span>
+                <span class="detail-value">${telemetryTemperature !== null ? `${telemetryTemperature}°C` : 'Not reported by tracker'}</span>
             </div>
             <div class="detail-item">
                 <span class="detail-label">Humidity:</span>
-                <span class="detail-value">${device.humidity !== null && device.humidity !== undefined ? device.humidity + '%' : 'N/A'}</span>
+                <span class="detail-value">${telemetryHumidity !== null ? `${telemetryHumidity}%` : 'Not reported by tracker'}</span>
             </div>
             <div class="detail-item">
                 <span class="detail-label">Location:</span>
-                <span class="detail-value">${device.location || 'Unknown'}</span>
+                <span class="detail-value">${telemetryLocationText}</span>
             </div>
             <div class="detail-item">
                 <span class="detail-label">Last Update:</span>
-                <span class="detail-value">${device.lastUpdate ? formatTime(device.lastUpdate) : 'No data yet'}</span>
+                <span class="detail-value">${telemetryLastUpdateText}</span>
             </div>
             <div class="detail-item">
                 <span class="detail-label">Battery:</span>
-                <span class="detail-value">${device.battery !== null && device.battery !== undefined ? device.battery + '%' : 'N/A'}</span>
+                <span class="detail-value">${telemetryBattery !== null ? `${telemetryBattery}%` : 'Not reported by tracker'}</span>
             </div>
         `;
     }
@@ -994,6 +2873,18 @@ function viewFullDeviceDetails(deviceId) {
     const modalBody = document.getElementById('deviceModalBody');
     const connectionStatus = getConnectionStatus(device);
     const lastSeenText = getLastSeenText(device);
+    const batteryLevelText = Number.isFinite(Number(device.battery))
+        ? `${Number(device.battery).toFixed(1)}%`
+        : 'Not reported by tracker';
+    const firmwareText = device.firmware && String(device.firmware).trim()
+        ? String(device.firmware)
+        : 'Not reported by tracker';
+    const uptimeText = device.uptime && String(device.uptime).trim()
+        ? String(device.uptime)
+        : 'Not reported by tracker';
+    const dataTransmittedText = device.dataTransmitted && String(device.dataTransmitted).trim()
+        ? String(device.dataTransmitted)
+        : 'Not reported by tracker';
     modalBody.innerHTML = `
         <div class="device-details-grid">
             <!-- Basic Information -->
@@ -1155,19 +3046,19 @@ function viewFullDeviceDetails(deviceId) {
             <h3><i class="fas fa-battery-full"></i> Device Status</h3>
             <div class="detail-item">
                 <span class="detail-label">Battery Level:</span>
-                <span class="detail-value">${device.battery || 'N/A'}%</span>
+                <span class="detail-value">${batteryLevelText}</span>
             </div>
             <div class="detail-item">
                 <span class="detail-label">Firmware Version:</span>
-                <span class="detail-value">${device.firmware || 'v1.0.0'}</span>
+                <span class="detail-value">${firmwareText}</span>
             </div>
             <div class="detail-item">
                 <span class="detail-label">Uptime:</span>
-                <span class="detail-value">${device.uptime || 'N/A'}</span>
+                <span class="detail-value">${uptimeText}</span>
             </div>
             <div class="detail-item">
                 <span class="detail-label">Data Transmitted:</span>
-                <span class="detail-value">${device.dataTransmitted || '0 MB'}</span>
+                <span class="detail-value">${dataTransmittedText}</span>
             </div>
         </div>
         
@@ -1189,16 +3080,85 @@ function viewFullDeviceDetails(deviceId) {
 }
 
 // Alerts
+const DEFAULT_ALERT_FILTERS = {
+    severity: 'all',
+    status: 'all',
+    query: ''
+};
+let alertFilters = { ...DEFAULT_ALERT_FILTERS };
+
 function initAlerts() {
     document.getElementById('markAllReadBtn').addEventListener('click', function() {
         markAllAlertsRead();
         loadAlerts();
         loadDashboardData();
     });
+
+    const severityFilter = document.getElementById('alertsSeverityFilter');
+    const statusFilter = document.getElementById('alertsStatusFilter');
+    const searchFilter = document.getElementById('alertsSearchFilter');
+    const clearFiltersBtn = document.getElementById('clearAlertsFilterBtn');
+
+    if (severityFilter) {
+        severityFilter.addEventListener('change', function () {
+            alertFilters.severity = severityFilter.value || 'all';
+            loadAlerts();
+        });
+    }
+    if (statusFilter) {
+        statusFilter.addEventListener('change', function () {
+            alertFilters.status = statusFilter.value || 'all';
+            loadAlerts();
+        });
+    }
+    if (searchFilter) {
+        searchFilter.addEventListener('input', function () {
+            alertFilters.query = (searchFilter.value || '').trim().toLowerCase();
+            loadAlerts();
+        });
+    }
+    if (clearFiltersBtn) {
+        clearFiltersBtn.addEventListener('click', function () {
+            alertFilters = { ...DEFAULT_ALERT_FILTERS };
+            if (severityFilter) severityFilter.value = DEFAULT_ALERT_FILTERS.severity;
+            if (statusFilter) statusFilter.value = DEFAULT_ALERT_FILTERS.status;
+            if (searchFilter) searchFilter.value = DEFAULT_ALERT_FILTERS.query;
+            loadAlerts();
+        });
+    }
+}
+
+function filterAlerts(alerts) {
+    if (!Array.isArray(alerts) || alerts.length === 0) return [];
+    return alerts.filter(alert => {
+        if (!alert) return false;
+
+        if (alertFilters.severity !== 'all' && (alert.severity || 'info') !== alertFilters.severity) {
+            return false;
+        }
+
+        if (alertFilters.status === 'read' && !alert.read) {
+            return false;
+        }
+        if (alertFilters.status === 'unread' && alert.read) {
+            return false;
+        }
+
+        if (alertFilters.query) {
+            const title = (alert.title || '').toLowerCase();
+            const message = (alert.message || '').toLowerCase();
+            if (!title.includes(alertFilters.query) && !message.includes(alertFilters.query)) {
+                return false;
+            }
+        }
+
+        return true;
+    });
 }
 
 function loadAlerts() {
     const alerts = getAlerts();
+    const filteredAlerts = filterAlerts(alerts);
     const unreadCount = alerts.filter(a => !a.read).length;
     
     // Update badge
@@ -1212,8 +3172,13 @@ function loadAlerts() {
         container.innerHTML = '<p class="empty-state">No alerts at this time</p>';
         return;
     }
-    
-    container.innerHTML = alerts.map(alert => `
+
+    if (filteredAlerts.length === 0) {
+        container.innerHTML = '<p class="empty-state">No alerts match current filters</p>';
+        return;
+    }
+
+    container.innerHTML = filteredAlerts.map(alert => `
         <div class="alert-item ${alert.severity} ${alert.read ? '' : 'unread'}" onclick="markAlertRead('${alert.id}')">
             <div class="alert-icon">
                 <i class="${alert.icon}"></i>
@@ -1245,21 +3210,472 @@ function markAllAlertsRead() {
 }
 
 // Analytics
-function initAnalytics() {
-    // Charts will be initialized when analytics section is viewed
+let analyticsSamplesCache = [];
+let analyticsSamplesCacheKey = '';
+let analyticsSamplesFetchedAt = 0;
+let lastAnalyticsSampleTs = 0;
+
+function getAnalyticsAuthToken() {
+    if (typeof window !== 'undefined' && window.ANALYTICS_TOKEN) {
+        return window.ANALYTICS_TOKEN;
+    }
+    const stored = localStorage.getItem('cargotrack_analytics_token');
+    return stored || '';
 }
 
-function initCharts() {
+function getAnalyticsAuthHeaders() {
+    const token = getAnalyticsAuthToken();
+    if (!token) return {};
+    return {
+        Authorization: `Bearer ${token}`
+    };
+}
+
+async function fetchAnalyticsSamples(range) {
+    const authHeaders = getAnalyticsAuthHeaders();
+    if (!authHeaders.Authorization) {
+        return analyticsSamplesCache;
+    }
+    const rangeMs = range.bucketMs * range.count;
+    const now = Date.now();
+    const endTimeMs = range.endTime ? range.endTime.getTime() : now;
+    const cacheKey = `${rangeMs}:${endTimeMs}`;
+    if (analyticsSamplesCacheKey === cacheKey && now - analyticsSamplesFetchedAt < ANALYTICS_REFRESH_MS) {
+        return analyticsSamplesCache;
+    }
+
+    try {
+        const since = endTimeMs - rangeMs;
+        const response = await fetch(
+            `${ANALYTICS_SAMPLE_ENDPOINT}?rangeMs=${encodeURIComponent(rangeMs)}&since=${encodeURIComponent(since)}`,
+            {
+                cache: 'no-store',
+                headers: authHeaders
+            }
+        );
+        if (!response.ok) return analyticsSamplesCache;
+        const data = await response.json();
+        if (!data || !Array.isArray(data.samples)) return analyticsSamplesCache;
+        analyticsSamplesCache = data.samples;
+        analyticsSamplesCacheKey = cacheKey;
+        analyticsSamplesFetchedAt = now;
+    } catch (error) {
+        console.warn('Failed to fetch analytics samples:', error);
+    }
+
+    return analyticsSamplesCache;
+}
+
+function getDeviceLastUpdateTimestamp(device) {
+    const ts = Date.parse(
+        device.lastUpdate || device.updatedAt || (device.tracker && device.tracker.lastFix)
+    );
+    return Number.isFinite(ts) ? ts : null;
+}
+
+function recordAnalyticsSample(devices, alerts) {
+    const authHeaders = getAnalyticsAuthHeaders();
+    if (!authHeaders.Authorization) {
+        return;
+    }
+    const now = Date.now();
+    if (lastAnalyticsSampleTs && now - lastAnalyticsSampleTs < ANALYTICS_SAMPLE_INTERVAL_MS) {
+        return;
+    }
+    lastAnalyticsSampleTs = now;
+
+    let connectedDevices = 0;
+    let recentDevices = 0;
+    let batterySum = 0;
+    let batteryCount = 0;
+    let tempSum = 0;
+    let tempCount = 0;
+    const recentWindowMs = 15 * 60 * 1000;
+
+    devices.forEach(device => {
+        const updateTs = getDeviceLastUpdateTimestamp(device);
+        if (updateTs) {
+            if (now - updateTs <= STALE_DEVICE_MS) connectedDevices += 1;
+            if (now - updateTs <= recentWindowMs) recentDevices += 1;
+        }
+        const batteryValue = Number(device.battery);
+        if (Number.isFinite(batteryValue)) {
+            batterySum += batteryValue;
+            batteryCount += 1;
+        }
+        const temperatureValue = Number(device.temperature);
+        if (Number.isFinite(temperatureValue)) {
+            tempSum += temperatureValue;
+            tempCount += 1;
+        }
+    });
+
+    const avgBattery = batteryCount ? batterySum / batteryCount : null;
+    const avgTemperature = tempCount ? tempSum / tempCount : null;
+    const alerts24h = alerts.filter(alert => {
+        const ts = Date.parse(alert.timestamp);
+        return Number.isFinite(ts) && now - ts <= 24 * 60 * 60 * 1000;
+    }).length;
+
+    const sample = {
+        timestamp: new Date(now).toISOString(),
+        connectedDevices,
+        recentDevices,
+        avgBattery,
+        avgTemperature,
+        alerts24h
+    };
+
+    if (analyticsSamplesCache.length) {
+        analyticsSamplesCache.push(sample);
+    }
+
+    fetch(ANALYTICS_SAMPLE_ENDPOINT, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            ...authHeaders
+        },
+        body: JSON.stringify(sample)
+    }).catch(error => {
+        console.warn('Failed to persist analytics sample:', error);
+    });
+}
+
+function updateAnalyticsMetrics(devices, alerts) {
+    const filteredDevices = getAnalyticsFilteredDevices(devices);
+    const now = Date.now();
+    const connectedCount = filteredDevices.reduce((count, device) => {
+        const updateTs = getDeviceLastUpdateTimestamp(device);
+        if (updateTs && now - updateTs <= STALE_DEVICE_MS) return count + 1;
+        return count;
+    }, 0);
+    const inTransitCount = filteredDevices.filter(device => {
+        return (device.status || '').toLowerCase() === 'active';
+    }).length;
+    const deliveredCount = filteredDevices.filter(device => {
+        return (device.status || '').toLowerCase() === 'completed';
+    }).length;
+    const delayedCount = filteredDevices.filter(device => {
+        const connection = getConnectionStatus(device);
+        return connection.label === 'Stale' || connection.label === 'No GPS';
+    }).length;
+
+    const avgBattery = (() => {
+        const values = filteredDevices
+            .map(device => Number(device.battery))
+            .filter(value => Number.isFinite(value));
+        if (!values.length) return null;
+        return values.reduce((sum, value) => sum + value, 0) / values.length;
+    })();
+
+    const avgTemperature = (() => {
+        const values = filteredDevices
+            .map(device => Number(device.temperature))
+            .filter(value => Number.isFinite(value));
+        if (!values.length) return null;
+        return values.reduce((sum, value) => sum + value, 0) / values.length;
+    })();
+
+    const alerts24h = alerts.filter(alert => {
+        const ts = Date.parse(alert.timestamp);
+        return Number.isFinite(ts) && now - ts <= 24 * 60 * 60 * 1000;
+    }).length;
+    const conditionCounts = filteredDevices.reduce((acc, device) => {
+        const logistics = device?.logistics || {};
+        if (logistics.monitoringEnabled === false) return acc;
+
+        acc.monitored += 1;
+
+        const temp = toFiniteNumber(device.temperature);
+        const humidity = toFiniteNumber(device.humidity);
+        const tilt = toFiniteNumber(device.tilt ?? device?.tracker?.tilt);
+        const collision = toFiniteNumber(device.collision ?? device?.tracker?.collision);
+
+        const tempMin = toFiniteNumber(logistics.tempMin) ?? -10;
+        const tempMax = toFiniteNumber(logistics.tempMax) ?? 30;
+        const humidityMin = toFiniteNumber(logistics.humidityMin) ?? 20;
+        const humidityMax = toFiniteNumber(logistics.humidityMax) ?? 80;
+        const tiltMax = toFiniteNumber(logistics.tiltMax) ?? 30;
+        const collisionMaxG = toFiniteNumber(logistics.collisionMaxG) ?? 2.5;
+        const deliveryGraceMinutes = toFiniteNumber(logistics.deliveryGraceMinutes) ?? 30;
+
+        if (temp !== null && (temp < tempMin || temp > tempMax)) acc.temp += 1;
+        if (humidity !== null && (humidity < humidityMin || humidity > humidityMax)) acc.humidity += 1;
+        if (tilt !== null && Math.abs(tilt) > tiltMax) acc.tilt += 1;
+        if (collision !== null && Math.abs(collision) > collisionMaxG) acc.collision += 1;
+
+        const expectedDeliveryAt = logistics.expectedDeliveryAt || device?.expectedDeliveryAt || null;
+        if (expectedDeliveryAt) {
+            const expectedTs = new Date(expectedDeliveryAt).getTime();
+            const graceMs = Math.max(0, Number(deliveryGraceMinutes || 0)) * 60 * 1000;
+            if (Number.isFinite(expectedTs) && now > expectedTs + graceMs) {
+                acc.deliveryDelay += 1;
+            }
+        }
+
+        return acc;
+    }, {
+        monitored: 0,
+        temp: 0,
+        humidity: 0,
+        tilt: 0,
+        collision: 0,
+        deliveryDelay: 0
+    });
+
+    const activeDevicesEl = document.getElementById('analyticsActiveDevices');
+    if (activeDevicesEl) activeDevicesEl.textContent = String(connectedCount);
+    const inTransitEl = document.getElementById('analyticsInTransit');
+    if (inTransitEl) inTransitEl.textContent = String(inTransitCount);
+    const deliveredEl = document.getElementById('analyticsDelivered');
+    if (deliveredEl) deliveredEl.textContent = String(deliveredCount);
+    const delayedEl = document.getElementById('analyticsDelayed');
+    if (delayedEl) delayedEl.textContent = String(delayedCount);
+    const avgBatteryEl = document.getElementById('analyticsAvgBattery');
+    if (avgBatteryEl) {
+        avgBatteryEl.textContent = Number.isFinite(avgBattery)
+            ? `${avgBattery.toFixed(1)}%`
+            : '-';
+    }
+    const avgTempEl = document.getElementById('analyticsAvgTemp');
+    if (avgTempEl) {
+        avgTempEl.textContent = Number.isFinite(avgTemperature)
+            ? `${avgTemperature.toFixed(1)}°C`
+            : '-';
+    }
+    const alerts24hEl = document.getElementById('analyticsAlert24h');
+    if (alerts24hEl) alerts24hEl.textContent = String(alerts24h);
+    const monitoredDevicesEl = document.getElementById('analyticsMonitoredDevices');
+    if (monitoredDevicesEl) monitoredDevicesEl.textContent = String(conditionCounts.monitored);
+    const tempViolationsEl = document.getElementById('analyticsTempViolations');
+    if (tempViolationsEl) tempViolationsEl.textContent = String(conditionCounts.temp);
+    const humidityViolationsEl = document.getElementById('analyticsHumidityViolations');
+    if (humidityViolationsEl) humidityViolationsEl.textContent = String(conditionCounts.humidity);
+    const tiltViolationsEl = document.getElementById('analyticsTiltViolations');
+    if (tiltViolationsEl) tiltViolationsEl.textContent = String(conditionCounts.tilt);
+    const collisionViolationsEl = document.getElementById('analyticsCollisionViolations');
+    if (collisionViolationsEl) collisionViolationsEl.textContent = String(conditionCounts.collision);
+    const deliveryDelaysEl = document.getElementById('analyticsDeliveryDelays');
+    if (deliveryDelaysEl) deliveryDelaysEl.textContent = String(conditionCounts.deliveryDelay);
+
+    const activeDevicesNote = document.getElementById('analyticsActiveDevicesNote');
+    if (activeDevicesNote) {
+        activeDevicesNote.textContent = 'Recently active devices';
+    }
+    const avgBatteryNote = document.getElementById('analyticsAvgBatteryNote');
+    if (avgBatteryNote) {
+        avgBatteryNote.textContent = 'Across devices with battery';
+    }
+    const avgTempNote = document.getElementById('analyticsAvgTempNote');
+    if (avgTempNote) {
+        avgTempNote.textContent = 'Across devices with temperature';
+    }
+    const alerts24hNote = document.getElementById('analyticsAlert24hNote');
+    if (alerts24hNote) {
+        alerts24hNote.textContent = 'Last 24 hours';
+    }
+    const inTransitNote = document.getElementById('analyticsInTransitNote');
+    if (inTransitNote) {
+        inTransitNote.textContent = 'Active shipments in transit';
+    }
+    const deliveredNote = document.getElementById('analyticsDeliveredNote');
+    if (deliveredNote) {
+        deliveredNote.textContent = 'Marked as completed';
+    }
+    const delayedNote = document.getElementById('analyticsDelayedNote');
+    if (delayedNote) {
+        delayedNote.textContent = 'Stale or no GPS';
+    }
+    const monitoredDevicesNote = document.getElementById('analyticsMonitoredDevicesNote');
+    if (monitoredDevicesNote) {
+        monitoredDevicesNote.textContent = 'With logistics monitoring enabled';
+    }
+    const tempViolationsNote = document.getElementById('analyticsTempViolationsNote');
+    if (tempViolationsNote) {
+        tempViolationsNote.textContent = 'Current threshold violations';
+    }
+    const humidityViolationsNote = document.getElementById('analyticsHumidityViolationsNote');
+    if (humidityViolationsNote) {
+        humidityViolationsNote.textContent = 'Current threshold violations';
+    }
+    const tiltViolationsNote = document.getElementById('analyticsTiltViolationsNote');
+    if (tiltViolationsNote) {
+        tiltViolationsNote.textContent = 'Current threshold violations';
+    }
+    const collisionViolationsNote = document.getElementById('analyticsCollisionViolationsNote');
+    if (collisionViolationsNote) {
+        collisionViolationsNote.textContent = 'Current threshold violations';
+    }
+    const deliveryDelaysNote = document.getElementById('analyticsDeliveryDelaysNote');
+    if (deliveryDelaysNote) {
+        deliveryDelaysNote.textContent = 'ETA exceeded with grace';
+    }
+}
+
+function getAnalyticsSeriesFromSamples(samples, bucketStarts, bucketMs, field) {
+    const sums = new Array(bucketStarts.length).fill(0);
+    const counts = new Array(bucketStarts.length).fill(0);
+    const base = bucketStarts[0]?.getTime();
+    if (!Number.isFinite(base)) return sums;
+
+    samples.forEach(sample => {
+        const ts = Date.parse(sample.timestamp);
+        if (!Number.isFinite(ts)) return;
+        const index = Math.floor((ts - base) / bucketMs);
+        if (index < 0 || index >= sums.length) return;
+        const value = sample[field];
+        if (!Number.isFinite(value)) return;
+        sums[index] += value;
+        counts[index] += 1;
+    });
+
+    return sums.map((sum, index) => {
+        if (!counts[index]) return 0;
+        return Math.round((sum / counts[index]) * 10) / 10;
+    });
+}
+
+function initAnalytics() {
+    const rangeSelect = document.getElementById('analyticsRangeSelect');
+    if (rangeSelect) {
+        rangeSelect.addEventListener('change', () => {
+            refreshAnalyticsCharts();
+        });
+    }
+
+    const groupSelect = document.getElementById('analyticsGroupFilter');
+    if (groupSelect) {
+        groupSelect.addEventListener('change', () => {
+            updateAnalyticsMetrics(getDevices(), getAlerts());
+            refreshAnalyticsCharts();
+        });
+    }
+
+    refreshAnalyticsGroupOptions();
+}
+
+function getStartOfToday() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today;
+}
+
+function getAnalyticsRangeConfig() {
+    const select = document.getElementById('analyticsRangeSelect');
+    const value = select ? select.value : 'today';
+    switch (value) {
+        case 'yesterday': {
+            const endTime = getStartOfToday();
+            return { unit: 'hour', count: 24, bucketMs: 60 * 60 * 1000, endTime };
+        }
+        case 'today':
+            return { unit: 'hour', count: 24, bucketMs: 60 * 60 * 1000, endTime: new Date() };
+        case '30d':
+            return { unit: 'day', count: 30, bucketMs: 24 * 60 * 60 * 1000, endTime: getStartOfToday() };
+        case '90d':
+            return { unit: 'day', count: 90, bucketMs: 24 * 60 * 60 * 1000, endTime: getStartOfToday() };
+        case '6m':
+            return { unit: 'day', count: 180, bucketMs: 24 * 60 * 60 * 1000, endTime: getStartOfToday() };
+        case '12m':
+            return { unit: 'day', count: 365, bucketMs: 24 * 60 * 60 * 1000, endTime: getStartOfToday() };
+        case '24m':
+            return { unit: 'day', count: 730, bucketMs: 24 * 60 * 60 * 1000, endTime: getStartOfToday() };
+        case '7d':
+        default:
+            return { unit: 'day', count: 7, bucketMs: 24 * 60 * 60 * 1000, endTime: getStartOfToday() };
+    }
+}
+
+function getLastNHours(hoursCount, endTime) {
+    const hours = [];
+    const now = endTime ? new Date(endTime) : new Date();
+    now.setMinutes(0, 0, 0);
+    for (let i = hoursCount - 1; i >= 0; i -= 1) {
+        const hour = new Date(now);
+        hour.setHours(now.getHours() - i);
+        hours.push(hour);
+    }
+    return hours;
+}
+
+function getLastNDays(daysCount, endTime) {
+    const days = [];
+    const today = endTime ? new Date(endTime) : new Date();
+    today.setHours(0, 0, 0, 0);
+    for (let i = daysCount - 1; i >= 0; i -= 1) {
+        const day = new Date(today);
+        day.setDate(today.getDate() - i);
+        days.push(day);
+    }
+    return days;
+}
+
+function formatBucketLabel(date, unit) {
+    if (unit === 'hour') {
+        return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    }
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function getDeviceActivitySeries(devices, bucketStarts, bucketMs) {
+    const counts = new Array(bucketStarts.length).fill(0);
+    const base = bucketStarts[0]?.getTime();
+    if (!Number.isFinite(base)) return counts;
+    devices.forEach(device => {
+        const ts = Date.parse(
+            device.lastUpdate || device.updatedAt || (device.tracker && device.tracker.lastFix)
+        );
+        if (!Number.isFinite(ts)) return;
+        const index = Math.floor((ts - base) / bucketMs);
+        if (index >= 0 && index < counts.length) {
+            counts[index] += 1;
+        }
+    });
+    return counts;
+}
+
+function getAlertDistribution(alerts) {
+    const counts = { critical: 0, warning: 0, info: 0 };
+    alerts.forEach(alert => {
+        const severity = (alert.severity || 'info').toLowerCase();
+        if (severity === 'critical') counts.critical += 1;
+        else if (severity === 'warning') counts.warning += 1;
+        else counts.info += 1;
+    });
+    return counts;
+}
+
+async function initCharts() {
+    if (charts.shipmentTrends) {
+        charts.shipmentTrends.destroy();
+        delete charts.shipmentTrends;
+    }
+    if (charts.alertDistribution) {
+        charts.alertDistribution.destroy();
+        delete charts.alertDistribution;
+    }
+
+    const devices = getAnalyticsFilteredDevices(getDevices());
+    const alerts = getAlerts();
+    const range = getAnalyticsRangeConfig();
+    const buckets = range.unit === 'hour'
+        ? getLastNHours(range.count, range.endTime)
+        : getLastNDays(range.count, range.endTime);
+    const labels = buckets.map(date => formatBucketLabel(date, range.unit));
+    const activityData = getDeviceActivitySeries(devices, buckets, range.bucketMs);
+    const alertCounts = getAlertDistribution(alerts);
+
     // Shipment Trends Chart
     const trendsCtx = document.getElementById('shipmentTrendsChart');
     if (trendsCtx) {
         charts.shipmentTrends = new Chart(trendsCtx, {
             type: 'line',
             data: {
-                labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                labels,
                 datasets: [{
-                    label: 'Shipments',
-                    data: [12, 19, 15, 25, 22, 18, 24],
+                    label: 'Device activity',
+                    data: activityData,
                     borderColor: 'rgb(37, 99, 235)',
                     backgroundColor: 'rgba(37, 99, 235, 0.1)',
                     tension: 0.4
@@ -1285,7 +3701,7 @@ function initCharts() {
             data: {
                 labels: ['Critical', 'Warning', 'Info'],
                 datasets: [{
-                    data: [5, 12, 8],
+                    data: [alertCounts.critical, alertCounts.warning, alertCounts.info],
                     backgroundColor: [
                         'rgb(239, 68, 68)',
                         'rgb(245, 158, 11)',
@@ -1298,6 +3714,58 @@ function initCharts() {
                 maintainAspectRatio: false
             }
         });
+    }
+
+    const samples = await fetchAnalyticsSamples(range);
+    if (charts.shipmentTrends && samples.length && getAnalyticsGroupFilter() === 'all') {
+        const updated = getAnalyticsSeriesFromSamples(
+            samples,
+            buckets,
+            range.bucketMs,
+            'recentDevices'
+        );
+        charts.shipmentTrends.data.datasets[0].data = updated;
+        charts.shipmentTrends.update();
+    }
+}
+
+async function refreshAnalyticsCharts() {
+    if (charts.shipmentTrends) {
+        const range = getAnalyticsRangeConfig();
+        const buckets = range.unit === 'hour'
+            ? getLastNHours(range.count, range.endTime)
+            : getLastNDays(range.count, range.endTime);
+        const labels = buckets.map(date => formatBucketLabel(date, range.unit));
+        const activityData = getDeviceActivitySeries(
+            getAnalyticsFilteredDevices(getDevices()),
+            buckets,
+            range.bucketMs
+        );
+        charts.shipmentTrends.data.labels = labels;
+        charts.shipmentTrends.data.datasets[0].data = activityData;
+        charts.shipmentTrends.update();
+
+        const samples = await fetchAnalyticsSamples(range);
+        if (samples.length && getAnalyticsGroupFilter() === 'all') {
+            const updated = getAnalyticsSeriesFromSamples(
+                samples,
+                buckets,
+                range.bucketMs,
+                'recentDevices'
+            );
+            charts.shipmentTrends.data.datasets[0].data = updated;
+            charts.shipmentTrends.update();
+        }
+    }
+
+    if (charts.alertDistribution) {
+        const alertCounts = getAlertDistribution(getAlerts());
+        charts.alertDistribution.data.datasets[0].data = [
+            alertCounts.critical,
+            alertCounts.warning,
+            alertCounts.info
+        ];
+        charts.alertDistribution.update();
     }
 }
 
@@ -1396,6 +3864,27 @@ function updateHumidityChart() {
         'Humidity',
         { labels, data },
         'rgb(59, 130, 246)',
+        '%'
+    );
+}
+
+function updateBatteryChart() {
+    const canvas = document.getElementById('batteryChart');
+    if (!canvas) return;
+
+    if (charts.battery) {
+        charts.battery.destroy();
+    }
+
+    const devices = getDevices();
+    const labels = devices.slice(0, 7).map(d => d.name);
+    const data = devices.slice(0, 7).map(d => d.battery ?? null);
+
+    charts.battery = createSensorChart(
+        'batteryChart',
+        'Battery',
+        { labels, data },
+        'rgb(34, 197, 94)',
         '%'
     );
 }
@@ -1629,7 +4118,15 @@ async function connectTracker() {
         
         // Save settings
         saveTrackerSettings();
-        
+
+        if (typeof registerDeviceIds === 'function') {
+            registerDeviceIds([deviceId, imei].filter(Boolean));
+        }
+        // Fetch live locations soon so app shows connection once ingest has data
+        if (typeof fetchLiveLocations === 'function') {
+            setTimeout(fetchLiveLocations, 600);
+        }
+
         // Update UI
         const connectBtn = document.getElementById('connectTrackerBtn');
         const disconnectBtn = document.getElementById('disconnectTrackerBtn');
@@ -1966,6 +4463,7 @@ function updateDeviceFromTracker(data) {
             device.tracker.satellites = data.satellites;
             device.tracker.accuracy = data.accuracy;
         }
+        evaluateDeviceLogisticsConditions(device);
         
         localStorage.setItem('cargotrack_devices', JSON.stringify(devices));
         
@@ -2008,6 +4506,12 @@ function initSettings() {
     // Load current settings
     loadAccountSettings();
     loadNotificationSettings();
+
+    const capabilities = getPlanCapabilities();
+    const apiKeysCard = document.getElementById('apiKeysCard');
+    if (apiKeysCard && !capabilities.allowApiKeys) {
+        apiKeysCard.style.display = 'none';
+    }
     
     // Account settings form
     const accountForm = document.getElementById('accountSettingsForm');
@@ -2060,7 +4564,9 @@ function initSettings() {
     // API Key generation
     const generateApiKeyBtn = document.getElementById('generateApiKeyBtn');
     if (generateApiKeyBtn) {
-        generateApiKeyBtn.addEventListener('click', generateUserApiKey);
+        generateApiKeyBtn.addEventListener('click', () => {
+            generateUserApiKey();
+        });
     }
     
     // Load user API keys
@@ -2068,87 +4574,105 @@ function initSettings() {
 }
 
 // User API Key Management
-function generateUserApiKey() {
+async function fetchTenantApiKeys() {
+    const authHeaders = getApiAuthHeaders();
+    if (!authHeaders.Authorization) {
+        return [];
+    }
+    const response = await fetch('/api/api-keys', {
+        headers: authHeaders,
+        cache: 'no-store'
+    });
+    if (!response.ok) {
+        return [];
+    }
+    const data = await response.json();
+    return Array.isArray(data.keys) ? data.keys : [];
+}
+
+async function createTenantApiKey(name) {
+    const response = await fetch('/api/api-keys', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            ...getApiAuthHeaders()
+        },
+        body: JSON.stringify({ name })
+    });
+    if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        throw new Error(text || 'Failed to generate API key');
+    }
+    const data = await response.json();
+    return data.key;
+}
+
+async function updateTenantApiKey(id, active) {
+    const response = await fetch('/api/api-keys', {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+            ...getApiAuthHeaders()
+        },
+        body: JSON.stringify({ id, active })
+    });
+    if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        throw new Error(text || 'Failed to update API key');
+    }
+}
+
+async function deleteTenantApiKey(id) {
+    const response = await fetch('/api/api-keys', {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+            ...getApiAuthHeaders()
+        },
+        body: JSON.stringify({ id })
+    });
+    if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        throw new Error(text || 'Failed to delete API key');
+    }
+}
+
+async function generateUserApiKey() {
     const currentUser = safeGetCurrentUser();
     if (!currentUser) {
         alert('Please login to generate API keys');
         return;
     }
-    
-    // Check if user API keys are allowed
-    const systemSettings = JSON.parse(localStorage.getItem('lte_system_settings') || '{}');
-    if (systemSettings.allowUserApiKeys === false) {
-        alert('API key generation is currently disabled by administrator. Please contact support.');
+
+    const capabilities = getPlanCapabilities();
+    if (!capabilities.allowApiKeys) {
+        alert('API key generation is not available on your plan.');
         return;
     }
-    
+
     const keyName = prompt('Enter a name for this API key (e.g., "ERP Integration", "Custom Dashboard"):');
     if (!keyName || !keyName.trim()) {
         return;
     }
-    
-    // Generate API key
-    const apiKey = generateSecureApiKey();
-    const keyData = {
-        id: 'key_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-        name: keyName.trim(),
-        key: apiKey,
-        userId: currentUser.id,
-        createdAt: new Date().toISOString(),
-        lastUsed: null,
-        active: true
-    };
-    
-    // Save API key
-    const userApiKeys = getUserApiKeys();
-    userApiKeys.push(keyData);
-    saveUserApiKeys(userApiKeys);
-    
-    // Show the key (only shown once)
-    showApiKeyModal(keyData);
-    
-    // Reload list
-    loadUserApiKeys();
-}
 
-function generateSecureApiKey() {
-    // Generate a secure API key for integrations
-    const prefix = 'CTRK';
-    const segment1 = generateRandomString(40);
-    const segment2 = generateRandomString(50);
-    return `${prefix}.${segment1}.${segment2}`;
-}
-
-function generateRandomString(length) {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let result = '';
-    for (let i = 0; i < length; i++) {
-        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    try {
+        const keyData = await createTenantApiKey(keyName.trim());
+        showApiKeyModal(keyData);
+        loadUserApiKeys();
+    } catch (error) {
+        alert(error.message || 'Failed to generate API key.');
     }
-    return result;
 }
 
-function getUserApiKeys() {
-    const currentUser = safeGetCurrentUser();
-    if (!currentUser) return [];
-    
-    const allKeys = JSON.parse(localStorage.getItem('user_api_keys') || '[]');
-    return allKeys.filter(key => key.userId === currentUser.id);
-}
-
-function saveUserApiKeys(keys) {
-    const allKeys = JSON.parse(localStorage.getItem('user_api_keys') || '[]');
-    const otherKeys = allKeys.filter(key => {
-        const userKeys = keys.map(k => k.id);
-        return !userKeys.includes(key.id);
-    });
-    localStorage.setItem('user_api_keys', JSON.stringify([...otherKeys, ...keys]));
-}
-
-function loadUserApiKeys() {
-    const keys = getUserApiKeys();
+async function loadUserApiKeys() {
     const container = document.getElementById('userApiKeysList');
     if (!container) return;
+    const capabilities = getPlanCapabilities();
+    if (!capabilities.allowApiKeys) {
+        container.innerHTML = '<p style="color: var(--text-light); padding: 2rem; text-align: center;">API key management is available on Enterprise plans.</p>';
+        return;
+    }
+    const keys = await fetchTenantApiKeys();
     
     if (keys.length === 0) {
         container.innerHTML = '<p style="color: var(--text-light); padding: 2rem; text-align: center;">No API keys generated yet. Click "Generate New API Key" to create one.</p>';
@@ -2165,7 +4689,7 @@ function loadUserApiKeys() {
                 </div>
                 <div style="display: flex; gap: 0.5rem;">
                     <span class="status-badge ${key.active ? 'active' : 'inactive'}">${key.active ? 'Active' : 'Inactive'}</span>
-                    <button class="btn btn-outline btn-small" onclick="toggleApiKey('${key.id}')">
+                    <button class="btn btn-outline btn-small" onclick="toggleApiKey('${key.id}', ${key.active ? 'true' : 'false'})">
                         <i class="fas fa-${key.active ? 'pause' : 'play'}"></i>
                     </button>
                     <button class="btn btn-outline btn-small" onclick="deleteApiKey('${key.id}')">
@@ -2174,7 +4698,7 @@ function loadUserApiKeys() {
                 </div>
             </div>
             <div style="background: var(--bg-dark); padding: 0.75rem; border-radius: 0.25rem; font-family: monospace; font-size: 0.875rem; word-break: break-all;">
-                ${key.key.substring(0, 20)}...${key.key.substring(key.key.length - 10)}
+                ${key.key ? `${key.key.substring(0, 20)}...${key.key.substring(key.key.length - 10)}` : 'Hidden'}
             </div>
             <small style="color: var(--text-light); display: block; margin-top: 0.5rem;">
                 <i class="fas fa-info-circle"></i> Full key is only shown once when created. Copy it securely.
@@ -2183,25 +4707,26 @@ function loadUserApiKeys() {
     `).join('');
 }
 
-function toggleApiKey(keyId) {
-    const keys = getUserApiKeys();
-    const key = keys.find(k => k.id === keyId);
-    if (key) {
-        key.active = !key.active;
-        saveUserApiKeys(keys);
+async function toggleApiKey(keyId, isActive) {
+    try {
+        await updateTenantApiKey(keyId, !isActive);
         loadUserApiKeys();
+    } catch (error) {
+        alert(error.message || 'Failed to update API key.');
     }
 }
 
-function deleteApiKey(keyId) {
+async function deleteApiKey(keyId) {
     if (!confirm('Are you sure you want to delete this API key? This action cannot be undone.')) {
         return;
     }
-    
-    const keys = getUserApiKeys();
-    const filtered = keys.filter(k => k.id !== keyId);
-    saveUserApiKeys(filtered);
-    loadUserApiKeys();
+
+    try {
+        await deleteTenantApiKey(keyId);
+        loadUserApiKeys();
+    } catch (error) {
+        alert(error.message || 'Failed to delete API key.');
+    }
 }
 
 function showApiKeyModal(keyData) {
@@ -2233,13 +4758,98 @@ function showApiKeyModal(keyData) {
 // Make functions globally available
 window.toggleApiKey = toggleApiKey;
 window.deleteApiKey = deleteApiKey;
+window.viewDevice = viewDevice;
+window.editDevice = editDevice;
+window.deleteDevice = deleteDevice;
+window.viewFullDeviceDetails = viewFullDeviceDetails;
+window.deleteArea = deleteArea;
+window.deleteAsset = deleteAsset;
+window.deleteGroup = deleteGroup;
+window.deleteUser = deleteUser;
+
+let deviceStatusFilter = 'all';
+let deviceSearchTerm = '';
+
+function getDeviceSearchTerm() {
+    const input = document.getElementById('deviceSearchInput');
+    if (!input) return '';
+    return input.value.trim().toLowerCase();
+}
+
+function matchesDeviceSearch(device, term) {
+    if (!term) return true;
+    const id = (device.id || '').toString().toLowerCase();
+    const name = (device.name || '').toString().toLowerCase();
+    const location = (device.location || '').toString().toLowerCase();
+    const status = (device.status || '').toString().toLowerCase();
+    const type = (device.type || '').toString().toLowerCase();
+    const imei = (device.imei || '').toString().toLowerCase();
+    const lteImei = (device?.lte?.imei || '').toString().toLowerCase();
+    return (
+        id.includes(term) ||
+        name.includes(term) ||
+        location.includes(term) ||
+        status.includes(term) ||
+        type.includes(term) ||
+        imei.includes(term) ||
+        lteImei.includes(term)
+    );
+}
+
+function filterDevicesBySearch(devices) {
+    if (!Array.isArray(devices)) return [];
+    const term = deviceSearchTerm || getDeviceSearchTerm();
+    if (!term) return devices;
+    return devices.filter(device => matchesDeviceSearch(device, term));
+}
+
+function getAnalyticsGroupFilter() {
+    const select = document.getElementById('analyticsGroupFilter');
+    return select ? select.value : 'all';
+}
+
+function filterDevicesByGroup(devices, groupName) {
+    if (!Array.isArray(devices)) return [];
+    if (!groupName || groupName === 'all') return devices;
+    const normalized = groupName.toLowerCase();
+    return devices.filter(device => {
+        const deviceGroup = (device.group || '').toString().toLowerCase();
+        return deviceGroup === normalized;
+    });
+}
+
+function getAnalyticsFilteredDevices(devices) {
+    const groupFilter = getAnalyticsGroupFilter();
+    return filterDevicesByGroup(devices, groupFilter);
+}
+
+function refreshAnalyticsGroupOptions(groups = null) {
+    const select = document.getElementById('analyticsGroupFilter');
+    if (!select) return;
+    const current = select.value || 'all';
+    const list = groups || getGroups();
+    const options = ['<option value="all">All groups</option>']
+        .concat(list.map(group => `<option value="${group.name}">${group.name}</option>`));
+    select.innerHTML = options.join('');
+    select.value = list.some(group => group.name === current) ? current : 'all';
+}
 
 // Update devices table
 function updateDevicesTable(devices) {
     const tableBody = document.getElementById('devicesTableBody');
     if (!tableBody) return;
-    
-    tableBody.innerHTML = devices.slice(0, 10).map(device => `
+    const filtered = filterDevicesForStatusTable(devices);
+
+    if (filtered.length === 0) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="6" class="empty-state">No devices match the current filter.</td>
+            </tr>
+        `;
+        return;
+    }
+
+    tableBody.innerHTML = filtered.slice(0, 10).map(device => `
         <tr>
             <td>${device.id}</td>
             <td><span class="status-badge ${device.status}">${device.status}</span></td>
@@ -2255,9 +4865,132 @@ function updateDevicesTable(devices) {
     `).join('');
 }
 
-function getBlockedDeviceIds() {
-    const key = 'cargotrack_blocked_devices';
-    const stored = localStorage.getItem(key);
+function filterDevicesForStatusTable(devices) {
+    if (!Array.isArray(devices)) return [];
+    const searched = filterDevicesBySearch(devices);
+    if (deviceStatusFilter === 'all') return searched;
+
+    return searched.filter(device => {
+        if (deviceStatusFilter === 'connected') {
+            return getConnectionStatus(device).label === 'Connected';
+        }
+        if (deviceStatusFilter === 'stale') {
+            return getConnectionStatus(device).label === 'Stale';
+        }
+        if (deviceStatusFilter === 'no-gps') {
+            return getConnectionStatus(device).label === 'No GPS';
+        }
+        return device.status === deviceStatusFilter;
+    });
+}
+
+function applyDeviceStatusFilter() {
+    const selection = prompt(
+        'Filter devices by status:\n' +
+        '- all\n' +
+        '- active\n' +
+        '- inactive\n' +
+        '- warning\n' +
+        '- connected\n' +
+        '- stale\n' +
+        '- no-gps',
+        deviceStatusFilter
+    );
+
+    if (selection === null) return;
+    const value = selection.trim().toLowerCase();
+    const allowed = new Set(['all', 'active', 'inactive', 'warning', 'connected', 'stale', 'no-gps']);
+    if (!allowed.has(value)) {
+        alert('Invalid filter. Try: all, active, inactive, warning, connected, stale, no-gps.');
+        return;
+    }
+
+    deviceStatusFilter = value;
+    loadDashboardData();
+}
+
+function exportDeviceStatusTable() {
+    const devices = getDevices();
+    const filtered = filterDevicesForStatusTable(devices);
+    if (!filtered.length) {
+        alert('No devices to export for the current filter.');
+        return;
+    }
+
+    const header = ['Device ID', 'Status', 'Location', 'Temperature', 'Last Update'];
+    const rows = filtered.map(device => [
+        device.id,
+        device.status,
+        device.location || 'Unknown',
+        device.temperature !== null && device.temperature !== undefined ? `${device.temperature}` : 'N/A',
+        formatTime(device.lastUpdate)
+    ]);
+
+    const csv = [header, ...rows]
+        .map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(','))
+        .join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `device-status-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+}
+
+function getApiAuthHeaders() {
+    if (typeof window.getSessionAuthHeaders === 'function') {
+        return window.getSessionAuthHeaders();
+    }
+    const token = localStorage.getItem('cargotrack_session_token');
+    return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function decodeSessionPayload() {
+    const token = localStorage.getItem('cargotrack_session_token');
+    if (!token) return null;
+    const parts = token.split('.');
+    if (parts.length !== 2) return null;
+    const body = parts[0].replace(/-/g, '+').replace(/_/g, '/');
+    const pad = body.length % 4 ? '='.repeat(4 - (body.length % 4)) : '';
+    try {
+        return JSON.parse(atob(body + pad));
+    } catch (error) {
+        return null;
+    }
+}
+
+function getPlanTier() {
+    const claims = decodeSessionPayload();
+    if (claims?.planTier) return claims.planTier;
+    const currentUser = safeGetCurrentUser();
+    return currentUser?.planTier || currentUser?.package || 'individual';
+}
+
+function getPlanCapabilities() {
+    const tier = (getPlanTier() || '').toString().toLowerCase();
+    const defaults = {
+        deviceLimit: 3,
+        allowApiKeys: false,
+        allowAdvancedAnalytics: false
+    };
+    if (tier.includes('enterprise')) {
+        return { deviceLimit: 1000, allowApiKeys: true, allowAdvancedAnalytics: true };
+    }
+    if (tier.includes('smb') || tier.includes('pro') || tier.includes('business')) {
+        return { deviceLimit: 25, allowApiKeys: false, allowAdvancedAnalytics: true };
+    }
+    if (tier.includes('reseller')) {
+        return { deviceLimit: 10000, allowApiKeys: true, allowAdvancedAnalytics: true };
+    }
+    return defaults;
+}
+
+function getDeviceRegistry() {
+    const stored = localStorage.getItem(DEVICE_REGISTRY_KEY);
     if (!stored) return new Set();
     try {
         const ids = JSON.parse(stored);
@@ -2265,38 +4998,111 @@ function getBlockedDeviceIds() {
             return new Set(ids.filter(Boolean));
         }
     } catch (error) {
-        console.warn('Failed to parse blocked devices list:', error);
+        console.warn('Failed to parse device registry:', error);
     }
     return new Set();
 }
 
-function isDemoDevice(device) {
-    if (!device) return false;
-    const demoLocations = new Set(['New York', 'Los Angeles', 'Chicago', 'Houston', 'Miami']);
-    const demoGroups = new Set(['Warehouse A', 'Fleet 1', 'Cold Chain', 'Warehouse B', 'Fleet 2']);
-    const demoIds = new Set(['TEST-123', 'TAT140-868373079552768']);
-    const hasDemoId = typeof device.id === 'string' && /^DEV-\d{4}$/.test(device.id);
-    const hasExplicitDemoId = typeof device.id === 'string' && (demoIds.has(device.id) || device.id.startsWith('TEST-'));
-    const hasDemoName = typeof device.name === 'string' && /^Device \d+$/.test(device.name);
-    const hasDemoLocation = demoLocations.has(device.location);
-    const hasDemoGroup = demoGroups.has(device.group);
-    if (hasExplicitDemoId) return true;
-    return hasDemoId && hasDemoName && hasDemoLocation && hasDemoGroup;
+function saveDeviceRegistry(registry) {
+    localStorage.setItem(DEVICE_REGISTRY_KEY, JSON.stringify(Array.from(registry)));
 }
 
-function setBlockedDeviceIds(ids) {
-    const key = 'cargotrack_blocked_devices';
-    localStorage.setItem(key, JSON.stringify(Array.from(ids)));
+function registerDeviceIds(ids) {
+    if (!Array.isArray(ids)) return;
+    const registry = getDeviceRegistry();
+    let updated = false;
+    ids.forEach((id) => {
+        if (id && !registry.has(id)) {
+            registry.add(id);
+            updated = true;
+        }
+    });
+    if (updated) {
+        saveDeviceRegistry(registry);
+        syncDeviceRegistryToServer(Array.from(registry));
+    }
+}
+
+async function syncDeviceRegistryToServer(deviceIds) {
+    if (!Array.isArray(deviceIds) || !deviceIds.length) return;
+    try {
+        await fetch('/api/device-registry', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getApiAuthHeaders()
+            },
+            body: JSON.stringify({ deviceIds })
+        });
+    } catch (error) {
+        console.warn('Device registry sync failed:', error);
+    }
+}
+
+async function unregisterDeviceIdsOnServer(deviceIds) {
+    if (!Array.isArray(deviceIds) || !deviceIds.length) return;
+    try {
+        await fetch('/api/device-registry', {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getApiAuthHeaders()
+            },
+            body: JSON.stringify({ deviceIds })
+        });
+    } catch (error) {
+        console.warn('Device registry remove sync failed:', error);
+    }
+}
+
+function syncDeviceRegistryFromDevices(devices) {
+    if (!Array.isArray(devices)) return;
+    const registry = new Set();
+    devices.forEach((device) => {
+        if (device?.id) registry.add(device.id);
+        if (device?.lte?.imei) registry.add(device.lte.imei);
+    });
+    saveDeviceRegistry(registry);
+    syncDeviceRegistryToServer(Array.from(registry));
+}
+
+function getDeviceIdentity(device) {
+    if (!device || typeof device !== 'object') return null;
+    const imei = (device?.lte?.imei || '').toString().trim();
+    const id = (device?.id || device?.deviceId || '').toString().trim();
+    return imei || id || null;
+}
+
+function dedupeDevicesByIdentity(devices) {
+    if (!Array.isArray(devices)) return [];
+    const merged = new Map();
+    devices.forEach((device) => {
+        const identity = getDeviceIdentity(device);
+        if (!identity) return;
+        const existing = merged.get(identity);
+        if (!existing) {
+            merged.set(identity, device);
+            return;
+        }
+        merged.set(identity, {
+            ...existing,
+            ...device,
+            lte: {
+                ...(existing.lte || {}),
+                ...(device.lte || {})
+            },
+            tracker: {
+                ...(existing.tracker || {}),
+                ...(device.tracker || {})
+            }
+        });
+    });
+    return Array.from(merged.values());
 }
 
 // Data management functions
 function getDevices() {
     const devicesKey = 'cargotrack_devices';
-    const devicesResetKey = 'cargotrack_devices_cleared_v2';
-    if (!localStorage.getItem(devicesResetKey)) {
-        localStorage.setItem(devicesKey, JSON.stringify([]));
-        localStorage.setItem(devicesResetKey, 'true');
-    }
     const devices = localStorage.getItem(devicesKey);
     
     if (!devices) {
@@ -2304,14 +5110,27 @@ function getDevices() {
         return [];
     }
     
-    const blockedIds = getBlockedDeviceIds();
     const parsed = JSON.parse(devices);
-    const filtered = Array.isArray(parsed)
-        ? parsed.filter(device => !blockedIds.has(device.id)).filter(device => !isDemoDevice(device))
-        : [];
-    if (filtered.length !== parsed.length) {
+    const parsedList = Array.isArray(parsed) ? parsed : [];
+    const deduped = dedupeDevicesByIdentity(parsedList);
+    const filtered = deduped;
+    if (filtered.length !== parsedList.length) {
         localStorage.setItem(devicesKey, JSON.stringify(filtered));
     }
+    const currentUser = safeGetCurrentUser();
+    if (currentUser) {
+        let updated = false;
+        filtered.forEach((device) => {
+            if (device && !device.ownerId) {
+                device.ownerId = currentUser.id;
+                updated = true;
+            }
+        });
+        if (updated) {
+            localStorage.setItem(devicesKey, JSON.stringify(filtered));
+        }
+    }
+    syncDeviceRegistryFromDevices(filtered);
     return filtered;
 }
 
@@ -2322,6 +5141,14 @@ function closeDeviceModal() {
 function closeDeviceFormModal() {
     document.getElementById('deviceFormModal').classList.remove('active');
     document.getElementById('deviceForm').reset();
+    const copySource = document.getElementById('logisticsCopySource');
+    if (copySource) {
+        copySource.innerHTML = '<option value="">Select a source device</option>';
+    }
+    const currentAreaInput = document.getElementById('logisticsCurrentArea');
+    if (currentAreaInput) {
+        currentAreaInput.value = '';
+    }
     editingDeviceId = null;
     goToStep1(); // Reset to first step
 }
@@ -2379,10 +5206,72 @@ function setDeviceTypeSelect(value) {
     select.value = nextValue;
 }
 
+function populateLogisticsCopySourceOptions(currentDeviceId = null) {
+    const select = document.getElementById('logisticsCopySource');
+    if (!select) return;
+    const devices = getDevices().filter(device => device && device.id && device.id !== currentDeviceId);
+    const options = devices.map(device => {
+        const imei = (device?.lte?.imei || '').toString().trim();
+        const label = `${device.name || device.id}${imei ? ` (${imei})` : ''}`;
+        return `<option value="${device.id}">${label}</option>`;
+    });
+    select.innerHTML = `<option value="">Select a source device</option>${options.join('')}`;
+    select.disabled = options.length === 0;
+}
+
+function applyCopiedLogisticsRules() {
+    const select = document.getElementById('logisticsCopySource');
+    if (!select) return;
+    const sourceDeviceId = (select.value || '').trim();
+    if (!sourceDeviceId) {
+        alert('Please select a source device first.');
+        return;
+    }
+
+    const sourceDevice = getDevices().find(device => device.id === sourceDeviceId);
+    if (!sourceDevice) {
+        alert('Source device not found. Please refresh and try again.');
+        return;
+    }
+
+    const logistics = sourceDevice.logistics || {};
+    const monitoringEnabledEl = document.getElementById('logisticsMonitoringEnabled');
+    if (monitoringEnabledEl) monitoringEnabledEl.checked = logistics.monitoringEnabled !== false;
+    const tempMinEl = document.getElementById('logisticsTempMin');
+    if (tempMinEl) tempMinEl.value = toFiniteNumber(logistics.tempMin) ?? -10;
+    const tempMaxEl = document.getElementById('logisticsTempMax');
+    if (tempMaxEl) tempMaxEl.value = toFiniteNumber(logistics.tempMax) ?? 30;
+    const humidityMinEl = document.getElementById('logisticsHumidityMin');
+    if (humidityMinEl) humidityMinEl.value = toFiniteNumber(logistics.humidityMin) ?? 20;
+    const humidityMaxEl = document.getElementById('logisticsHumidityMax');
+    if (humidityMaxEl) humidityMaxEl.value = toFiniteNumber(logistics.humidityMax) ?? 80;
+    const tiltMaxEl = document.getElementById('logisticsTiltMax');
+    if (tiltMaxEl) tiltMaxEl.value = toFiniteNumber(logistics.tiltMax) ?? 30;
+    const collisionMaxEl = document.getElementById('logisticsCollisionMaxG');
+    if (collisionMaxEl) collisionMaxEl.value = toFiniteNumber(logistics.collisionMaxG) ?? 2.5;
+    const deliveryGraceEl = document.getElementById('deliveryGraceMinutes');
+    if (deliveryGraceEl) deliveryGraceEl.value = toFiniteNumber(logistics.deliveryGraceMinutes) ?? 30;
+    const cooldownEl = document.getElementById('logisticsAlertCooldownMinutes');
+    if (cooldownEl) cooldownEl.value = toFiniteNumber(logistics.alertCooldownMinutes) ?? 15;
+    const startAreaEl = document.getElementById('logisticsStartAreaId');
+    if (startAreaEl) {
+        startAreaEl.value = logistics.startAreaId || '';
+    }
+    const destinationAreaEl = document.getElementById('logisticsDestinationAreaId');
+    if (destinationAreaEl) {
+        destinationAreaEl.value = logistics.destinationAreaId || '';
+    }
+
+    if (typeof showToast === 'function') {
+        showToast(`Copied logistics rules from ${sourceDevice.name || sourceDevice.id}.`, 'success');
+    }
+}
+
 function showDeviceForm(deviceId = null) {
     editingDeviceId = deviceId;
     const form = document.getElementById('deviceForm');
     const formTitle = document.getElementById('deviceFormTitle');
+    refreshDeviceAssetOptions();
     
     // Always start at step 1
     goToStep1();
@@ -2398,11 +5287,65 @@ function showDeviceForm(deviceId = null) {
             document.getElementById('deviceGroup').value = device.group || '';
             setDeviceTypeSelect(device.type || 'Tracker');
             document.getElementById('deviceId').value = device.id || '';
+            const modelSelect = document.getElementById('deviceModel');
+            if (modelSelect) {
+                modelSelect.value = device.model || device.lte?.model || '';
+            }
             
             // Populate step 2 fields
             document.getElementById('deviceName').value = device.name || '';
             document.getElementById('deviceAsset').value = device.asset || '';
-            document.getElementById('deviceLocation').value = device.location || '';
+            const locationField = document.getElementById('deviceLocation');
+            if (locationField) {
+                locationField.value = device?.logistics?.routeNote || device.location || '';
+            }
+            populateDeviceAreaOptions({
+                startAreaId: device?.logistics?.startAreaId || '',
+                destinationAreaId: device?.logistics?.destinationAreaId || '',
+                device
+            });
+            const expectedDeliveryField = document.getElementById('expectedDeliveryAt');
+            if (expectedDeliveryField) {
+                expectedDeliveryField.value = device?.logistics?.expectedDeliveryAt
+                    ? toLocalDatetimeValue(new Date(device.logistics.expectedDeliveryAt))
+                    : '';
+            }
+            const deliveryGraceField = document.getElementById('deliveryGraceMinutes');
+            if (deliveryGraceField) {
+                deliveryGraceField.value = device?.logistics?.deliveryGraceMinutes ?? 30;
+            }
+            const logisticsEnabledField = document.getElementById('logisticsMonitoringEnabled');
+            if (logisticsEnabledField) {
+                logisticsEnabledField.checked = device?.logistics?.monitoringEnabled !== false;
+            }
+            const logisticsTempMinField = document.getElementById('logisticsTempMin');
+            if (logisticsTempMinField) {
+                logisticsTempMinField.value = device?.logistics?.tempMin ?? -10;
+            }
+            const logisticsTempMaxField = document.getElementById('logisticsTempMax');
+            if (logisticsTempMaxField) {
+                logisticsTempMaxField.value = device?.logistics?.tempMax ?? 30;
+            }
+            const logisticsHumidityMinField = document.getElementById('logisticsHumidityMin');
+            if (logisticsHumidityMinField) {
+                logisticsHumidityMinField.value = device?.logistics?.humidityMin ?? 20;
+            }
+            const logisticsHumidityMaxField = document.getElementById('logisticsHumidityMax');
+            if (logisticsHumidityMaxField) {
+                logisticsHumidityMaxField.value = device?.logistics?.humidityMax ?? 80;
+            }
+            const logisticsTiltMaxField = document.getElementById('logisticsTiltMax');
+            if (logisticsTiltMaxField) {
+                logisticsTiltMaxField.value = device?.logistics?.tiltMax ?? 30;
+            }
+            const logisticsCollisionMaxField = document.getElementById('logisticsCollisionMaxG');
+            if (logisticsCollisionMaxField) {
+                logisticsCollisionMaxField.value = device?.logistics?.collisionMaxG ?? 2.5;
+            }
+            const logisticsCooldownField = document.getElementById('logisticsAlertCooldownMinutes');
+            if (logisticsCooldownField) {
+                logisticsCooldownField.value = device?.logistics?.alertCooldownMinutes ?? 15;
+            }
             // Status and runtime telemetry are set from live data
             
             // Set networks
@@ -2432,6 +5375,7 @@ function showDeviceForm(deviceId = null) {
                 document.getElementById('lteDataLogFrequency').value = device.lte.dataLogFrequency || '5000';
             }
         }
+        populateLogisticsCopySourceOptions(deviceId);
     } else {
         // Adding new device
         formTitle.textContent = 'Add New Device';
@@ -2439,6 +5383,10 @@ function showDeviceForm(deviceId = null) {
         
         // Set defaults for step 2
         setDeviceTypeSelect('Tracker');
+        const modelSelect = document.getElementById('deviceModel');
+        if (modelSelect) {
+            modelSelect.value = '';
+        }
         document.getElementById('gpsStatus').value = 'Active';
 
         const systemSettings = JSON.parse(localStorage.getItem('lte_system_settings') || '{}');
@@ -2450,6 +5398,52 @@ function showDeviceForm(deviceId = null) {
         if (systemSettings.defaultApn) {
             document.getElementById('lteApn').value = systemSettings.defaultApn;
         }
+        const expectedDeliveryField = document.getElementById('expectedDeliveryAt');
+        if (expectedDeliveryField) {
+            expectedDeliveryField.value = '';
+        }
+        const locationField = document.getElementById('deviceLocation');
+        if (locationField) {
+            locationField.value = '';
+        }
+        populateDeviceAreaOptions();
+        const deliveryGraceField = document.getElementById('deliveryGraceMinutes');
+        if (deliveryGraceField) {
+            deliveryGraceField.value = 30;
+        }
+        const logisticsEnabledField = document.getElementById('logisticsMonitoringEnabled');
+        if (logisticsEnabledField) {
+            logisticsEnabledField.checked = true;
+        }
+        const logisticsTempMinField = document.getElementById('logisticsTempMin');
+        if (logisticsTempMinField) {
+            logisticsTempMinField.value = -10;
+        }
+        const logisticsTempMaxField = document.getElementById('logisticsTempMax');
+        if (logisticsTempMaxField) {
+            logisticsTempMaxField.value = 30;
+        }
+        const logisticsHumidityMinField = document.getElementById('logisticsHumidityMin');
+        if (logisticsHumidityMinField) {
+            logisticsHumidityMinField.value = 20;
+        }
+        const logisticsHumidityMaxField = document.getElementById('logisticsHumidityMax');
+        if (logisticsHumidityMaxField) {
+            logisticsHumidityMaxField.value = 80;
+        }
+        const logisticsTiltMaxField = document.getElementById('logisticsTiltMax');
+        if (logisticsTiltMaxField) {
+            logisticsTiltMaxField.value = 30;
+        }
+        const logisticsCollisionMaxField = document.getElementById('logisticsCollisionMaxG');
+        if (logisticsCollisionMaxField) {
+            logisticsCollisionMaxField.value = 2.5;
+        }
+        const logisticsCooldownField = document.getElementById('logisticsAlertCooldownMinutes');
+        if (logisticsCooldownField) {
+            logisticsCooldownField.value = 15;
+        }
+        populateLogisticsCopySourceOptions();
         
         // Check GPS/GNSS and temperature by default
         document.querySelector('input[name="networks"][value="GPS/GNSS"]').checked = true;
@@ -2462,18 +5456,64 @@ function showDeviceForm(deviceId = null) {
 function saveDeviceFromForm() {
     const form = document.getElementById('deviceForm');
     const formData = new FormData(form);
+    const currentUser = safeGetCurrentUser();
     
     // Get step 1 info
-    const deviceGroup = formData.get('deviceGroup');
+    const deviceGroupRaw = formData.get('deviceGroup');
+    const deviceGroup = (deviceGroupRaw || '').toString().trim();
     const deviceType = formData.get('deviceType');
     const deviceId = formData.get('deviceId');
+    const deviceModel = (formData.get('deviceModel') || '').toString().trim();
     
     // Get step 2 info
     const deviceName = formData.get('deviceName') || deviceId; // Use ID as name if name not provided
-    const deviceAsset = formData.get('deviceAsset');
+    const deviceAsset = (formData.get('deviceAsset') || '').toString().trim();
     
     // Get step 3 info
-    const deviceLocation = formData.get('deviceLocation');
+    const deviceLocation = (formData.get('deviceLocation') || '').toString().trim();
+    const logisticsStartAreaIdRaw = (formData.get('logisticsStartAreaId') || '').toString().trim();
+    const logisticsDestinationAreaIdRaw = (formData.get('logisticsDestinationAreaId') || '').toString().trim();
+    const logisticsStartAreaId = logisticsStartAreaIdRaw || null;
+    const logisticsDestinationAreaId = logisticsDestinationAreaIdRaw || null;
+    const startArea = logisticsStartAreaId ? getAreaById(logisticsStartAreaId) : null;
+    const destinationArea = logisticsDestinationAreaId ? getAreaById(logisticsDestinationAreaId) : null;
+    const destinationLocation = destinationArea?.name || '';
+    const routeNote = deviceLocation;
+    const expectedDeliveryAtRaw = (formData.get('expectedDeliveryAt') || '').toString().trim();
+    const deliveryGraceMinutesRaw = (formData.get('deliveryGraceMinutes') || '').toString().trim();
+    const logisticsMonitoringEnabled = formData.get('logisticsMonitoringEnabled') !== null;
+    const logisticsTempMinRaw = (formData.get('logisticsTempMin') || '').toString().trim();
+    const logisticsTempMaxRaw = (formData.get('logisticsTempMax') || '').toString().trim();
+    const logisticsHumidityMinRaw = (formData.get('logisticsHumidityMin') || '').toString().trim();
+    const logisticsHumidityMaxRaw = (formData.get('logisticsHumidityMax') || '').toString().trim();
+    const logisticsTiltMaxRaw = (formData.get('logisticsTiltMax') || '').toString().trim();
+    const logisticsCollisionMaxGRaw = (formData.get('logisticsCollisionMaxG') || '').toString().trim();
+    const logisticsAlertCooldownMinutesRaw = (formData.get('logisticsAlertCooldownMinutes') || '').toString().trim();
+    const deliveryGraceMinutes = deliveryGraceMinutesRaw ? Number(deliveryGraceMinutesRaw) : null;
+    const logisticsTempMin = logisticsTempMinRaw ? Number(logisticsTempMinRaw) : null;
+    const logisticsTempMax = logisticsTempMaxRaw ? Number(logisticsTempMaxRaw) : null;
+    const logisticsHumidityMin = logisticsHumidityMinRaw ? Number(logisticsHumidityMinRaw) : null;
+    const logisticsHumidityMax = logisticsHumidityMaxRaw ? Number(logisticsHumidityMaxRaw) : null;
+    const logisticsTiltMax = logisticsTiltMaxRaw ? Number(logisticsTiltMaxRaw) : null;
+    const logisticsCollisionMaxG = logisticsCollisionMaxGRaw ? Number(logisticsCollisionMaxGRaw) : null;
+    const logisticsAlertCooldownMinutes = logisticsAlertCooldownMinutesRaw ? Number(logisticsAlertCooldownMinutesRaw) : null;
+    const logisticsSettings = {
+        monitoringEnabled: logisticsMonitoringEnabled,
+        startAreaId: startArea ? startArea.id : null,
+        startAreaName: startArea ? startArea.name : '',
+        destinationAreaId: destinationArea ? destinationArea.id : null,
+        destinationAreaName: destinationArea ? destinationArea.name : '',
+        routeNote: routeNote || '',
+        expectedDeliveryAt: expectedDeliveryAtRaw ? new Date(expectedDeliveryAtRaw).toISOString() : null,
+        deliveryGraceMinutes: Number.isFinite(deliveryGraceMinutes) ? deliveryGraceMinutes : 30,
+        tempMin: Number.isFinite(logisticsTempMin) ? logisticsTempMin : -10,
+        tempMax: Number.isFinite(logisticsTempMax) ? logisticsTempMax : 30,
+        humidityMin: Number.isFinite(logisticsHumidityMin) ? logisticsHumidityMin : 20,
+        humidityMax: Number.isFinite(logisticsHumidityMax) ? logisticsHumidityMax : 80,
+        tiltMax: Number.isFinite(logisticsTiltMax) ? logisticsTiltMax : 30,
+        collisionMaxG: Number.isFinite(logisticsCollisionMaxG) ? logisticsCollisionMaxG : 2.5,
+        alertCooldownMinutes: Number.isFinite(logisticsAlertCooldownMinutes) ? logisticsAlertCooldownMinutes : 15
+    };
     
     // Get selected networks
     const selectedNetworks = [];
@@ -2527,6 +5567,7 @@ function saveDeviceFromForm() {
     const lteDataFormat = (formData.get('lteDataFormat') || 'json').toString().trim();
     const lteDataLogFrequency = (formData.get('lteDataLogFrequency') || '5000').toString().trim();
     const lteSettings = {
+        model: deviceModel,
         imei: lteImei,
         simIccid: lteSimIccid,
         carrier: lteCarrier,
@@ -2534,8 +5575,32 @@ function saveDeviceFromForm() {
         dataFormat: lteDataFormat,
         dataLogFrequency: lteDataLogFrequency
     };
-    
     const devices = getDevices();
+
+    if (deviceGroup) {
+        const groups = getGroups();
+        const exists = groups.some(group => group.name.toLowerCase() === deviceGroup.toLowerCase());
+        if (!exists) {
+            groups.push({
+                id: `group-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                name: deviceGroup,
+                description: '',
+                createdAt: new Date().toISOString()
+            });
+            saveGroups(groups);
+            refreshUserGroupOptions(groups);
+            refreshDeviceGroupOptions(groups);
+            loadGroups();
+            if (typeof showToast === 'function') {
+                showToast(`Group "${deviceGroup}" created and linked to this device.`, 'success');
+            }
+        }
+    }
+
+    const wasAssetCreated = ensureAssetExists(deviceAsset);
+    if (wasAssetCreated) {
+        loadAssets();
+    }
     
     if (editingDeviceId) {
         // Update existing device
@@ -2549,11 +5614,13 @@ function saveDeviceFromForm() {
             devices[deviceIndex] = {
                 ...existingDevice,
                 id: deviceId, // Allow ID update
+                ownerId: existingDevice.ownerId || (currentUser ? currentUser.id : null),
                 name: deviceName,
                 group: deviceGroup,
+                model: deviceModel,
                 type: deviceType,
                 asset: deviceAsset || '',
-                location: deviceLocation || 'Unknown',
+                location: destinationLocation || routeNote || 'Unknown',
                 status: deviceStatus,
                 latitude: latitude,
                 longitude: longitude,
@@ -2572,6 +5639,12 @@ function saveDeviceFromForm() {
                     lastFix: new Date().toISOString()
                 },
                 lte: lteSettings,
+                logistics: {
+                    ...existingDevice.logistics,
+                    ...logisticsSettings,
+                    currentAreaId: existingDevice?.logistics?.currentAreaId || null,
+                    currentAreaName: existingDevice?.logistics?.currentAreaName || ''
+                },
             temperature: existingDevice.temperature ?? null,
             humidity: existingDevice.humidity ?? null,
                 lastUpdate: existingDevice.lastUpdate || null
@@ -2579,14 +5652,21 @@ function saveDeviceFromForm() {
         }
     } else {
         // Create new device
+        const capabilities = getPlanCapabilities();
+        if (devices.length >= capabilities.deviceLimit) {
+            alert(`Device limit reached for your plan (${capabilities.deviceLimit}). Please upgrade to add more devices.`);
+            return;
+        }
         const newDevice = {
             id: deviceId, // Use provided ID
+            ownerId: currentUser ? currentUser.id : null,
             name: deviceName,
             group: deviceGroup,
+            model: deviceModel,
             type: deviceType,
             asset: deviceAsset || '',
             status: deviceStatus,
-            location: deviceLocation || 'Unknown',
+            location: destinationLocation || routeNote || 'Unknown',
             latitude: latitude,
             longitude: longitude,
             temperature: null,
@@ -2597,7 +5677,7 @@ function saveDeviceFromForm() {
             accuracy: accuracy,
             firmware: null,
             uptime: null,
-            dataTransmitted: '0 MB',
+            dataTransmitted: null,
             networks: selectedNetworks.length > 0 ? selectedNetworks : ['GPS/GNSS'],
             sensors: sensors,
             tracker: {
@@ -2607,6 +5687,7 @@ function saveDeviceFromForm() {
                 lastFix: null
             },
             lte: lteSettings,
+            logistics: logisticsSettings,
             lastUpdate: null,
             createdAt: new Date().toISOString()
         };
@@ -2615,10 +5696,14 @@ function saveDeviceFromForm() {
     }
     
     localStorage.setItem('cargotrack_devices', JSON.stringify(devices));
+    registerDeviceIds([deviceId, lteImei]);
     closeDeviceFormModal();
     loadDevices();
     loadDashboardData();
-    
+    if (typeof fetchLiveLocations === 'function') {
+        setTimeout(fetchLiveLocations, 600);
+    }
+
     // Show success message
     alert(editingDeviceId ? 'Device updated successfully!' : 'Device added successfully!');
 }
@@ -2637,6 +5722,400 @@ function getAlerts() {
 
 function saveAlerts(alerts) {
     localStorage.setItem('cargotrack_alerts', JSON.stringify(alerts));
+}
+
+function getLogisticsMonitoringSettings() {
+    const currentUser = safeGetCurrentUser();
+    const defaults = {
+        mobilePhone: ''
+    };
+    if (!currentUser || typeof getUserNotificationSettings !== 'function') {
+        return defaults;
+    }
+    const settings = getUserNotificationSettings(currentUser.id) || {};
+    return {
+        ...defaults,
+        ...settings
+    };
+}
+
+function getLogisticsState() {
+    const raw = localStorage.getItem(LOGISTICS_STATE_KEY);
+    if (!raw) return {};
+    try {
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (error) {
+        console.warn('Failed to parse logistics monitoring state:', error);
+        return {};
+    }
+}
+
+function saveLogisticsState(state) {
+    localStorage.setItem(LOGISTICS_STATE_KEY, JSON.stringify(state || {}));
+}
+
+function getDeviceLogisticsKey(device) {
+    if (!device) return null;
+    const imei = (device?.lte?.imei || '').toString().trim();
+    const id = (device?.id || '').toString().trim();
+    return imei || id || null;
+}
+
+function toFiniteNumber(value) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : null;
+}
+
+function getDeviceHumidityTelemetry(device) {
+    if (!device) return null;
+    const directHumidity = toFiniteNumber(device.humidity);
+    if (directHumidity !== null) return directHumidity;
+
+    const trackerHumidity = toFiniteNumber(device?.tracker?.humidity);
+    if (trackerHumidity !== null) return trackerHumidity;
+
+    const humiditySensor = Array.isArray(device.sensors)
+        ? device.sensors.find(sensor => (sensor?.type || '').toString().toLowerCase() === 'humidity')
+        : null;
+    return toFiniteNumber(humiditySensor?.value);
+}
+
+function pushChannelNotification(storageKey, payload) {
+    const items = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    items.unshift(payload);
+    if (items.length > 500) {
+        items.splice(500);
+    }
+    localStorage.setItem(storageKey, JSON.stringify(items));
+}
+
+function dispatchAlertChannels(alertEntry) {
+    const currentUser = safeGetCurrentUser();
+    if (!currentUser) return;
+    const settings = getLogisticsMonitoringSettings();
+    if (settings.alertNotifications === false) return;
+
+    if (settings.emailAlerts !== false && typeof sendEmail === 'function' && currentUser.email) {
+        sendEmail(
+            currentUser.email,
+            `[CargoTrack] ${alertEntry.title}`,
+            `${alertEntry.message}\n\nSeverity: ${alertEntry.severity}\nTime: ${new Date(alertEntry.timestamp).toLocaleString()}`,
+            'logisticsAlert'
+        );
+    }
+
+    if (settings.smsAlerts) {
+        pushChannelNotification(SMS_NOTIFICATIONS_KEY, {
+            id: `sms-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            to: settings.mobilePhone || currentUser.phone || '',
+            message: `[CargoTrack] ${alertEntry.title}: ${alertEntry.message}`,
+            severity: alertEntry.severity,
+            timestamp: alertEntry.timestamp
+        });
+    }
+
+    if (settings.pushNotifications !== false) {
+        pushChannelNotification(MOBILE_PUSH_NOTIFICATIONS_KEY, {
+            id: `push-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            title: alertEntry.title,
+            message: alertEntry.message,
+            severity: alertEntry.severity,
+            timestamp: alertEntry.timestamp
+        });
+
+        if ('Notification' in window && Notification.permission === 'granted') {
+            try {
+                new Notification(alertEntry.title, { body: alertEntry.message });
+            } catch (error) {
+                // Notification API not available in current browser context.
+            }
+        }
+    }
+}
+
+function evaluateDeviceLogisticsConditions(device) {
+    const deviceKey = getDeviceLogisticsKey(device);
+    if (!deviceKey) return;
+    const logistics = device?.logistics || {};
+    if (logistics.monitoringEnabled === false) return;
+    const settings = getLogisticsMonitoringSettings();
+
+    const now = Date.now();
+    const cooldownMinutes = toFiniteNumber(logistics.alertCooldownMinutes) ?? 15;
+    const cooldownMs = Math.max(1, Number(cooldownMinutes) || 15) * 60 * 1000;
+    const state = getLogisticsState();
+
+    const triggerCondition = ({ key, active, title, message, severity = 'warning', icon = 'fas fa-truck-loading' }) => {
+        const stateKey = `${deviceKey}:${key}`;
+        const current = state[stateKey] || { active: false, lastAlertAt: 0 };
+        if (active && (!current.active || now - Number(current.lastAlertAt || 0) >= cooldownMs)) {
+            addAlertEntry({
+                title,
+                message,
+                severity,
+                icon,
+                skipChannelDispatch: false
+            });
+            state[stateKey] = { active: true, lastAlertAt: now };
+            return;
+        }
+        if (!active && current.active) {
+            state[stateKey] = { active: false, lastAlertAt: Number(current.lastAlertAt || 0) };
+            return;
+        }
+        if (!state[stateKey]) {
+            state[stateKey] = { active: false, lastAlertAt: 0 };
+        }
+    };
+
+    const areas = getAreas();
+    const currentArea = getContainingAreaForCoordinates(device.latitude, device.longitude, areas);
+    const currentAreaId = currentArea ? currentArea.id : null;
+    const currentAreaName = currentArea ? currentArea.name : '';
+    const startAreaId = (logistics.startAreaId || '').toString().trim() || null;
+    const destinationAreaId = (logistics.destinationAreaId || '').toString().trim() || null;
+    const startArea = startAreaId ? areas.find(area => area.id === startAreaId) : null;
+    const destinationArea = destinationAreaId ? areas.find(area => area.id === destinationAreaId) : null;
+
+    device.logistics = {
+        ...logistics,
+        startAreaId: startArea ? startArea.id : null,
+        startAreaName: startArea ? startArea.name : (logistics.startAreaName || ''),
+        destinationAreaId: destinationArea ? destinationArea.id : null,
+        destinationAreaName: destinationArea ? destinationArea.name : (logistics.destinationAreaName || ''),
+        currentAreaId,
+        currentAreaName
+    };
+
+    const routeStateKey = `${deviceKey}:route-progress`;
+    const existingRouteState = state[routeStateKey];
+    let routeState = existingRouteState && typeof existingRouteState === 'object'
+        ? existingRouteState
+        : null;
+    const routeConfigChanged = routeState
+        ? routeState.startAreaId !== startAreaId || routeState.destinationAreaId !== destinationAreaId
+        : true;
+    if (!routeState || routeConfigChanged) {
+        routeState = {
+            startAreaId,
+            destinationAreaId,
+            seenStartArea: Boolean(startAreaId && currentAreaId === startAreaId),
+            lastAreaId: currentAreaId,
+            initializedAt: now
+        };
+    } else {
+        if (startAreaId && currentAreaId === startAreaId) {
+            routeState.seenStartArea = true;
+        }
+        if (startAreaId && routeState.seenStartArea && routeState.lastAreaId === startAreaId && currentAreaId !== startAreaId) {
+            addAlertEntry({
+                title: 'Shipment Departed Start Area',
+                message: `${device.name || deviceKey} left ${startArea?.name || 'the start area'}.`,
+                severity: 'info',
+                icon: 'fas fa-truck-moving'
+            });
+        }
+        if (destinationAreaId && routeState.lastAreaId !== destinationAreaId && currentAreaId === destinationAreaId) {
+            addAlertEntry({
+                title: 'Shipment Arrived at Destination',
+                message: `${device.name || deviceKey} arrived at ${destinationArea?.name || 'the destination area'}.`,
+                severity: 'success',
+                icon: 'fas fa-flag-checkered'
+            });
+        }
+        routeState.lastAreaId = currentAreaId;
+    }
+    state[routeStateKey] = routeState;
+
+    const temp = toFiniteNumber(device.temperature);
+    const humidity = toFiniteNumber(device.humidity);
+    const tilt = toFiniteNumber(device.tilt ?? device?.tracker?.tilt);
+    const collision = toFiniteNumber(device.collision ?? device?.tracker?.collision);
+    const expectedDeliveryAt = device?.logistics?.expectedDeliveryAt || device?.expectedDeliveryAt || null;
+    const tempMin = toFiniteNumber(logistics.tempMin) ?? -10;
+    const tempMax = toFiniteNumber(logistics.tempMax) ?? 30;
+    const humidityMin = toFiniteNumber(logistics.humidityMin) ?? 20;
+    const humidityMax = toFiniteNumber(logistics.humidityMax) ?? 80;
+    const tiltMax = toFiniteNumber(logistics.tiltMax) ?? 30;
+    const collisionMaxG = toFiniteNumber(logistics.collisionMaxG) ?? 2.5;
+    const deliveryGraceMinutes = toFiniteNumber(logistics.deliveryGraceMinutes) ?? 30;
+
+    triggerCondition({
+        key: 'temp-range',
+        active: temp !== null && (temp < tempMin || temp > tempMax),
+        title: 'Temperature Out of Range',
+        message: `${device.name || deviceKey} temperature is ${temp}°C (allowed ${tempMin}°C to ${tempMax}°C).`,
+        severity: 'critical',
+        icon: 'fas fa-thermometer-half'
+    });
+
+    triggerCondition({
+        key: 'humidity-range',
+        active: humidity !== null && (humidity < humidityMin || humidity > humidityMax),
+        title: 'Humidity Out of Range',
+        message: `${device.name || deviceKey} humidity is ${humidity}% (allowed ${humidityMin}% to ${humidityMax}%).`,
+        severity: 'warning',
+        icon: 'fas fa-tint'
+    });
+
+    triggerCondition({
+        key: 'tilt-threshold',
+        active: tilt !== null && Math.abs(tilt) > tiltMax,
+        title: 'Excessive Tilt Detected',
+        message: `${device.name || deviceKey} tilt reached ${tilt}° (max ${tiltMax}°).`,
+        severity: 'critical',
+        icon: 'fas fa-exclamation-triangle'
+    });
+
+    triggerCondition({
+        key: 'collision-threshold',
+        active: collision !== null && Math.abs(collision) > collisionMaxG,
+        title: 'Collision / Impact Alert',
+        message: `${device.name || deviceKey} impact reached ${collision}g (max ${collisionMaxG}g).`,
+        severity: 'critical',
+        icon: 'fas fa-car-crash'
+    });
+
+    let deliveryDelayActive = false;
+    if (expectedDeliveryAt) {
+        const expectedTs = new Date(expectedDeliveryAt).getTime();
+        if (Number.isFinite(expectedTs)) {
+            const graceMs = Math.max(0, Number(deliveryGraceMinutes || 0)) * 60 * 1000;
+            deliveryDelayActive = now > expectedTs + graceMs;
+        }
+    }
+    triggerCondition({
+        key: 'delivery-delay',
+        active: deliveryDelayActive,
+        title: 'Delivery Delay Alert',
+        message: `${device.name || deviceKey} delivery ETA has been exceeded.`,
+        severity: 'warning',
+        icon: 'fas fa-clock'
+    });
+
+    saveLogisticsState(state);
+}
+
+function runLogisticsMonitoringSweep() {
+    const devices = getDevices();
+    devices.forEach((device) => evaluateDeviceLogisticsConditions(device));
+}
+
+function addAlertEntry({ title, message, severity = 'info', icon = 'fas fa-bell', skipChannelDispatch = false }) {
+    const alerts = getAlerts();
+    const entry = {
+        id: `alert-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        title,
+        message,
+        severity,
+        icon,
+        read: false,
+        timestamp: new Date().toISOString()
+    };
+    alerts.unshift(entry);
+    saveAlerts(alerts);
+    loadAlerts();
+    loadDashboardData();
+    if (!skipChannelDispatch) {
+        dispatchAlertChannels(entry);
+    }
+}
+
+function getAreaStateMap() {
+    const stored = localStorage.getItem(AREA_STATE_STORAGE_KEY);
+    if (!stored) return {};
+    try {
+        const parsed = JSON.parse(stored);
+        return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (error) {
+        console.warn('Failed to parse area state:', error);
+        return {};
+    }
+}
+
+function saveAreaStateMap(state) {
+    localStorage.setItem(AREA_STATE_STORAGE_KEY, JSON.stringify(state));
+}
+
+function pruneAreaState(areaId) {
+    const state = getAreaStateMap();
+    const nextState = Object.fromEntries(
+        Object.entries(state).filter(([key]) => !key.endsWith(`:${areaId}`))
+    );
+    saveAreaStateMap(nextState);
+}
+
+function getDistanceMeters(a, b) {
+    const toRad = value => (value * Math.PI) / 180;
+    const earthRadius = 6371000;
+    const dLat = toRad(b.lat - a.lat);
+    const dLng = toRad(b.lng - a.lng);
+    const lat1 = toRad(a.lat);
+    const lat2 = toRad(b.lat);
+    const sinDLat = Math.sin(dLat / 2);
+    const sinDLng = Math.sin(dLng / 2);
+    const aa = sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLng * sinDLng;
+    const c = 2 * Math.atan2(Math.sqrt(aa), Math.sqrt(1 - aa));
+    return earthRadius * c;
+}
+
+function isPointInPolygon(point, polygon) {
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const xi = polygon[i][1];
+        const yi = polygon[i][0];
+        const xj = polygon[j][1];
+        const yj = polygon[j][0];
+        const intersects = yi > point.lat !== yj > point.lat &&
+            point.lng < ((xj - xi) * (point.lat - yi)) / (yj - yi) + xi;
+        if (intersects) inside = !inside;
+    }
+    return inside;
+}
+
+function updateAreaAlerts(device) {
+    if (!device || !hasValidCoordinates(device.latitude, device.longitude)) return;
+    const areas = getAreas();
+    if (areas.length === 0) return;
+    const state = getAreaStateMap();
+    const deviceKey = device.id || device.deviceId || device.imei;
+    if (!deviceKey) return;
+
+    areas.forEach(area => {
+        let inside = false;
+        if (area.shape === 'polygon' && Array.isArray(area.polygon) && area.polygon.length >= 3) {
+            inside = isPointInPolygon(
+                { lat: device.latitude, lng: device.longitude },
+                area.polygon
+            );
+        } else if (area.center && area.radiusMeters) {
+            const distance = getDistanceMeters(
+                { lat: device.latitude, lng: device.longitude },
+                area.center
+            );
+            inside = distance <= area.radiusMeters;
+        } else {
+            return;
+        }
+        const stateKey = `${deviceKey}:${area.id}`;
+        const previous = state[stateKey];
+        if (previous === undefined) {
+            state[stateKey] = inside;
+            return;
+        }
+        if (previous !== inside) {
+            state[stateKey] = inside;
+            addAlertEntry({
+                title: inside ? 'Area Entered' : 'Area Left',
+                message: `${device.name || deviceKey} ${inside ? 'entered' : 'left'} ${area.name}.`,
+                severity: inside ? 'info' : 'warning',
+                icon: inside ? 'fas fa-location-arrow' : 'fas fa-route'
+            });
+        }
+    });
+
+    saveAreaStateMap(state);
 }
 
 function getRecentActivities() {
@@ -2669,22 +6148,30 @@ function hasValidCoordinates(latitude, longitude) {
 }
 
 function getConnectionStatus(device) {
-    if (!device.lastUpdate) {
+    const lastUpdate = device.lastUpdate || device.updatedAt || device?.tracker?.lastFix || null;
+    if (!lastUpdate) {
         return { label: 'Not connected', className: 'inactive' };
     }
-    const lastSeen = new Date(device.lastUpdate).getTime();
+    const lastSeen = new Date(lastUpdate).getTime();
     const isStale = Number.isFinite(lastSeen) && Date.now() - lastSeen > STALE_DEVICE_MS;
     if (isStale) {
         return { label: 'Stale', className: 'warning' };
     }
-    return hasValidCoordinates(device.latitude, device.longitude)
-        ? { label: 'Connected', className: 'active' }
-        : { label: 'No GPS', className: 'warning' };
+    if (hasValidCoordinates(device.latitude, device.longitude)) {
+        return { label: 'Connected', className: 'active' };
+    }
+    // Recent data but no GPS yet: show Connected so app reflects tracker is sending
+    const recentMs = 5 * 60 * 1000;
+    if (Number.isFinite(lastSeen) && Date.now() - lastSeen <= recentMs) {
+        return { label: 'Connected', className: 'active' };
+    }
+    return { label: 'No GPS', className: 'warning' };
 }
 
 function getLastSeenText(device) {
-    if (!device.lastUpdate) return 'No data yet';
-    return formatTime(device.lastUpdate);
+    const lastUpdate = device.lastUpdate || device.updatedAt || device?.tracker?.lastFix || null;
+    if (!lastUpdate) return 'No data yet';
+    return formatTime(lastUpdate);
 }
 
 function viewDevice(deviceId) {
@@ -2714,9 +6201,14 @@ function deleteDevice(deviceId) {
 
     const updatedDevices = devices.filter(d => d.id !== deviceId);
     localStorage.setItem('cargotrack_devices', JSON.stringify(updatedDevices));
-    const blockedIds = getBlockedDeviceIds();
-    blockedIds.add(deviceId);
-    setBlockedDeviceIds(blockedIds);
+    const registry = getDeviceRegistry();
+    registry.delete(deviceId);
+    if (device.lte?.imei) {
+        registry.delete(device.lte.imei);
+    }
+    saveDeviceRegistry(registry);
+    syncDeviceRegistryToServer(Array.from(registry));
+    unregisterDeviceIdsOnServer([deviceId, device.lte?.imei].filter(Boolean));
 
     if (selectedDeviceId === deviceId) {
         selectedDeviceId = null;
@@ -2782,10 +6274,17 @@ function loadUserInvoices() {
     
     // Generate invoices for existing transactions
     if (typeof generateInvoicesForTransactions === 'function') {
-        generateInvoicesForTransactions();
+        try {
+            generateInvoicesForTransactions();
+        } catch (error) {
+            console.warn('Invoice generation failed:', error);
+        }
     }
     
-    const invoices = getUserInvoices(currentUser.id);
+    const userInvoices = getUserInvoices(currentUser.id);
+    const invoices = Array.isArray(userInvoices)
+        ? [...userInvoices].sort((a, b) => new Date(b?.date || 0).getTime() - new Date(a?.date || 0).getTime())
+        : [];
     const tableBody = document.getElementById('invoicesTable');
     
     if (!tableBody) return;
@@ -2803,10 +6302,10 @@ function loadUserInvoices() {
             <tr>
                 <td><strong>${invoice.invoiceNumber}</strong></td>
                 <td>${formatDate(invoice.date)}</td>
-                <td><span class="status-badge">${invoice.items[0].description.split(' - ')[0]}</span></td>
-                <td><strong>$${invoice.total.toFixed(2)}</strong></td>
+                <td><span class="status-badge">${getInvoicePackageLabel(invoice)}</span></td>
+                <td><strong>$${getInvoiceTotalAmount(invoice).toFixed(2)}</strong></td>
                 <td><span class="status-badge ${invoice.status === 'paid' ? 'active' : 'warning'}">${invoice.status}</span></td>
-                <td>${invoice.paymentMethod}</td>
+                <td>${invoice.paymentMethod || 'Unknown'}</td>
                 <td>
                     <div class="user-actions">
                         <button class="btn-icon-small view" onclick="viewInvoice('${invoice.id}')" title="View">
@@ -2826,19 +6325,33 @@ function loadUserInvoices() {
     loadPaymentMethods();
 }
 
+function getInvoicePackageLabel(invoice) {
+    const description = invoice?.items?.[0]?.description;
+    if (!description || typeof description !== 'string') {
+        return 'Subscription';
+    }
+    const [label] = description.split(' - ');
+    return label || 'Subscription';
+}
+
+function getInvoiceTotalAmount(invoice) {
+    const total = Number(invoice?.total);
+    return Number.isFinite(total) ? total : 0;
+}
+
 function updateBillingSummary(invoices) {
     const paidInvoices = invoices.filter(inv => inv.status === 'paid');
-    const totalPaid = paidInvoices.reduce((sum, inv) => sum + inv.total, 0);
+    const totalPaid = paidInvoices.reduce((sum, inv) => sum + getInvoiceTotalAmount(inv), 0);
     
     const now = new Date();
     const thisMonthInvoices = paidInvoices.filter(inv => {
         const invDate = new Date(inv.date);
         return invDate.getMonth() === now.getMonth() && invDate.getFullYear() === now.getFullYear();
     });
-    const monthlyPaid = thisMonthInvoices.reduce((sum, inv) => sum + inv.total, 0);
+    const monthlyPaid = thisMonthInvoices.reduce((sum, inv) => sum + getInvoiceTotalAmount(inv), 0);
     
     const pendingInvoices = invoices.filter(inv => inv.status === 'pending');
-    const pendingAmount = pendingInvoices.reduce((sum, inv) => sum + inv.total, 0);
+    const pendingAmount = pendingInvoices.reduce((sum, inv) => sum + getInvoiceTotalAmount(inv), 0);
     
     document.getElementById('totalPaid').textContent = '$' + totalPaid.toFixed(2);
     document.getElementById('monthlyPaid').textContent = '$' + monthlyPaid.toFixed(2);
@@ -2896,10 +6409,18 @@ function downloadInvoice(invoiceId) {
 
 function refreshInvoices() {
     if (typeof generateInvoicesForTransactions === 'function') {
-        generateInvoicesForTransactions();
+        try {
+            generateInvoicesForTransactions();
+        } catch (error) {
+            console.warn('Invoice refresh generation failed:', error);
+        }
     }
     loadUserInvoices();
-    alert('Invoices refreshed!');
+    if (typeof showToast === 'function') {
+        showToast('Invoices refreshed.', 'success');
+    } else {
+        alert('Invoices refreshed!');
+    }
 }
 
 // Notification Settings Functions
@@ -2916,6 +6437,8 @@ function loadNotificationSettings() {
     document.getElementById('systemNotifications').checked = settings.systemNotifications !== false;
     document.getElementById('paymentThankYou').checked = settings.paymentThankYou !== false;
     document.getElementById('subscriptionReminder').checked = settings.subscriptionReminder !== false;
+    const mobilePhoneEl = document.getElementById('mobilePhone');
+    if (mobilePhoneEl) mobilePhoneEl.value = settings.mobilePhone || currentUser.phone || '';
 }
 
 function saveNotificationSettings() {
@@ -2932,10 +6455,14 @@ function saveNotificationSettings() {
         alertNotifications: document.getElementById('alertNotifications').checked,
         systemNotifications: document.getElementById('systemNotifications').checked,
         paymentThankYou: document.getElementById('paymentThankYou').checked,
-        subscriptionReminder: document.getElementById('subscriptionReminder').checked
+        subscriptionReminder: document.getElementById('subscriptionReminder').checked,
+        mobilePhone: (document.getElementById('mobilePhone')?.value || '').trim()
     };
     
     saveUserNotificationSettings(currentUser.id, settings);
+    if (settings.pushNotifications && 'Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission().catch(() => {});
+    }
     alert('Notification preferences saved successfully!');
 }
 
