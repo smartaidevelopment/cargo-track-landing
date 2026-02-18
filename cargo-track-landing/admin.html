@@ -1026,10 +1026,44 @@
 
         <!-- All Devices Section -->
         <section id="admin-devices" class="content-section">
+            <!-- Status summary cards -->
+            <div class="stats-grid" style="margin-bottom:1.5rem;">
+                <div class="stat-card">
+                    <i class="fas fa-microchip"></i>
+                    <h3 id="adminDevTotal">0</h3>
+                    <p>Total Devices</p>
+                </div>
+                <div class="stat-card">
+                    <i class="fas fa-check-circle" style="color:#10b981;"></i>
+                    <h3 id="adminDevOnline" style="color:#10b981;">0</h3>
+                    <p>Online</p>
+                </div>
+                <div class="stat-card">
+                    <i class="fas fa-exclamation-triangle" style="color:#f59e0b;"></i>
+                    <h3 id="adminDevStale" style="color:#f59e0b;">0</h3>
+                    <p>Stale / No GPS</p>
+                </div>
+                <div class="stat-card">
+                    <i class="fas fa-times-circle" style="color:#ef4444;"></i>
+                    <h3 id="adminDevOffline" style="color:#ef4444;">0</h3>
+                    <p>Offline</p>
+                </div>
+            </div>
+
             <div class="dashboard-card full-width">
                 <div class="card-header">
                     <h2>All Devices (System-wide)</h2>
-                    <div class="card-actions">
+                    <div class="card-actions" style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+                        <input type="text" id="adminDeviceSearch" placeholder="Search devices..." style="padding:0.4rem 0.75rem;border:1px solid var(--border-color);border-radius:0.375rem;font-size:0.875rem;width:200px;">
+                        <select id="adminDeviceFilter" style="padding:0.4rem 0.75rem;border:1px solid var(--border-color);border-radius:0.375rem;font-size:0.875rem;">
+                            <option value="all">All Statuses</option>
+                            <option value="online">Online</option>
+                            <option value="stale">Stale / No GPS</option>
+                            <option value="offline">Offline</option>
+                        </select>
+                        <button class="btn btn-outline btn-small" id="refreshDeviceListBtn" title="Refresh Devices">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
                         <button class="btn btn-primary btn-small" id="adminAddDeviceBtn" type="button">
                             <i class="fas fa-plus"></i> Add Device
                         </button>
@@ -1043,17 +1077,17 @@
                         <thead>
                             <tr>
                                 <th>Device ID</th>
-                                <th>Owner</th>
                                 <th>Name</th>
+                                <th>Owner / Tenant</th>
                                 <th>Type</th>
-                                <th>Status</th>
-                                <th>Network</th>
-                                <th>Last Update</th>
+                                <th>Connection</th>
+                                <th>Location</th>
+                                <th>Sensors</th>
+                                <th>Last Seen</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="allDevicesTable">
-                            <!-- Table rows will be populated by JS -->
                         </tbody>
                     </table>
                 </div>
@@ -1067,7 +1101,6 @@
                         <button class="modal-close" id="closeAdminDeviceModal">&times;</button>
                     </div>
                     <div class="modal-body" id="adminDeviceModalBody">
-                        <!-- Populated by JS -->
                     </div>
                 </div>
             </div>

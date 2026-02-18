@@ -2944,65 +2944,170 @@ function exportFinancialReport() {
 }
 
 // All Devices
+
+const ADMIN_STALE_MS = 5 * 60 * 1000;
+
+function adminParseTimestamp(val) {
+    if (!val) return null;
+    if (typeof val === 'number') return Number.isFinite(val) ? val : null;
+    const ms = Date.parse(val);
+    return Number.isFinite(ms) ? ms : null;
+}
+
+function adminGetBestTimestamp(device) {
+    const candidates = [device?.lastUpdate, device?.updatedAt, device?.tracker?.lastFix];
+    let best = null;
+    candidates.forEach(c => {
+        const ms = adminParseTimestamp(c);
+        if (ms && (!best || ms > best.ms)) best = { ms, raw: c };
+    });
+    return best;
+}
+
+function adminGetStaleThreshold(device) {
+    const interval = Number(device?.lte?.dataLogFrequency);
+    if (!interval || !Number.isFinite(interval)) return ADMIN_STALE_MS;
+    const adaptive = Math.round((interval * 4) + 30000);
+    return Math.max(ADMIN_STALE_MS, Math.min(adaptive, 30 * 60 * 1000));
+}
+
+function adminHasCoords(device) {
+    return Number.isFinite(device?.latitude) && Number.isFinite(device?.longitude);
+}
+
+function adminConnectionStatus(device) {
+    const best = adminGetBestTimestamp(device);
+    if (!best) return { label: 'Not connected', cls: 'inactive', group: 'offline' };
+    const stale = Date.now() - best.ms > adminGetStaleThreshold(device);
+    if (stale) return { label: 'Stale', cls: 'warning', group: 'stale' };
+    if (adminHasCoords(device)) return { label: 'Connected', cls: 'active', group: 'online' };
+    return { label: 'No GPS', cls: 'warning', group: 'stale' };
+}
+
+function adminLastSeenText(device) {
+    const best = adminGetBestTimestamp(device);
+    if (!best) return 'No data';
+    return formatTime(best.raw);
+}
+
+function adminSensorSummary(device) {
+    const parts = [];
+    const t = device.temperature;
+    if (t != null && Number.isFinite(Number(t))) parts.push(`${Number(t).toFixed(1)}°C`);
+    const h = device.humidity;
+    if (h != null && Number.isFinite(Number(h))) parts.push(`${Number(h).toFixed(0)}%`);
+    const b = device.battery;
+    if (b != null && Number.isFinite(Number(b))) parts.push(`🔋${Number(b).toFixed(0)}%`);
+    return parts.length ? parts.join(' · ') : '—';
+}
+
 async function loadAllDevices() {
     await fetchAdminDevices();
     const devices = getAllDevices();
-    const tableBody = document.getElementById('allDevicesTable');
-    if (!tableBody) return;
-    
-    tableBody.innerHTML = devices.map(device => {
-        const ownerEmail = device.ownerEmail || 'Unknown';
-        const ownerCompany = device.ownerCompany || 'Unknown';
-        const networks = device.networks || [];
-        
-        return `
+    const searchEl = document.getElementById('adminDeviceSearch');
+    const filterEl = document.getElementById('adminDeviceFilter');
+    const search = (searchEl?.value || '').toLowerCase().trim();
+    const filter = filterEl?.value || 'all';
+
+    let online = 0, stale = 0, offline = 0;
+    const rows = [];
+
+    devices.forEach(device => {
+        const conn = adminConnectionStatus(device);
+        if (conn.group === 'online') online++;
+        else if (conn.group === 'stale') stale++;
+        else offline++;
+
+        if (filter !== 'all' && conn.group !== filter) return;
+
+        const searchStr = `${device.id} ${device.name} ${device.ownerEmail} ${device.tenantName || ''} ${device.type || ''}`.toLowerCase();
+        if (search && !searchStr.includes(search)) return;
+
+        const ownerLabel = device.ownerEmail || device.tenantName || 'Unknown';
+        const tenantLabel = device.tenantName ? `<small style="display:block;color:var(--text-light);">${device.tenantName}</small>` : '';
+        const hasLoc = adminHasCoords(device);
+        const locText = hasLoc
+            ? `<a href="#" onclick="event.preventDefault();adminLocateDevice('${device.id}')" title="Show on map" style="font-size:0.8rem;">${Number(device.latitude).toFixed(3)}, ${Number(device.longitude).toFixed(3)}</a>`
+            : '<span style="color:var(--text-light);">—</span>';
+
+        rows.push(`
             <tr>
-                <td>${device.id}</td>
-                <td>${ownerEmail}</td>
-                <td>${device.name}</td>
+                <td><code style="font-size:0.8rem;">${device.id}</code></td>
+                <td><strong>${device.name || '—'}</strong></td>
+                <td>${ownerLabel}${tenantLabel}</td>
                 <td>${device.type || 'Standard'}</td>
-                <td><span class="status-badge ${device.status}">${device.status}</span></td>
-                <td>${networks.slice(0, 2).join(', ')}${networks.length > 2 ? '...' : ''}</td>
-                <td>${formatTime(device.lastUpdate)}</td>
+                <td><span class="status-badge ${conn.cls}">${conn.label}</span></td>
+                <td>${locText}</td>
+                <td style="font-size:0.8rem;">${adminSensorSummary(device)}</td>
+                <td style="font-size:0.8rem;">${adminLastSeenText(device)}</td>
                 <td>
-                    <button class="btn btn-outline btn-small" onclick="viewDeviceAdmin('${device.id}')" title="View">
-                        <i class="fas fa-eye"></i>
-                    </button>
-                    <button class="btn btn-outline btn-small" onclick="editDeviceAdmin('${device.id}')" title="Edit">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button class="btn btn-outline btn-small" onclick="deleteDeviceAdmin('${device.id}')" title="Delete">
-                        <i class="fas fa-trash"></i>
-                    </button>
+                    <button class="btn btn-outline btn-small" onclick="viewDeviceAdmin('${device.id}')" title="View Details"><i class="fas fa-eye"></i></button>
+                    <button class="btn btn-outline btn-small" onclick="editDeviceAdmin('${device.id}')" title="Edit"><i class="fas fa-edit"></i></button>
+                    <button class="btn btn-outline btn-small" onclick="deleteDeviceAdmin('${device.id}')" title="Delete"><i class="fas fa-trash"></i></button>
                 </td>
             </tr>
-        `;
-    }).join('');
+        `);
+    });
+
+    const tableBody = document.getElementById('allDevicesTable');
+    if (tableBody) {
+        tableBody.innerHTML = rows.length ? rows.join('') : '<tr><td colspan="9" class="empty-state" style="text-align:center;padding:2rem;">No devices found</td></tr>';
+    }
+
+    const el = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
+    el('adminDevTotal', devices.length);
+    el('adminDevOnline', online);
+    el('adminDevStale', stale);
+    el('adminDevOffline', offline);
 }
 
 function getAllDevices() {
     return adminDevicesCache;
 }
 
+function adminLocateDevice(deviceId) {
+    const device = getAllDevices().find(d => d.id === deviceId);
+    if (!device || !adminHasCoords(device)) {
+        showNotification('No coordinates available for this device.', 'warning');
+        return;
+    }
+    document.querySelector('[data-section="admin-dashboard"]')?.click();
+    setTimeout(() => {
+        if (adminGlobalMap) {
+            adminGlobalMap.setView([device.latitude, device.longitude], 15);
+            adminGlobalDeviceMarkers.forEach(m => {
+                const ll = m.getLatLng();
+                if (Math.abs(ll.lat - device.latitude) < 0.0001 && Math.abs(ll.lng - device.longitude) < 0.0001) {
+                    m.openPopup();
+                }
+            });
+        }
+    }, 300);
+}
+
 function initAdminDeviceManagement() {
     const addBtn = document.getElementById('adminAddDeviceBtn');
-    if (addBtn) {
-        addBtn.addEventListener('click', () => showAdminDeviceForm());
-    }
+    if (addBtn) addBtn.addEventListener('click', () => showAdminDeviceForm());
     const exportBtn = document.getElementById('exportDevicesBtn');
-    if (exportBtn) {
-        exportBtn.addEventListener('click', exportAdminDevices);
-    }
+    if (exportBtn) exportBtn.addEventListener('click', exportAdminDevices);
     const closeBtn = document.getElementById('closeAdminDeviceModal');
-    if (closeBtn) {
-        closeBtn.addEventListener('click', closeAdminDeviceModal);
-    }
+    if (closeBtn) closeBtn.addEventListener('click', closeAdminDeviceModal);
     const modal = document.getElementById('adminDeviceModal');
-    if (modal) {
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) closeAdminDeviceModal();
+    if (modal) modal.addEventListener('click', (e) => { if (e.target === modal) closeAdminDeviceModal(); });
+
+    const refreshBtn = document.getElementById('refreshDeviceListBtn');
+    if (refreshBtn) refreshBtn.addEventListener('click', () => {
+        refreshBtn.querySelector('i').classList.add('fa-spin');
+        loadAllDevices().then(() => {
+            setTimeout(() => refreshBtn.querySelector('i')?.classList.remove('fa-spin'), 500);
+            showNotification('Device list refreshed.', 'success');
         });
-    }
+    });
+
+    const searchEl = document.getElementById('adminDeviceSearch');
+    const filterEl = document.getElementById('adminDeviceFilter');
+    if (searchEl) searchEl.addEventListener('input', () => loadAllDevices());
+    if (filterEl) filterEl.addEventListener('change', () => loadAllDevices());
 }
 
 function exportAdminDevices() {
@@ -3044,44 +3149,122 @@ function viewDeviceAdmin(deviceId) {
     const body = document.getElementById('adminDeviceModalBody');
     if (!modal || !body) return;
 
-    title.textContent = 'Device Details';
+    title.textContent = `Device: ${device.name || device.id}`;
+
+    const conn = adminConnectionStatus(device);
+    const lastSeen = adminLastSeenText(device);
+    const networks = device.networks || [];
+    const sensors = device.sensors || [];
+    const tracker = device.tracker || {};
+    const lte = device.lte || {};
+    const logistics = device.logistics || {};
+    const hasLoc = adminHasCoords(device);
+    const coordsText = hasLoc ? `${Number(device.latitude).toFixed(5)}, ${Number(device.longitude).toFixed(5)}` : 'No coordinates';
+    const vv = (val, suffix) => (val != null && Number.isFinite(Number(val))) ? `${Number(val)}${suffix || ''}` : 'Not reported';
+
+    const sensorIcons = {
+        'temperature': 'fas fa-thermometer-half', 'humidity': 'fas fa-tint',
+        'accelerometer': 'fas fa-compress-arrows-alt', 'gyroscope': 'fas fa-sync',
+        'magnetometer': 'fas fa-compass', 'pressure': 'fas fa-weight',
+        'light': 'fas fa-lightbulb', 'proximity': 'fas fa-hand-paper'
+    };
+    const sensorColors = {
+        'temperature': '#f5576c', 'humidity': '#4facfe', 'accelerometer': '#43e97b',
+        'gyroscope': '#fa709a', 'magnetometer': '#30cfd0', 'pressure': '#a8edea',
+        'light': '#fcb69f', 'proximity': '#764ba2'
+    };
+
+    const sensorHtml = sensors.length > 0 ? sensors.map(s => {
+        const icon = sensorIcons[s.type] || 'fas fa-circle';
+        const color = sensorColors[s.type] || '#667eea';
+        return `<div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem;background:var(--bg-light);border-radius:0.5rem;border:1px solid var(--border-color);">
+            <div style="width:36px;height:36px;border-radius:0.5rem;background:${color};display:flex;align-items:center;justify-content:center;color:#fff;"><i class="${icon}"></i></div>
+            <div><strong>${s.name || s.type}</strong><br><small style="color:var(--text-light);">${s.value != null ? s.value + ' ' + (s.unit || '') : 'Awaiting data'}</small></div>
+        </div>`;
+    }).join('') : '<p style="color:var(--text-light);">No sensors configured</p>';
+
+    const networkBadgesHtml = networks.length > 0 ? networks.map(n =>
+        `<span style="display:inline-flex;align-items:center;gap:0.35rem;padding:0.35rem 0.75rem;background:#eff6ff;border:1px solid #bfdbfe;border-radius:1rem;font-size:0.8rem;color:#1d4ed8;"><i class="fas fa-wifi"></i> ${n}</span>`
+    ).join(' ') : '<span style="color:var(--text-light);">None</span>';
+
     body.innerHTML = `
-        <div class="settings-form">
-            <div class="form-row">
-                <div class="form-group"><label>Device ID</label><input type="text" value="${device.id || ''}" readonly></div>
-                <div class="form-group"><label>Name</label><input type="text" value="${device.name || ''}" readonly></div>
+        <div class="device-details-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;">
+            <div class="form-section">
+                <h4><i class="fas fa-info-circle"></i> Basic Information</h4>
+                <div class="detail-item"><span class="detail-label">Device ID:</span><span class="detail-value"><code>${device.id}</code></span></div>
+                <div class="detail-item"><span class="detail-label">Name:</span><span class="detail-value">${device.name || '—'}</span></div>
+                <div class="detail-item"><span class="detail-label">Model:</span><span class="detail-value">${device.model || lte.model || '—'}</span></div>
+                <div class="detail-item"><span class="detail-label">Type:</span><span class="detail-value">${device.type || 'Standard'}</span></div>
+                <div class="detail-item"><span class="detail-label">Group:</span><span class="detail-value">${device.group || '—'}</span></div>
+                <div class="detail-item"><span class="detail-label">Asset:</span><span class="detail-value">${device.asset || '—'}</span></div>
+                <div class="detail-item"><span class="detail-label">Status:</span><span class="detail-value"><span class="status-badge ${device.status}">${device.status || 'unknown'}</span></span></div>
+                <div class="detail-item"><span class="detail-label">Connection:</span><span class="detail-value"><span class="status-badge ${conn.cls}">${conn.label}</span></span></div>
+                <div class="detail-item"><span class="detail-label">Last Seen:</span><span class="detail-value">${lastSeen}</span></div>
+                <div class="detail-item"><span class="detail-label">Registered:</span><span class="detail-value">${device.createdAt ? formatTime(device.createdAt) : '—'}</span></div>
             </div>
-            <div class="form-row">
-                <div class="form-group"><label>Type</label><input type="text" value="${device.type || 'Standard'}" readonly></div>
-                <div class="form-group"><label>Status</label><input type="text" value="${device.status || 'unknown'}" readonly></div>
+
+            <div class="form-section">
+                <h4><i class="fas fa-user"></i> Ownership</h4>
+                <div class="detail-item"><span class="detail-label">Owner Email:</span><span class="detail-value">${device.ownerEmail || '—'}</span></div>
+                <div class="detail-item"><span class="detail-label">Company:</span><span class="detail-value">${device.ownerCompany || '—'}</span></div>
+                <div class="detail-item"><span class="detail-label">Tenant:</span><span class="detail-value">${device.tenantName || device.tenantId || '—'}</span></div>
+                <div class="detail-item"><span class="detail-label">Namespace:</span><span class="detail-value"><code style="font-size:0.8rem;">${device.ownerNamespace || '—'}</code></span></div>
             </div>
-            <div class="form-row">
-                <div class="form-group"><label>Owner</label><input type="text" value="${device.ownerEmail || 'Unknown'}" readonly></div>
-                <div class="form-group"><label>Company</label><input type="text" value="${device.ownerCompany || 'Unknown'}" readonly></div>
+
+            <div class="form-section">
+                <h4><i class="fas fa-map-marker-alt"></i> Location</h4>
+                <div class="detail-item"><span class="detail-label">Coordinates:</span><span class="detail-value">${coordsText}${hasLoc ? ` <a href="#" onclick="event.preventDefault();closeAdminDeviceModal();adminLocateDevice('${device.id}')" style="margin-left:0.5rem;font-size:0.8rem;"><i class="fas fa-crosshairs"></i> Locate</a>` : ''}</span></div>
+                <div class="detail-item"><span class="detail-label">Temperature:</span><span class="detail-value">${vv(device.temperature, '°C')}</span></div>
+                <div class="detail-item"><span class="detail-label">Humidity:</span><span class="detail-value">${vv(device.humidity, '%')}</span></div>
+                <div class="detail-item"><span class="detail-label">Battery:</span><span class="detail-value">${vv(device.battery, '%')}</span></div>
+                <div class="detail-item"><span class="detail-label">Signal:</span><span class="detail-value">${device.signalStrength || 'Not reported'}</span></div>
             </div>
-            <div class="form-row">
-                <div class="form-group"><label>Tenant</label><input type="text" value="${device.tenantName || device.tenantId || 'N/A'}" readonly></div>
-                <div class="form-group"><label>Namespace</label><input type="text" value="${device.ownerNamespace || 'N/A'}" readonly></div>
+
+            <div class="form-section">
+                <h4><i class="fas fa-satellite"></i> GPS / GNSS Tracker</h4>
+                <div class="detail-item"><span class="detail-label">GPS Status:</span><span class="detail-value">${tracker.gpsStatus || '—'}</span></div>
+                <div class="detail-item"><span class="detail-label">Satellites:</span><span class="detail-value">${tracker.satellites ?? device.satellites ?? 'Not reported'}</span></div>
+                <div class="detail-item"><span class="detail-label">Accuracy:</span><span class="detail-value">${tracker.accuracy ? tracker.accuracy + 'm' : 'Not reported'}</span></div>
+                <div class="detail-item"><span class="detail-label">Last Fix:</span><span class="detail-value">${tracker.lastFix ? formatTime(tracker.lastFix) : '—'}</span></div>
             </div>
-            <div class="form-row">
-                <div class="form-group"><label>Latitude</label><input type="text" value="${device.latitude ?? 'N/A'}" readonly></div>
-                <div class="form-group"><label>Longitude</label><input type="text" value="${device.longitude ?? 'N/A'}" readonly></div>
+
+            <div class="form-section">
+                <h4><i class="fas fa-signal"></i> 4G LTE Settings</h4>
+                <div class="detail-item"><span class="detail-label">IMEI:</span><span class="detail-value"><code>${lte.imei || '—'}</code></span></div>
+                <div class="detail-item"><span class="detail-label">SIM ICCID:</span><span class="detail-value"><code>${lte.simIccid || '—'}</code></span></div>
+                <div class="detail-item"><span class="detail-label">Carrier:</span><span class="detail-value">${lte.carrier || '—'}</span></div>
+                <div class="detail-item"><span class="detail-label">APN:</span><span class="detail-value">${lte.apn || '—'}</span></div>
+                <div class="detail-item"><span class="detail-label">Data Format:</span><span class="detail-value">${lte.dataFormat || '—'}</span></div>
+                <div class="detail-item"><span class="detail-label">Reporting Interval:</span><span class="detail-value">${lte.dataLogFrequency ? lte.dataLogFrequency + 'ms' : '—'}</span></div>
             </div>
-            <div class="form-row">
-                <div class="form-group"><label>Temperature</label><input type="text" value="${device.temperature ?? 'N/A'}" readonly></div>
-                <div class="form-group"><label>Battery</label><input type="text" value="${device.battery ?? 'N/A'}" readonly></div>
+
+            <div class="form-section">
+                <h4><i class="fas fa-truck"></i> Logistics Monitoring</h4>
+                <div class="detail-item"><span class="detail-label">Monitoring:</span><span class="detail-value"><span class="status-badge ${logistics.monitoringEnabled !== false ? 'active' : 'inactive'}">${logistics.monitoringEnabled !== false ? 'Enabled' : 'Disabled'}</span></span></div>
+                <div class="detail-item"><span class="detail-label">Temp Range:</span><span class="detail-value">${logistics.tempMin ?? '-10'}°C — ${logistics.tempMax ?? '30'}°C</span></div>
+                <div class="detail-item"><span class="detail-label">Humidity Range:</span><span class="detail-value">${logistics.humidityMin ?? '20'}% — ${logistics.humidityMax ?? '80'}%</span></div>
+                <div class="detail-item"><span class="detail-label">Max Tilt:</span><span class="detail-value">${logistics.tiltMax ?? '30'}°</span></div>
+                <div class="detail-item"><span class="detail-label">Max Collision:</span><span class="detail-value">${logistics.collisionMaxG ?? '2.5'}g</span></div>
+                <div class="detail-item"><span class="detail-label">Delivery Grace:</span><span class="detail-value">${logistics.deliveryGraceMinutes ?? '30'} min</span></div>
+                <div class="detail-item"><span class="detail-label">Alert Cooldown:</span><span class="detail-value">${logistics.alertCooldownMinutes ?? '15'} min</span></div>
             </div>
-            <div class="form-row">
-                <div class="form-group"><label>Signal</label><input type="text" value="${device.signalStrength ?? 'N/A'}" readonly></div>
-                <div class="form-group"><label>Last Update</label><input type="text" value="${device.lastUpdate ? formatTime(device.lastUpdate) : 'N/A'}" readonly></div>
-            </div>
-            <div class="form-row">
-                <div class="form-group" style="flex:1"><label>Networks</label><input type="text" value="${(device.networks || []).join(', ') || 'None'}" readonly></div>
-            </div>
-            <div style="display:flex;gap:0.5rem;margin-top:1rem;">
-                <button class="btn btn-primary btn-small" onclick="editDeviceAdmin('${device.id}')"><i class="fas fa-edit"></i> Edit</button>
-                <button class="btn btn-outline btn-small" onclick="deleteDeviceAdmin('${device.id}')"><i class="fas fa-trash"></i> Delete</button>
-            </div>
+        </div>
+
+        <div class="form-section" style="margin-top:1.25rem;">
+            <h4><i class="fas fa-network-wired"></i> Network Connectivity</h4>
+            <div style="display:flex;flex-wrap:wrap;gap:0.5rem;">${networkBadgesHtml}</div>
+        </div>
+
+        <div class="form-section" style="margin-top:1.25rem;">
+            <h4><i class="fas fa-microchip"></i> Sensors</h4>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.75rem;">${sensorHtml}</div>
+        </div>
+
+        <div class="form-actions" style="margin-top:1.5rem;">
+            <button class="btn btn-outline" onclick="closeAdminDeviceModal()"><i class="fas fa-times"></i> Close</button>
+            ${hasLoc ? `<button class="btn btn-outline" onclick="closeAdminDeviceModal();adminLocateDevice('${device.id}')"><i class="fas fa-crosshairs"></i> Locate on Map</button>` : ''}
+            <button class="btn btn-outline" onclick="editDeviceAdmin('${device.id}')"><i class="fas fa-edit"></i> Edit</button>
+            <button class="btn btn-outline danger" onclick="deleteDeviceAdmin('${device.id}')"><i class="fas fa-trash"></i> Delete</button>
         </div>
     `;
     modal.style.display = 'flex';
