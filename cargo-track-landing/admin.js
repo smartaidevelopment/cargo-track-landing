@@ -4039,37 +4039,23 @@ async function loadResellerData() {
 }
 
 async function cleanOrphanedTenants() {
-    if (!resellerTenantsCache.length) return;
-    const serverUsers = resellerUsersCache || [];
-    const localUsers = typeof getUsers === 'function' ? getUsers() : [];
-    const allUsers = [...serverUsers, ...localUsers];
-    const usedTenantIds = new Set(allUsers.map(u => u.tenantId).filter(Boolean));
-
-    const orphans = resellerTenantsCache.filter(t => !usedTenantIds.has(t.id));
-    if (!orphans.length) return;
-
-    console.log(`Found ${orphans.length} orphaned tenant(s) to clean:`, orphans.map(t => t.name));
-    let cleaned = 0;
-    for (const tenant of orphans) {
-        try {
-            const resp = await fetch(`/api/tenants?tenantId=${encodeURIComponent(tenant.id)}`, {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json', ...getApiAuthHeaders() }
-            });
-            if (resp.ok) {
-                cleaned++;
-                console.log(`Cleaned orphaned tenant: ${tenant.name} (${tenant.id})`);
-            } else {
-                const err = await resp.json().catch(() => ({}));
-                console.warn(`Failed to delete tenant ${tenant.name}: ${resp.status}`, err);
-            }
-        } catch (e) {
-            console.warn('Failed to clean orphaned tenant:', tenant.id, e);
+    try {
+        const resp = await fetch('/api/tenants?action=cleanup', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json', ...getApiAuthHeaders() }
+        });
+        if (!resp.ok) {
+            console.warn('Tenant cleanup failed:', resp.status);
+            return;
         }
-    }
-    if (cleaned > 0) {
-        await fetchTenants();
-        showNotification(`Cleaned ${cleaned} orphaned tenant workspace(s).`, 'info');
+        const result = await resp.json();
+        if (result.removed && result.removed.length > 0) {
+            console.log('Cleaned orphaned tenants:', result.removed);
+            await fetchTenants();
+            showNotification(`Removed ${result.removed.length} orphaned workspace(s): ${result.removed.join(', ')}`, 'info');
+        }
+    } catch (e) {
+        console.warn('Tenant cleanup error:', e);
     }
 }
 

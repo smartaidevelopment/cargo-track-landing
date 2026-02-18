@@ -120,6 +120,34 @@ module.exports = async (req, res) => {
         if (session.role !== 'admin') {
             return res.status(403).json({ error: 'Forbidden' });
         }
+
+        const action = (req.query?.action || '').toString().trim();
+        if (action === 'cleanup') {
+            const tenants = await loadTenants();
+            const usersRaw = await redis.get(buildKey(PUBLIC_NAMESPACE, 'cargotrack_users'));
+            const users = Array.isArray(decodeValue(usersRaw)) ? decodeValue(usersRaw) : [];
+            const usedIds = new Set(users.map(u => u.tenantId).filter(Boolean));
+            const kept = tenants.filter(t => usedIds.has(t.id));
+            const removed = tenants.filter(t => !usedIds.has(t.id));
+            if (removed.length > 0) {
+                await saveTenants(kept);
+                const NAMESPACES_SET = 'storage:namespaces';
+                for (const t of removed) {
+                    const ns = `tenant:${t.id}`;
+                    try {
+                        await Promise.all([
+                            redis.del(buildKey(ns, 'cargotrack_devices')),
+                            redis.del(buildKey(ns, 'cargotrack_alerts')),
+                            redis.del(buildKey(ns, 'cargotrack_invoices')),
+                            redis.del(buildKey(ns, 'cargotrack_payments')),
+                            redis.srem(NAMESPACES_SET, ns)
+                        ]);
+                    } catch (_) {}
+                }
+            }
+            return res.status(200).json({ ok: true, removed: removed.map(t => t.name), kept: kept.length });
+        }
+
         const tenantId = (req.query?.tenantId || '').toString().trim();
         if (!tenantId) {
             return res.status(400).json({ error: 'Missing tenantId' });
