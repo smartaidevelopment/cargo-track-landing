@@ -3,8 +3,17 @@ const { getSessionFromRequest } = require('./_auth');
 
 const redis = Redis.fromEnv();
 
+const NAMESPACES_SET = 'storage:namespaces';
+const DEVICES_KEY = 'cargotrack_devices';
+const buildStorageKey = (namespace, key) => `storage:${namespace}:${key}`;
+const parseJsonValue = (value) => {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'object') return value;
+    try { return JSON.parse(value); } catch (_) { return null; }
+};
+
 module.exports = async (req, res) => {
-    if (req.method !== 'GET') {
+    if (req.method !== 'GET' && req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
@@ -16,6 +25,10 @@ module.exports = async (req, res) => {
     const deviceId = (req.query?.deviceId || '').toString().trim();
     if (!deviceId) {
         return res.status(400).json({ error: 'deviceId query parameter is required' });
+    }
+
+    if (req.method === 'POST') {
+        return handleFix(req, res, deviceId);
     }
 
     const checks = {
@@ -93,3 +106,57 @@ module.exports = async (req, res) => {
         return res.status(500).json({ error: 'Diagnostics check failed' });
     }
 };
+
+async function handleFix(req, res, deviceId) {
+    try {
+        const namespaces = await redis.smembers(NAMESPACES_SET);
+        let foundTenantId = null;
+        let foundImei = null;
+
+        for (const ns of namespaces) {
+            const raw = await redis.get(buildStorageKey(ns, DEVICES_KEY));
+            const devices = Array.isArray(parseJsonValue(raw)) ? parseJsonValue(raw) : [];
+            const match = devices.find((d) => d.id === deviceId);
+            if (match) {
+                if (ns.startsWith('tenant:')) {
+                    foundTenantId = ns.replace('tenant:', '');
+                } else if (match.tenantId) {
+                    foundTenantId = match.tenantId;
+                }
+                foundImei = match.lte?.imei || null;
+                break;
+            }
+        }
+
+        if (!foundTenantId) {
+            return res.status(404).json({ error: 'Could not determine tenant for this device. Ensure the device is assigned to a tenant namespace.' });
+        }
+
+        const REGISTRY_KEY = 'cargotrack_device_registry';
+        const registrySetKey = `storage:set:tenant:${foundTenantId}:${REGISTRY_KEY}`;
+        const ops = [
+            redis.set(`device:tenant:${deviceId}`, foundTenantId),
+            redis.sadd(registrySetKey, deviceId)
+        ];
+        if (foundImei) {
+            ops.push(redis.set(`device:tenant:${foundImei}`, foundTenantId));
+            ops.push(redis.sadd(registrySetKey, foundImei));
+        }
+        await Promise.all(ops);
+
+        const members = await redis.smembers(registrySetKey);
+        const registryKey = buildStorageKey(`tenant:${foundTenantId}`, REGISTRY_KEY);
+        await redis.set(registryKey, JSON.stringify(Array.from(new Set(members.map(String)))));
+
+        return res.status(200).json({
+            ok: true,
+            deviceId,
+            tenantId: foundTenantId,
+            imei: foundImei,
+            message: 'Device registered to tenant successfully'
+        });
+    } catch (error) {
+        console.error('Ingest status fix failed:', error);
+        return res.status(500).json({ error: 'Failed to fix device registration' });
+    }
+}

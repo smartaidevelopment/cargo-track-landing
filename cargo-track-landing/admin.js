@@ -3476,6 +3476,9 @@ async function runDeviceDiagnostics(deviceId) {
             dataSection = `<div style="margin-top:0.75rem;padding:0.75rem;background:var(--bg-light);border-radius:0.5rem;border:1px solid var(--border-color);"><strong style="display:block;margin-bottom:0.5rem;">Last Received Data:</strong>${fields.join('<br>')}</div>`;
         }
 
+        const needsFix = !d.tenantMapping || d.registryStatus !== 'registered';
+        const fixBtn = needsFix ? `<div style="margin-top:0.75rem;"><button class="btn btn-primary btn-small" onclick="fixDeviceRegistration('${deviceId}')"><i class="fas fa-wrench"></i> Fix Registration</button></div>` : '';
+
         panel.innerHTML = `
             <div class="form-section">
                 <h4><i class="fas fa-stethoscope"></i> Connection Diagnostics</h4>
@@ -3490,10 +3493,30 @@ async function runDeviceDiagnostics(deviceId) {
                     ${check(d.inDevicesSet, 'Device in live data index')}
                     ${check(!!d.latestData, d.latestData ? `Last data: ${d.dataAgeLabel || 'unknown age'}` : 'No data received yet')}
                 </div>
+                ${fixBtn}
                 ${dataSection}
             </div>`;
     } catch (e) {
         panel.innerHTML = `<div class="form-section"><h4><i class="fas fa-stethoscope"></i> Connection Diagnostics</h4><p style="color:#ef4444;">Error: ${e.message}</p></div>`;
+    }
+}
+
+async function fixDeviceRegistration(deviceId) {
+    const panel = document.getElementById('deviceDiagnosticsPanel');
+    try {
+        const resp = await fetch(`/api/ingest-status?deviceId=${encodeURIComponent(deviceId)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...getApiAuthHeaders() }
+        });
+        const result = await resp.json();
+        if (!resp.ok) {
+            showNotification(result.error || 'Failed to fix registration.', 'error');
+            return;
+        }
+        showNotification(`Device registered to tenant ${result.tenantId} successfully.`, 'success');
+        await runDeviceDiagnostics(deviceId);
+    } catch (e) {
+        showNotification('Failed to fix registration: ' + e.message, 'error');
     }
 }
 

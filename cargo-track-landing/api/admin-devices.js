@@ -159,6 +159,22 @@ async function handleGet(req, res, session) {
             };
         });
 
+        const REGISTRY_KEY = 'cargotrack_device_registry';
+        const mappingOps = [];
+        devices.forEach((device) => {
+            const tid = device.tenantId;
+            if (!tid || !device.id) return;
+            mappingOps.push(redis.set(`device:tenant:${device.id}`, tid));
+            const imei = device.lte?.imei;
+            if (imei) mappingOps.push(redis.set(`device:tenant:${imei}`, tid));
+            const setKey = `storage:set:tenant:${tid}:${REGISTRY_KEY}`;
+            mappingOps.push(redis.sadd(setKey, device.id));
+            if (imei) mappingOps.push(redis.sadd(setKey, imei));
+        });
+        if (mappingOps.length) {
+            Promise.all(mappingOps).catch((err) => console.warn('Background tenant mapping sync:', err));
+        }
+
         return res.status(200).json({ devices: merged });
     } catch (error) {
         console.error('Admin devices fetch failed:', error);
