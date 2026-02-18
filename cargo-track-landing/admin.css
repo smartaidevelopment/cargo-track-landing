@@ -188,6 +188,255 @@
     color: var(--secondary-color);
 }
 
+/* Invoice Action Group */
+.invoice-action-group {
+    display: flex;
+    gap: 0.25rem;
+    align-items: center;
+}
+
+.invoice-action-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.invoice-dropdown-menu {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 100%;
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    min-width: 200px;
+    z-index: 100;
+    padding: 0.35rem 0;
+}
+
+.invoice-dropdown-menu.show {
+    display: block;
+}
+
+.invoice-dropdown-menu button {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    width: 100%;
+    padding: 0.55rem 1rem;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--text-dark);
+    text-align: left;
+    transition: background 0.15s;
+}
+
+.invoice-dropdown-menu button:hover {
+    background: var(--bg-light);
+}
+
+.invoice-dropdown-menu button i {
+    width: 16px;
+    text-align: center;
+    color: var(--text-light);
+}
+
+.invoice-dropdown-menu .dropdown-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 0.35rem 0;
+}
+
+.invoice-dropdown-menu .dropdown-danger {
+    color: #ef4444;
+}
+
+.invoice-dropdown-menu .dropdown-danger i {
+    color: #ef4444;
+}
+
+/* Invoice Bulk Actions Bar */
+.invoice-bulk-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: #eef2ff;
+    border: 1px solid #c7d2fe;
+    border-radius: 0.5rem;
+    margin-top: 1rem;
+    font-size: 0.875rem;
+}
+
+.invoice-bulk-actions span {
+    font-weight: 600;
+    color: var(--primary-color);
+    margin-right: 0.5rem;
+}
+
+.btn-danger-outline {
+    color: #ef4444 !important;
+    border-color: #ef4444 !important;
+}
+
+.btn-danger-outline:hover {
+    background: #fef2f2 !important;
+}
+
+/* Invoice Form – Line Items */
+.invoice-items-section {
+    margin: 1.25rem 0;
+}
+
+.invoice-items-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.invoice-items-header h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin: 0;
+}
+
+.invoice-items-table input {
+    width: 100%;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.35rem;
+    font-size: 0.85rem;
+}
+
+.invoice-items-table input:focus {
+    border-color: var(--primary-color);
+    outline: none;
+}
+
+.invoice-items-table .item-total {
+    font-weight: 600;
+    white-space: nowrap;
+    text-align: right;
+    padding-right: 0.5rem;
+}
+
+.invoice-form-totals {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.35rem;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.invoice-form-totals .total-line {
+    display: flex;
+    gap: 2rem;
+    font-size: 0.9rem;
+}
+
+.invoice-form-totals .total-line span:first-child {
+    min-width: 80px;
+    text-align: right;
+    color: var(--text-light);
+}
+
+.invoice-form-totals .total-line.grand {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    padding-top: 0.35rem;
+    border-top: 2px solid var(--primary-color);
+}
+
+/* Invoice Detail View */
+.invoice-detail-view {
+    padding: 0.5rem 0;
+}
+
+.invoice-detail-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.invoice-detail-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.invoice-detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-bottom: 1rem;
+}
+
+.invoice-detail-grid h4 {
+    color: var(--primary-color);
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.invoice-detail-grid p {
+    margin: 0.25rem 0;
+    font-size: 0.9rem;
+    color: var(--text-dark);
+}
+
+.invoice-detail-totals {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.35rem;
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+}
+
+.invoice-detail-totals .total-line {
+    display: flex;
+    gap: 2rem;
+    font-size: 0.9rem;
+}
+
+.invoice-detail-totals .total-line span:first-child {
+    min-width: 80px;
+    text-align: right;
+    color: var(--text-light);
+}
+
+.invoice-detail-totals .total-line.grand {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    padding-top: 0.5rem;
+    border-top: 2px solid var(--primary-color);
+}
+
+.invoice-detail-notes {
+    margin-top: 1.25rem;
+    padding: 0.75rem 1rem;
+    background: #f9fafb;
+    border-radius: 0.5rem;
+    font-size: 0.9rem;
+}
+
+/* Status badge – void */
+.status-badge.void {
+    background: #e5e7eb;
+    color: #6b7280;
+}
+
 /* Financial Analytics */
 .stat-card.financial {
     border-left: 4px solid var(--primary-color);
@@ -363,3 +612,316 @@
     }
 }
 
+/* ============================================================
+   Tracker Library
+   ============================================================ */
+
+.tracker-toolbar {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 1.25rem;
+}
+
+.tracker-filters {
+    display: flex;
+    gap: 0.4rem;
+}
+
+.tracker-filter-btn {
+    padding: 0.4rem 0.9rem;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    background: var(--bg-white);
+    color: var(--text-light);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.tracker-filter-btn:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.tracker-filter-btn.active {
+    background: var(--primary-color);
+    color: #fff;
+    border-color: var(--primary-color);
+}
+
+.tracker-search {
+    flex: 1;
+    min-width: 180px;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    font-size: 0.9rem;
+    font-family: inherit;
+}
+
+.tracker-search:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.tracker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 0.85rem;
+}
+
+.tracker-card {
+    background: var(--bg-white);
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    padding: 1rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    gap: 0.85rem;
+    align-items: flex-start;
+}
+
+.tracker-card:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);
+    transform: translateY(-2px);
+}
+
+.tracker-card-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 0.5rem;
+    background: linear-gradient(135deg, var(--primary-color), #0ea5e9);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+.tracker-card-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.tracker-card-title {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--text-dark);
+    line-height: 1.2;
+}
+
+.tracker-card-manufacturer {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    margin-bottom: 0.45rem;
+}
+
+.tracker-card-tags {
+    display: flex;
+    gap: 0.3rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.35rem;
+}
+
+.tracker-card-meta {
+    font-size: 0.75rem;
+    color: var(--text-light);
+}
+
+.tracker-badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.tracker-badge-http {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.tracker-badge-tcp {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.tracker-badge-mqtt {
+    background: #e0e7ff;
+    color: #3730a3;
+}
+
+.tracker-badge-ok {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.tracker-badge-gw {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+/* Tracker detail modal content */.tracker-detail-header {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.25rem;
+}
+
+.tracker-detail-section {
+    margin-bottom: 1.5rem;
+}
+
+.tracker-detail-section h4 {
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin-bottom: 0.6rem;
+    color: var(--text-dark);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.tracker-detail-section h4 i {
+    color: var(--primary-color);
+    font-size: 0.85rem;
+}
+
+.tracker-specs-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+}
+
+.tracker-specs-table td,
+.tracker-specs-table th {
+    padding: 0.5rem 0.65rem;
+    border-bottom: 1px solid var(--border-color);
+    text-align: left;
+    vertical-align: top;
+}
+
+.tracker-specs-table tr:last-child td {
+    border-bottom: none;
+}
+
+.tracker-specs-table td:first-child,
+.tracker-specs-table th:first-child {
+    font-weight: 600;
+    color: var(--text-dark);
+    width: 40%;
+    white-space: nowrap;
+}
+
+.tracker-specs-table th {
+    background: var(--bg-light);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-light);
+}
+
+.tracker-specs-table code {
+    background: #f1f5f9;
+    padding: 0.15rem 0.4rem;
+    border-radius: 0.25rem;
+    font-size: 0.82rem;
+}
+
+.tracker-code {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    overflow-x: auto;
+    margin-bottom: 0.6rem;
+    white-space: pre;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+}
+
+.tracker-setup-steps {
+    padding-left: 1.4rem;
+    font-size: 0.9rem;
+    line-height: 1.7;
+}
+
+.tracker-setup-steps li {
+    margin-bottom: 0.35rem;
+}
+
+.tracker-setup-steps code {
+    background: #f1f5f9;
+    padding: 0.1rem 0.35rem;
+    border-radius: 0.2rem;
+    font-size: 0.82rem;
+    word-break: break-all;
+}
+
+.tracker-notes {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 0.5rem;
+    padding: 1rem;
+}
+
+.tracker-notes h4 {
+    color: #92400e;
+}
+
+.tracker-notes h4 i {
+    color: #d97706;
+}
+
+.tracker-notes p {
+    color: #78350f;
+    font-size: 0.88rem;
+    line-height: 1.6;
+}
+
+.btn-copy {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--border-color);
+    border-radius: 0.3rem;
+    background: var(--bg-white);
+    cursor: pointer;
+    color: var(--text-light);
+    font-size: 0.75rem;
+    margin-left: 0.4rem;
+    vertical-align: middle;
+    transition: all 0.15s;
+}
+
+.btn-copy:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+@media (max-width: 768px) {
+    .tracker-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .tracker-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .tracker-specs-table td:first-child,
+    .tracker-specs-table th:first-child {
+        width: auto;
+        white-space: normal;
+    }
+}

@@ -1,6 +1,7 @@
 // Invoice and Billing Document System
 
 const INVOICES_KEY = 'cargotrack_invoices';
+const PAYMENT_TRANSACTIONS_KEY = 'cargotrack_payments';
 
 // Generate invoice
 function generateInvoice(transaction, user) {
@@ -79,7 +80,14 @@ function saveInvoice(invoice) {
 // Get all invoices
 function getInvoices() {
     const invoices = localStorage.getItem(INVOICES_KEY);
-    return invoices ? JSON.parse(invoices) : [];
+    if (!invoices) return [];
+    try {
+        const parsed = JSON.parse(invoices);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+        console.warn('Failed to parse invoices from storage:', error);
+        return [];
+    }
 }
 
 // Get user invoices
@@ -92,6 +100,43 @@ function getUserInvoices(userId) {
 function getInvoiceById(invoiceId) {
     const invoices = getInvoices();
     return invoices.find(inv => inv.id === invoiceId);
+}
+
+function resolveUsers() {
+    const getUsersFn = window.getUsers || (typeof getUsers !== 'undefined' ? getUsers : null);
+    if (typeof getUsersFn !== 'function') {
+        return [];
+    }
+    try {
+        const users = getUsersFn();
+        return Array.isArray(users) ? users : [];
+    } catch (error) {
+        console.warn('Failed to read users for invoices:', error);
+        return [];
+    }
+}
+
+function resolvePaymentTransactions() {
+    const getTransactionsFn =
+        window.getPaymentTransactions || (typeof getPaymentTransactions !== 'undefined' ? getPaymentTransactions : null);
+    if (typeof getTransactionsFn === 'function') {
+        try {
+            const txns = getTransactionsFn();
+            if (Array.isArray(txns)) return txns;
+        } catch (error) {
+            console.warn('Failed to read payment transactions from function:', error);
+        }
+    }
+
+    const stored = localStorage.getItem(PAYMENT_TRANSACTIONS_KEY);
+    if (!stored) return [];
+    try {
+        const parsed = JSON.parse(stored);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+        console.warn('Failed to parse payment transactions from storage:', error);
+        return [];
+    }
 }
 
 // Generate invoice PDF (HTML to PDF simulation)
@@ -158,7 +203,7 @@ function createInvoiceHTML(invoice) {
     <div class="invoice-container">
         <div class="invoice-header">
             <div>
-                <div class="invoice-logo">CargoTrack Pro</div>
+                <div class="invoice-logo">Aurion</div>
                 <p style="margin-top: 5px; color: #666;">Real-Time Cargo Tracking Solutions</p>
             </div>
             <div class="invoice-info">
@@ -226,7 +271,7 @@ function createInvoiceHTML(invoice) {
         
         <div class="invoice-footer">
             <p>Thank you for your business!</p>
-            <p style="margin-top: 10px;">CargoTrack Pro | support@cargotrackpro.com | www.cargotrackpro.com</p>
+            <p style="margin-top: 10px;">Aurion | info@aurion.io | www.aurion.io</p>
         </div>
     </div>
 </body>
@@ -259,9 +304,12 @@ function downloadInvoiceJSON(invoice) {
 
 // Auto-generate invoices for existing transactions
 function generateInvoicesForTransactions() {
-    const users = getUsers();
-    const transactions = getPaymentTransactions();
+    const users = resolveUsers();
+    const transactions = resolvePaymentTransactions();
     const existingInvoices = getInvoices();
+    if (!users.length || !transactions.length) {
+        return;
+    }
     
     transactions.forEach(txn => {
         // Check if invoice already exists
@@ -275,13 +323,95 @@ function generateInvoicesForTransactions() {
     });
 }
 
+// Update an existing invoice in storage
+function updateInvoice(invoiceId, updates) {
+    let invoices = getInvoices();
+    const idx = invoices.findIndex(inv => inv.id === invoiceId);
+    if (idx === -1) return null;
+    invoices[idx] = { ...invoices[idx], ...updates, updatedAt: new Date().toISOString() };
+    localStorage.setItem(INVOICES_KEY, JSON.stringify(invoices));
+    return invoices[idx];
+}
+
+// Delete an invoice from storage
+function deleteInvoice(invoiceId) {
+    let invoices = getInvoices();
+    const idx = invoices.findIndex(inv => inv.id === invoiceId);
+    if (idx === -1) return false;
+    invoices.splice(idx, 1);
+    localStorage.setItem(INVOICES_KEY, JSON.stringify(invoices));
+    return true;
+}
+
+// Create a manual invoice (not tied to a transaction)
+function createManualInvoice(data) {
+    const invoiceId = `INV-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+    const invoiceNumber = `INV-${String(Math.floor(Math.random() * 1000000)).padStart(6, '0')}`;
+
+    const items = (data.items || []).map(item => ({
+        description: item.description || '',
+        quantity: parseFloat(item.quantity) || 1,
+        unitPrice: parseFloat(item.unitPrice) || 0,
+        total: (parseFloat(item.quantity) || 1) * (parseFloat(item.unitPrice) || 0)
+    }));
+
+    const subtotal = items.reduce((sum, it) => sum + it.total, 0);
+    const taxRate = parseFloat(data.taxRate) || 0;
+    const tax = subtotal * (taxRate / 100);
+    const total = subtotal + tax;
+
+    const invoice = {
+        id: invoiceId,
+        invoiceNumber: invoiceNumber,
+        transactionId: null,
+        userId: data.userId || '',
+        userEmail: data.userEmail || '',
+        userCompany: data.userCompany || '',
+        userPhone: data.userPhone || '',
+        userAddress: data.userAddress || '',
+        date: data.date || new Date().toISOString(),
+        dueDate: data.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        items: items,
+        subtotal: subtotal,
+        tax: tax,
+        taxRate: taxRate,
+        total: total,
+        currency: data.currency || 'USD',
+        status: data.status || 'pending',
+        paymentMethod: data.paymentMethod || 'N/A',
+        notes: data.notes || ''
+    };
+
+    saveInvoice(invoice);
+    return invoice;
+}
+
+// Duplicate an invoice
+function duplicateInvoice(invoiceId) {
+    const original = getInvoiceById(invoiceId);
+    if (!original) return null;
+
+    const newId = `INV-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+    const newNumber = `INV-${String(Math.floor(Math.random() * 1000000)).padStart(6, '0')}`;
+
+    const copy = {
+        ...original,
+        id: newId,
+        invoiceNumber: newNumber,
+        transactionId: null,
+        date: new Date().toISOString(),
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        status: 'pending'
+    };
+
+    saveInvoice(copy);
+    return copy;
+}
+
 // Initialize invoices on load
 if (typeof window !== 'undefined') {
-    // Generate invoices for existing transactions when needed
     setTimeout(() => {
-        if (typeof getUsers === 'function' && typeof getPaymentTransactions === 'function') {
-            generateInvoicesForTransactions();
-        }
+        generateInvoicesForTransactions();
     }, 1000);
 }
 

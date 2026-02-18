@@ -5,6 +5,7 @@ let adminGlobalMap = null;
 let adminGlobalDeviceMarkers = [];
 let adminMapAutoRefreshInterval = null;
 let adminMapAutoRefreshEnabled = false;
+let adminDevicesCache = [];
 
 // Initialize admin dashboard
 document.addEventListener('DOMContentLoaded', function() {
@@ -26,6 +27,16 @@ document.addEventListener('DOMContentLoaded', function() {
             if (adminUserEmailEl) {
                 adminUserEmailEl.textContent = currentAdmin.email;
             }
+            const adminAccountEmailEl = document.getElementById('adminAccountEmail');
+            if (adminAccountEmailEl) {
+                adminAccountEmailEl.value = currentAdmin.email;
+            }
+            const resellerNav = document.querySelector('.sidebar-nav .nav-item[data-section="admin-reseller"]');
+            if (resellerNav) {
+                resellerNav.style.display = (currentAdmin.role === 'reseller' || currentAdmin.role === 'super_admin')
+                    ? ''
+                    : 'none';
+            }
         }
     }
     
@@ -41,7 +52,10 @@ document.addEventListener('DOMContentLoaded', function() {
     initInvoiceManagement();
     initFinancialAnalytics();
     initSecurityPrivacy();
+    initResellerManagement();
+    initAdminDeviceManagement();
     initAdminSettings();
+    initTrackerLibrary();
     
     // Initialize logout
     const adminLogoutBtn = document.getElementById('adminLogoutBtn');
@@ -60,6 +74,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Load initial data
     loadAdminDashboard();
     loadAllUsers();
+    fetchAdminDevices();
+    fetchTenants().catch(() => {});
     loadPaymentTransactions();
     loadSecurityAuditLog();
     loadPrivacyRequests();
@@ -68,6 +84,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('adminSearch');
     if (searchInput) {
         searchInput.addEventListener('input', handleAdminSearch);
+    }
+
+    // Notification bell
+    const notifBtn = document.getElementById('adminNotificationBtn');
+    if (notifBtn) {
+        notifBtn.addEventListener('click', () => {
+            showNotification('No new notifications.', 'info');
+        });
     }
 });
 
@@ -104,6 +128,7 @@ function setActiveAdminSection(targetSection, options = {}) {
         'admin-invoices': 'Invoices & Billing',
         'admin-analytics': 'Financial & Analytics',
         'admin-devices': 'All Devices',
+        'admin-reseller': 'Reseller Workspaces',
         'admin-security': 'Security & Privacy',
         'admin-settings': 'Admin Settings'
     };
@@ -126,6 +151,8 @@ function setActiveAdminSection(targetSection, options = {}) {
         loadFinancialAnalytics();
     } else if (sectionId === 'admin-devices') {
         loadAllDevices();
+    } else if (sectionId === 'admin-reseller') {
+        loadResellerData();
     } else if (sectionId === 'admin-security') {
         loadSecurityAuditLog();
         loadPrivacyRequests();
@@ -151,6 +178,33 @@ function initAdminNavigation() {
     });
 }
 
+function getApiAuthHeaders() {
+    if (typeof window.getSessionAuthHeaders === 'function') {
+        return window.getSessionAuthHeaders();
+    }
+    const token = localStorage.getItem('cargotrack_session_token');
+    return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function fetchAdminDevices() {
+    try {
+        const response = await fetch('/api/admin-devices', {
+            cache: 'no-store',
+            headers: getApiAuthHeaders()
+        });
+        if (!response.ok) {
+            console.warn('Admin devices fetch failed:', response.status);
+            return adminDevicesCache;
+        }
+        const data = await response.json();
+        adminDevicesCache = Array.isArray(data.devices) ? data.devices : [];
+        return adminDevicesCache;
+    } catch (error) {
+        console.warn('Admin devices fetch failed:', error);
+        return adminDevicesCache;
+    }
+}
+
 // Admin Dashboard
 function initAdminDashboard() {
     // Charts will be initialized when dashboard is viewed
@@ -169,11 +223,19 @@ function initAdminGlobalMap() {
     
     // Initialize admin global map
     adminGlobalMap = L.map('adminGlobalMap').setView([20, 0], 2);
-    
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors',
-        maxZoom: 19
-    }).addTo(adminGlobalMap);
+    const baseLayers = {
+        'Basic': L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '© OpenStreetMap contributors © CARTO'
+        }),
+        'Streets': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }),
+        'Topography': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors © OpenTopoMap'
+        })
+    };
+    baseLayers.Basic.addTo(adminGlobalMap);
+    L.control.layers(baseLayers, null, { position: 'topright' }).addTo(adminGlobalMap);
     
     // Refresh button
     const refreshBtn = document.getElementById('refreshAdminGlobalMapBtn');
@@ -219,7 +281,7 @@ function toggleAdminMapAutoRefresh() {
     }
 }
 
-function updateAdminGlobalMap() {
+async function updateAdminGlobalMap() {
     if (!adminGlobalMap) return;
     
     // Clear existing markers
@@ -228,14 +290,8 @@ function updateAdminGlobalMap() {
     
     // Get all devices from all users
     const getUsersFn = window.getUsers || (typeof getUsers !== 'undefined' ? getUsers : null);
-    const getAllDevicesFn = window.getAllDevices || (typeof getAllDevices !== 'undefined' ? getAllDevices : null);
-    
-    if (!getAllDevicesFn) {
-        console.warn('getAllDevices function not available');
-        return;
-    }
-    
-    const allDevices = getAllDevicesFn();
+    await fetchAdminDevices();
+    const allDevices = getAllDevices();
     let deviceCount = 0;
     
     allDevices.forEach(device => {
@@ -552,6 +608,8 @@ function loadAllUsers() {
         return;
     }
     
+    const renderUserEmailBadge = (u) => u.emailVerified ? '<span style="display:inline-block;margin-left:0.4rem;font-size:0.7rem;padding:0.1rem 0.4rem;background:#dcfce7;color:#166534;border-radius:9999px;font-weight:500;vertical-align:middle;">Verified</span>' : '<span style="display:inline-block;margin-left:0.4rem;font-size:0.7rem;padding:0.1rem 0.4rem;background:#fef3c7;color:#92400e;border-radius:9999px;font-weight:500;vertical-align:middle;">Unverified</span>';
+
     tableBody.innerHTML = users.map(user => {
         const packageColors = {
             'basic': '#667eea',
@@ -572,7 +630,7 @@ function loadAllUsers() {
             </td>
             <td>
                 <div>
-                    <div style="font-weight: 600; margin-bottom: 0.25rem;">${user.email}</div>
+                    <div style="font-weight: 600; margin-bottom: 0.25rem;">${user.email} ${renderUserEmailBadge(user)}</div>
                     ${user.company ? `<div style="font-size: 0.875rem; color: var(--text-light);">${user.company}</div>` : ''}
                 </div>
             </td>
@@ -682,6 +740,8 @@ function filterUsers() {
         'enterprise': '#4facfe'
     };
     
+    const renderFilteredEmailBadge = (u) => u.emailVerified ? '<span style="display:inline-block;margin-left:0.4rem;font-size:0.7rem;padding:0.1rem 0.4rem;background:#dcfce7;color:#166534;border-radius:9999px;font-weight:500;vertical-align:middle;">Verified</span>' : '<span style="display:inline-block;margin-left:0.4rem;font-size:0.7rem;padding:0.1rem 0.4rem;background:#fef3c7;color:#92400e;border-radius:9999px;font-weight:500;vertical-align:middle;">Unverified</span>';
+
     tableBody.innerHTML = filtered.map(user => {
         const packageColor = packageColors[user.package] || '#667eea';
         return `
@@ -696,7 +756,7 @@ function filterUsers() {
             </td>
             <td>
                 <div>
-                    <div style="font-weight: 600; margin-bottom: 0.25rem;">${user.email}</div>
+                    <div style="font-weight: 600; margin-bottom: 0.25rem;">${user.email} ${renderFilteredEmailBadge(user)}</div>
                     ${user.company ? `<div style="font-size: 0.875rem; color: var(--text-light);">${user.company}</div>` : ''}
                 </div>
             </td>
@@ -952,18 +1012,32 @@ function toggleUserStatus(userId) {
     }
 }
 
-function deleteUser(userId) {
+async function deleteUser(userId) {
     const users = getUsers();
     const user = users.find(u => u.id === userId);
     if (!user) return;
     
-    if (confirm(`Are you sure you want to delete user ${user.email}? This action cannot be undone.`)) {
-        const filtered = users.filter(u => u.id !== userId);
-        saveUsers(filtered);
-        logSecurityEvent('user_deletion', user.email, 'success');
-        loadAllUsers();
-        alert('User deleted successfully!');
+    if (!confirm(`Are you sure you want to delete user ${user.email}? This action cannot be undone.`)) return;
+
+    try {
+        const response = await fetch(`/api/users?userId=${encodeURIComponent(userId)}`, {
+            method: 'DELETE',
+            headers: getApiAuthHeaders()
+        });
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            alert('Failed to delete user: ' + (data.error || response.statusText));
+            return;
+        }
+    } catch (err) {
+        console.warn('Server delete failed, removing locally:', err);
     }
+
+    const filtered = users.filter(u => u.id !== userId);
+    saveUsers(filtered);
+    logSecurityEvent('user_deletion', user.email, 'success');
+    loadAllUsers();
+    alert('User deleted successfully!');
 }
 
 function showAddUserForm() {
@@ -1351,97 +1425,130 @@ function updatePaymentStats(transactions = null) {
 function initInvoiceManagement() {
     document.getElementById('exportInvoicesBtn').addEventListener('click', exportAllInvoices);
     document.getElementById('filterInvoiceStatus').addEventListener('change', filterAdminInvoices);
+    document.getElementById('filterInvoiceDateRange').addEventListener('change', filterAdminInvoices);
     document.getElementById('invoiceSearchInput').addEventListener('input', filterAdminInvoices);
+    document.getElementById('createInvoiceBtn').addEventListener('click', showCreateInvoiceModal);
+    document.getElementById('closeInvoiceFormModal').addEventListener('click', closeInvoiceFormModal);
+    document.getElementById('invoiceForm').addEventListener('submit', handleInvoiceFormSubmit);
+    document.getElementById('closeInvoiceDetailModal').addEventListener('click', closeInvoiceDetailModal);
+    document.getElementById('closeSendInvoiceModal').addEventListener('click', closeSendInvoiceModal);
+    document.getElementById('sendInvoiceForm').addEventListener('submit', handleSendInvoice);
+    document.getElementById('invoiceTaxRate').addEventListener('input', recalcAllInvoiceItems);
+    document.getElementById('selectAllInvoices').addEventListener('change', toggleSelectAllInvoices);
+}
+
+function renderInvoiceRow(invoice, users) {
+    const user = users.find(u => u.id === invoice.userId) || { email: invoice.userEmail || 'Unknown', company: invoice.userCompany || 'Unknown' };
+    const isOverdue = invoice.status === 'pending' && new Date(invoice.dueDate) < new Date();
+    const displayStatus = invoice.status === 'void' ? 'void' : (isOverdue ? 'overdue' : invoice.status);
+    const statusClass = invoice.status === 'paid' ? 'active' : (invoice.status === 'void' ? 'void' : (isOverdue ? 'error' : 'warning'));
+
+    return `
+        <tr data-invoice-id="${invoice.id}">
+            <td><input type="checkbox" class="invoice-select-cb" value="${invoice.id}"></td>
+            <td><strong>${invoice.invoiceNumber}</strong></td>
+            <td>
+                <div>${user.company || user.email}</div>
+                <div style="font-size: 0.75rem; color: var(--text-light);">${user.email}</div>
+            </td>
+            <td>${formatDate(invoice.date)}</td>
+            <td>${formatDate(invoice.dueDate)}</td>
+            <td><strong>$${invoice.total.toFixed(2)}</strong></td>
+            <td>
+                <span class="status-badge ${statusClass}">
+                    ${displayStatus}
+                </span>
+            </td>
+            <td>${invoice.paymentMethod || 'N/A'}</td>
+            <td>
+                <div class="invoice-action-group">
+                    <button class="btn-icon-small view" onclick="viewAdminInvoice('${invoice.id}')" title="View Details">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <button class="btn-icon-small edit" onclick="editAdminInvoice('${invoice.id}')" title="Edit">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <div class="invoice-action-dropdown">
+                        <button class="btn-icon-small" onclick="toggleInvoiceMenu(this)" title="More actions">
+                            <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                        <div class="invoice-dropdown-menu">
+                            <button onclick="downloadAdminInvoice('${invoice.id}')"><i class="fas fa-download"></i> Download PDF</button>
+                            <button onclick="sendAdminInvoice('${invoice.id}')"><i class="fas fa-paper-plane"></i> Send to Customer</button>
+                            ${invoice.status === 'pending' ? `<button onclick="markInvoicePaid('${invoice.id}')"><i class="fas fa-check-circle"></i> Mark as Paid</button>` : ''}
+                            ${invoice.status === 'paid' ? `<button onclick="markInvoiceUnpaid('${invoice.id}')"><i class="fas fa-undo"></i> Mark as Unpaid</button>` : ''}
+                            ${(invoice.status === 'pending' && new Date(invoice.dueDate) < new Date()) ? `<button onclick="sendPaymentReminder('${invoice.id}')"><i class="fas fa-bell"></i> Send Reminder</button>` : ''}
+                            <button onclick="duplicateAdminInvoice('${invoice.id}')"><i class="fas fa-copy"></i> Duplicate</button>
+                            ${invoice.status !== 'void' ? `<button onclick="voidAdminInvoice('${invoice.id}')"><i class="fas fa-ban"></i> Void Invoice</button>` : ''}
+                            <div class="dropdown-divider"></div>
+                            <button class="dropdown-danger" onclick="deleteAdminInvoice('${invoice.id}')"><i class="fas fa-trash"></i> Delete</button>
+                        </div>
+                    </div>
+                </div>
+            </td>
+        </tr>
+    `;
 }
 
 function loadAdminInvoices() {
-    // Generate invoices for all transactions
     if (typeof generateInvoicesForTransactions === 'function') {
         generateInvoicesForTransactions();
     }
-    
+
     const invoices = getInvoices();
     const tableBody = document.getElementById('adminInvoicesTable');
-    
     if (!tableBody) return;
-    
+
     if (invoices.length === 0) {
         tableBody.innerHTML = `
             <tr>
-                <td colspan="8" style="text-align: center; padding: 2rem; color: var(--text-light);">
-                    No invoices found. Click "Generate Missing Invoices" to create invoices from transactions.
+                <td colspan="9" style="text-align: center; padding: 2rem; color: var(--text-light);">
+                    No invoices found. Click "Create Invoice" or "Generate Missing" to get started.
                 </td>
             </tr>
         `;
     } else {
         const users = getUsers();
-        tableBody.innerHTML = invoices.map(invoice => {
-            const user = users.find(u => u.id === invoice.userId) || { email: 'Unknown', company: 'Unknown' };
-            const isOverdue = invoice.status === 'pending' && new Date(invoice.dueDate) < new Date();
-            
-            return `
-                <tr>
-                    <td><strong>${invoice.invoiceNumber}</strong></td>
-                    <td>
-                        <div>${user.company || user.email}</div>
-                        <div style="font-size: 0.75rem; color: var(--text-light);">${user.email}</div>
-                    </td>
-                    <td>${formatDate(invoice.date)}</td>
-                    <td>${formatDate(invoice.dueDate)}</td>
-                    <td><strong>$${invoice.total.toFixed(2)}</strong></td>
-                    <td>
-                        <span class="status-badge ${invoice.status === 'paid' ? 'active' : (isOverdue ? 'error' : 'warning')}">
-                            ${isOverdue ? 'Overdue' : invoice.status}
-                        </span>
-                    </td>
-                    <td>${invoice.paymentMethod}</td>
-                    <td>
-                        <div class="user-actions">
-                            <button class="btn-icon-small view" onclick="viewAdminInvoice('${invoice.id}')" title="View">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                            <button class="btn-icon-small edit" onclick="downloadAdminInvoice('${invoice.id}')" title="Download">
-                                <i class="fas fa-download"></i>
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            `;
-        }).join('');
+        tableBody.innerHTML = invoices.map(inv => renderInvoiceRow(inv, users)).join('');
     }
-    
+
     updateInvoiceStatistics(invoices);
     loadRecentInvoices(invoices);
+    updateBulkActions();
 }
 
 function updateInvoiceStatistics(invoices) {
     const paid = invoices.filter(inv => inv.status === 'paid');
     const pending = invoices.filter(inv => inv.status === 'pending');
+    const overdue = invoices.filter(inv => inv.status === 'pending' && new Date(inv.dueDate) < new Date());
     const totalRevenue = paid.reduce((sum, inv) => sum + inv.total, 0);
-    
+
     document.getElementById('adminTotalInvoices').textContent = invoices.length;
-    document.getElementById('adminInvoiceRevenue').textContent = '$' + totalRevenue.toFixed(2);
+    document.getElementById('adminInvoiceRevenue').textContent = '$' + totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     document.getElementById('adminPaidInvoices').textContent = paid.length;
     document.getElementById('adminPendingInvoices').textContent = pending.length;
+
+    const overdueEl = document.getElementById('adminOverdueInvoices');
+    if (overdueEl) overdueEl.textContent = overdue.length;
 }
 
 function loadRecentInvoices(invoices) {
     const recentList = document.getElementById('recentInvoicesList');
     if (!recentList) return;
-    
+
     const recent = invoices.slice(-5).reverse();
-    
+
     if (recent.length === 0) {
         recentList.innerHTML = '<p style="color: var(--text-light); padding: 1rem;">No recent invoices</p>';
     } else {
         recentList.innerHTML = recent.map(invoice => `
-            <div class="recent-invoice-item">
+            <div class="recent-invoice-item" onclick="viewAdminInvoice('${invoice.id}')" style="cursor:pointer;">
                 <div class="recent-invoice-header">
                     <strong>${invoice.invoiceNumber}</strong>
-                    <span class="status-badge ${invoice.status === 'paid' ? 'active' : 'warning'}">${invoice.status}</span>
+                    <span class="status-badge ${invoice.status === 'paid' ? 'active' : (invoice.status === 'void' ? 'void' : 'warning')}">${invoice.status}</span>
                 </div>
                 <div class="recent-invoice-details">
-                    <span>${invoice.userEmail}</span>
+                    <span>${invoice.userEmail || 'N/A'}</span>
                     <span>$${invoice.total.toFixed(2)}</span>
                 </div>
                 <div class="recent-invoice-date">${formatDate(invoice.date)}</div>
@@ -1450,94 +1557,416 @@ function loadRecentInvoices(invoices) {
     }
 }
 
-function filterAdminInvoices() {
+function getFilteredInvoices() {
     const statusFilter = document.getElementById('filterInvoiceStatus').value;
+    const dateRange = document.getElementById('filterInvoiceDateRange').value;
     const searchTerm = document.getElementById('invoiceSearchInput').value.toLowerCase();
-    
-    const invoices = getInvoices();
-    let filtered = invoices;
-    
+
+    let invoices = getInvoices();
+    const users = getUsers();
+
     if (statusFilter !== 'all') {
-        filtered = filtered.filter(inv => {
-            if (statusFilter === 'overdue') {
-                return inv.status === 'pending' && new Date(inv.dueDate) < new Date();
-            }
+        invoices = invoices.filter(inv => {
+            if (statusFilter === 'overdue') return inv.status === 'pending' && new Date(inv.dueDate) < new Date();
             return inv.status === statusFilter;
         });
     }
-    
+
+    if (dateRange !== 'all') {
+        const now = new Date();
+        let startDate;
+        if (dateRange === 'today') { startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate()); }
+        else if (dateRange === 'week') { startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); }
+        else if (dateRange === 'month') { startDate = new Date(now.getFullYear(), now.getMonth(), 1); }
+        else if (dateRange === 'quarter') { startDate = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1); }
+        if (startDate) invoices = invoices.filter(inv => new Date(inv.date) >= startDate);
+    }
+
     if (searchTerm) {
-        const users = getUsers();
-        filtered = filtered.filter(inv => {
+        invoices = invoices.filter(inv => {
             const user = users.find(u => u.id === inv.userId);
-            return inv.invoiceNumber.toLowerCase().includes(searchTerm) ||
-                   (user && (user.email.toLowerCase().includes(searchTerm) || 
-                            (user.company && user.company.toLowerCase().includes(searchTerm))));
+            return (inv.invoiceNumber || '').toLowerCase().includes(searchTerm) ||
+                (inv.userEmail || '').toLowerCase().includes(searchTerm) ||
+                (user && ((user.email || '').toLowerCase().includes(searchTerm) ||
+                    (user.company && user.company.toLowerCase().includes(searchTerm))));
         });
     }
-    
+
+    return invoices;
+}
+
+function filterAdminInvoices() {
+    const filtered = getFilteredInvoices();
     const tableBody = document.getElementById('adminInvoicesTable');
     if (!tableBody) return;
-    
+
     const users = getUsers();
-    tableBody.innerHTML = filtered.map(invoice => {
-        const user = users.find(u => u.id === invoice.userId) || { email: 'Unknown', company: 'Unknown' };
-        const isOverdue = invoice.status === 'pending' && new Date(invoice.dueDate) < new Date();
-        
-        return `
+    if (filtered.length === 0) {
+        tableBody.innerHTML = `
             <tr>
-                <td><strong>${invoice.invoiceNumber}</strong></td>
-                <td>
-                    <div>${user.company || user.email}</div>
-                    <div style="font-size: 0.75rem; color: var(--text-light);">${user.email}</div>
-                </td>
-                <td>${formatDate(invoice.date)}</td>
-                <td>${formatDate(invoice.dueDate)}</td>
-                <td><strong>$${invoice.total.toFixed(2)}</strong></td>
-                <td>
-                    <span class="status-badge ${invoice.status === 'paid' ? 'active' : (isOverdue ? 'error' : 'warning')}">
-                        ${isOverdue ? 'Overdue' : invoice.status}
-                    </span>
-                </td>
-                <td>${invoice.paymentMethod}</td>
-                <td>
-                    <div class="user-actions">
-                        <button class="btn-icon-small view" onclick="viewAdminInvoice('${invoice.id}')" title="View">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                        <button class="btn-icon-small edit" onclick="downloadAdminInvoice('${invoice.id}')" title="Download">
-                            <i class="fas fa-download"></i>
-                        </button>
-                    </div>
+                <td colspan="9" style="text-align: center; padding: 2rem; color: var(--text-light);">
+                    No invoices match the current filters.
                 </td>
             </tr>
         `;
-    }).join('');
+    } else {
+        tableBody.innerHTML = filtered.map(inv => renderInvoiceRow(inv, users)).join('');
+    }
+    updateBulkActions();
 }
 
+// ---- Create / Edit Invoice Modal ----
+function showCreateInvoiceModal() {
+    document.getElementById('invoiceEditId').value = '';
+    document.getElementById('invoiceFormTitle').innerHTML = '<i class="fas fa-file-invoice"></i> Create Invoice';
+    document.getElementById('invoiceFormSubmitBtn').textContent = 'Create Invoice';
+    document.getElementById('invoiceForm').reset();
+
+    const today = new Date().toISOString().split('T')[0];
+    const due = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    document.getElementById('invoiceDate').value = today;
+    document.getElementById('invoiceDueDate').value = due;
+
+    populateCustomerDropdown();
+    resetInvoiceItems();
+    document.getElementById('invoiceFormModal').classList.add('active');
+}
+
+function editAdminInvoice(invoiceId) {
+    const invoice = getInvoiceById(invoiceId);
+    if (!invoice) { alert('Invoice not found'); return; }
+
+    document.getElementById('invoiceEditId').value = invoiceId;
+    document.getElementById('invoiceFormTitle').innerHTML = '<i class="fas fa-edit"></i> Edit Invoice';
+    document.getElementById('invoiceFormSubmitBtn').textContent = 'Save Changes';
+
+    populateCustomerDropdown(invoice.userId);
+    document.getElementById('invoiceStatus').value = invoice.status || 'pending';
+    document.getElementById('invoiceDate').value = (invoice.date || '').split('T')[0];
+    document.getElementById('invoiceDueDate').value = (invoice.dueDate || '').split('T')[0];
+    document.getElementById('invoicePaymentMethod').value = invoice.paymentMethod || 'N/A';
+    document.getElementById('invoiceTaxRate').value = invoice.taxRate || 0;
+    document.getElementById('invoiceNotes').value = invoice.notes || '';
+
+    const itemsBody = document.getElementById('invoiceItemsBody');
+    itemsBody.innerHTML = '';
+    (invoice.items || []).forEach(item => {
+        addInvoiceLineItem(item);
+    });
+    if (!invoice.items || invoice.items.length === 0) addInvoiceLineItem();
+
+    recalcAllInvoiceItems();
+    document.getElementById('invoiceFormModal').classList.add('active');
+}
+
+function closeInvoiceFormModal() {
+    document.getElementById('invoiceFormModal').classList.remove('active');
+}
+
+function populateCustomerDropdown(selectedId) {
+    const select = document.getElementById('invoiceCustomer');
+    const users = getUsers();
+    select.innerHTML = '<option value="">Select customer...</option>';
+    users.forEach(u => {
+        const label = (u.company ? u.company + ' — ' : '') + u.email;
+        const opt = document.createElement('option');
+        opt.value = u.id;
+        opt.textContent = label;
+        if (selectedId && u.id === selectedId) opt.selected = true;
+        select.appendChild(opt);
+    });
+}
+
+function addInvoiceLineItem(data) {
+    const tbody = document.getElementById('invoiceItemsBody');
+    const tr = document.createElement('tr');
+    tr.className = 'invoice-item-row';
+    const desc = data ? data.description : '';
+    const qty = data ? data.quantity : 1;
+    const price = data ? data.unitPrice : 0;
+    const total = data ? (data.total || qty * price) : 0;
+    tr.innerHTML = `
+        <td><input type="text" class="item-description" value="${desc}" placeholder="Item description" required></td>
+        <td><input type="number" class="item-quantity" min="1" value="${qty}" onchange="recalcInvoiceItemRow(this)"></td>
+        <td><input type="number" class="item-unit-price" min="0" step="0.01" value="${price}" placeholder="0.00" onchange="recalcInvoiceItemRow(this)"></td>
+        <td class="item-total">$${total.toFixed(2)}</td>
+        <td><button type="button" class="btn-icon-small delete" onclick="removeInvoiceLineItem(this)" title="Remove"><i class="fas fa-times"></i></button></td>
+    `;
+    tbody.appendChild(tr);
+    recalcAllInvoiceItems();
+}
+
+function removeInvoiceLineItem(btn) {
+    const row = btn.closest('tr');
+    const tbody = row.parentElement;
+    if (tbody.querySelectorAll('.invoice-item-row').length <= 1) return;
+    row.remove();
+    recalcAllInvoiceItems();
+}
+
+function recalcInvoiceItemRow(input) {
+    const row = input.closest('tr');
+    const qty = parseFloat(row.querySelector('.item-quantity').value) || 0;
+    const price = parseFloat(row.querySelector('.item-unit-price').value) || 0;
+    row.querySelector('.item-total').textContent = '$' + (qty * price).toFixed(2);
+    recalcAllInvoiceItems();
+}
+
+function recalcAllInvoiceItems() {
+    const rows = document.querySelectorAll('#invoiceItemsBody .invoice-item-row');
+    let subtotal = 0;
+    rows.forEach(row => {
+        const qty = parseFloat(row.querySelector('.item-quantity').value) || 0;
+        const price = parseFloat(row.querySelector('.item-unit-price').value) || 0;
+        subtotal += qty * price;
+    });
+    const taxRate = parseFloat(document.getElementById('invoiceTaxRate').value) || 0;
+    const tax = subtotal * (taxRate / 100);
+    const total = subtotal + tax;
+
+    document.getElementById('invoiceFormSubtotal').textContent = '$' + subtotal.toFixed(2);
+    document.getElementById('invoiceFormTax').textContent = '$' + tax.toFixed(2);
+    document.getElementById('invoiceFormTotal').textContent = '$' + total.toFixed(2);
+}
+
+function resetInvoiceItems() {
+    const tbody = document.getElementById('invoiceItemsBody');
+    tbody.innerHTML = '';
+    addInvoiceLineItem();
+}
+
+function handleInvoiceFormSubmit(e) {
+    e.preventDefault();
+    const editId = document.getElementById('invoiceEditId').value;
+    const userId = document.getElementById('invoiceCustomer').value;
+    const users = getUsers();
+    const user = users.find(u => u.id === userId);
+
+    const rows = document.querySelectorAll('#invoiceItemsBody .invoice-item-row');
+    const items = [];
+    rows.forEach(row => {
+        items.push({
+            description: row.querySelector('.item-description').value,
+            quantity: parseFloat(row.querySelector('.item-quantity').value) || 1,
+            unitPrice: parseFloat(row.querySelector('.item-unit-price').value) || 0
+        });
+    });
+
+    const data = {
+        userId: userId,
+        userEmail: user ? user.email : '',
+        userCompany: user ? (user.company || '') : '',
+        userPhone: user ? (user.phone || '') : '',
+        userAddress: user ? (user.address || '') : '',
+        date: new Date(document.getElementById('invoiceDate').value).toISOString(),
+        dueDate: new Date(document.getElementById('invoiceDueDate').value).toISOString(),
+        status: document.getElementById('invoiceStatus').value,
+        paymentMethod: document.getElementById('invoicePaymentMethod').value,
+        taxRate: parseFloat(document.getElementById('invoiceTaxRate').value) || 0,
+        notes: document.getElementById('invoiceNotes').value,
+        items: items
+    };
+
+    const subtotal = items.reduce((s, it) => s + (it.quantity * it.unitPrice), 0);
+    const tax = subtotal * (data.taxRate / 100);
+    data.subtotal = subtotal;
+    data.tax = tax;
+    data.total = subtotal + tax;
+    data.currency = 'USD';
+    data.items = items.map(it => ({ ...it, total: it.quantity * it.unitPrice }));
+
+    if (editId) {
+        updateInvoice(editId, data);
+    } else {
+        createManualInvoice(data);
+    }
+
+    closeInvoiceFormModal();
+    loadAdminInvoices();
+}
+
+// ---- View Invoice Detail Modal ----
 function viewAdminInvoice(invoiceId) {
     const invoice = getInvoiceById(invoiceId);
-    if (!invoice) {
-        alert('Invoice not found');
-        return;
-    }
-    
-    const invoiceHTML = createInvoiceHTML(invoice);
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(invoiceHTML);
-    printWindow.document.close();
+    if (!invoice) { alert('Invoice not found'); return; }
+
+    const users = getUsers();
+    const user = users.find(u => u.id === invoice.userId) || {};
+    const isOverdue = invoice.status === 'pending' && new Date(invoice.dueDate) < new Date();
+    const displayStatus = invoice.status === 'void' ? 'Void' : (isOverdue ? 'Overdue' : invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1));
+    const statusClass = invoice.status === 'paid' ? 'active' : (invoice.status === 'void' ? 'void' : (isOverdue ? 'error' : 'warning'));
+
+    const body = document.getElementById('invoiceDetailBody');
+    body.innerHTML = `
+        <div class="invoice-detail-view">
+            <div class="invoice-detail-top">
+                <div>
+                    <h3 style="font-size:1.4rem;margin-bottom:0.25rem;">${invoice.invoiceNumber}</h3>
+                    <span class="status-badge ${statusClass}" style="font-size:0.85rem;">${displayStatus}</span>
+                </div>
+                <div class="invoice-detail-actions">
+                    <button class="btn btn-small btn-outline" onclick="editAdminInvoice('${invoice.id}');closeInvoiceDetailModal();"><i class="fas fa-edit"></i> Edit</button>
+                    <button class="btn btn-small btn-outline" onclick="downloadAdminInvoice('${invoice.id}')"><i class="fas fa-download"></i> Download</button>
+                    <button class="btn btn-small btn-outline" onclick="sendAdminInvoice('${invoice.id}');closeInvoiceDetailModal();"><i class="fas fa-paper-plane"></i> Send</button>
+                    ${invoice.status === 'pending' ? `<button class="btn btn-small btn-primary" onclick="markInvoicePaid('${invoice.id}');closeInvoiceDetailModal();"><i class="fas fa-check-circle"></i> Mark Paid</button>` : ''}
+                    <button class="btn btn-small btn-outline" onclick="printAdminInvoice('${invoice.id}')"><i class="fas fa-print"></i> Print</button>
+                </div>
+            </div>
+            <div class="invoice-detail-grid">
+                <div>
+                    <h4>Bill To</h4>
+                    <p><strong>${invoice.userCompany || user.company || 'N/A'}</strong></p>
+                    <p>${invoice.userEmail || user.email || 'N/A'}</p>
+                    ${invoice.userPhone ? `<p>${invoice.userPhone}</p>` : ''}
+                    ${invoice.userAddress ? `<p>${invoice.userAddress}</p>` : ''}
+                </div>
+                <div>
+                    <h4>Invoice Info</h4>
+                    <p><strong>Date:</strong> ${formatDate(invoice.date)}</p>
+                    <p><strong>Due Date:</strong> ${formatDate(invoice.dueDate)}</p>
+                    <p><strong>Payment:</strong> ${invoice.paymentMethod || 'N/A'}</p>
+                    <p><strong>Currency:</strong> ${invoice.currency || 'USD'}</p>
+                </div>
+            </div>
+            <table class="data-table" style="margin-top:1.25rem;">
+                <thead>
+                    <tr><th>Description</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Unit Price</th><th style="text-align:right;">Total</th></tr>
+                </thead>
+                <tbody>
+                    ${(invoice.items || []).map(item => `
+                        <tr>
+                            <td>${item.description}</td>
+                            <td style="text-align:right;">${item.quantity}</td>
+                            <td style="text-align:right;">$${(item.unitPrice || 0).toFixed(2)}</td>
+                            <td style="text-align:right;">$${(item.total || 0).toFixed(2)}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+            <div class="invoice-detail-totals">
+                <div class="total-line"><span>Subtotal:</span> <span>$${(invoice.subtotal || 0).toFixed(2)}</span></div>
+                ${invoice.taxRate > 0 ? `<div class="total-line"><span>Tax (${invoice.taxRate}%):</span> <span>$${(invoice.tax || 0).toFixed(2)}</span></div>` : ''}
+                <div class="total-line grand"><span>Total:</span> <span>$${(invoice.total || 0).toFixed(2)}</span></div>
+            </div>
+            ${invoice.notes ? `<div class="invoice-detail-notes"><strong>Notes:</strong> ${invoice.notes}</div>` : ''}
+        </div>
+    `;
+
+    document.getElementById('invoiceDetailTitle').innerHTML = `<i class="fas fa-file-invoice"></i> ${invoice.invoiceNumber}`;
+    document.getElementById('invoiceDetailModal').classList.add('active');
 }
 
+function closeInvoiceDetailModal() {
+    document.getElementById('invoiceDetailModal').classList.remove('active');
+}
+
+function printAdminInvoice(invoiceId) {
+    const invoice = getInvoiceById(invoiceId);
+    if (!invoice) return;
+    const html = createInvoiceHTML(invoice);
+    const w = window.open('', '_blank');
+    w.document.write(html);
+    w.document.close();
+    w.onload = function() { w.print(); };
+}
+
+// ---- Download ----
 function downloadAdminInvoice(invoiceId) {
     const invoice = getInvoiceById(invoiceId);
-    if (!invoice) {
-        alert('Invoice not found');
-        return;
-    }
-    
+    if (!invoice) { alert('Invoice not found'); return; }
     downloadInvoicePDF(invoice);
 }
 
+// ---- Status Changes ----
+function markInvoicePaid(invoiceId) {
+    if (!confirm('Mark this invoice as paid?')) return;
+    updateInvoice(invoiceId, { status: 'paid' });
+    loadAdminInvoices();
+}
+
+function markInvoiceUnpaid(invoiceId) {
+    if (!confirm('Mark this invoice as unpaid (pending)?')) return;
+    updateInvoice(invoiceId, { status: 'pending' });
+    loadAdminInvoices();
+}
+
+function voidAdminInvoice(invoiceId) {
+    if (!confirm('Void this invoice? This will mark it as void.')) return;
+    updateInvoice(invoiceId, { status: 'void' });
+    loadAdminInvoices();
+}
+
+// ---- Delete ----
+function deleteAdminInvoice(invoiceId) {
+    if (!confirm('Are you sure you want to permanently delete this invoice? This cannot be undone.')) return;
+    deleteInvoice(invoiceId);
+    loadAdminInvoices();
+}
+
+// ---- Duplicate ----
+function duplicateAdminInvoice(invoiceId) {
+    const newInv = duplicateInvoice(invoiceId);
+    if (newInv) {
+        loadAdminInvoices();
+        alert('Invoice duplicated as ' + newInv.invoiceNumber);
+    }
+}
+
+// ---- Send Invoice ----
+function sendAdminInvoice(invoiceId) {
+    const invoice = getInvoiceById(invoiceId);
+    if (!invoice) { alert('Invoice not found'); return; }
+
+    document.getElementById('sendInvoiceId').value = invoiceId;
+    document.getElementById('sendInvoiceEmail').value = invoice.userEmail || '';
+    document.getElementById('sendInvoiceSubject').value = 'Invoice ' + invoice.invoiceNumber + ' from Aurion';
+    document.getElementById('sendInvoiceMessage').value = 'Dear Customer,\n\nPlease find attached invoice ' + invoice.invoiceNumber + ' for $' + invoice.total.toFixed(2) + '.\n\nDue date: ' + formatDate(invoice.dueDate) + '\n\nThank you for your business!\n\nAurion Team';
+    document.getElementById('sendInvoiceModal').classList.add('active');
+}
+
+function closeSendInvoiceModal() {
+    document.getElementById('sendInvoiceModal').classList.remove('active');
+}
+
+function handleSendInvoice(e) {
+    e.preventDefault();
+    const invoiceId = document.getElementById('sendInvoiceId').value;
+    const email = document.getElementById('sendInvoiceEmail').value;
+    const subject = document.getElementById('sendInvoiceSubject').value;
+    const message = document.getElementById('sendInvoiceMessage').value;
+
+    const invoice = getInvoiceById(invoiceId);
+    if (!invoice) return;
+
+    if (typeof sendPaymentThankYouEmail === 'function') {
+        const users = getUsers();
+        const user = users.find(u => u.id === invoice.userId) || { email: email };
+        sendPaymentThankYouEmail(user, invoice);
+    }
+
+    updateInvoice(invoiceId, { lastSentAt: new Date().toISOString(), lastSentTo: email });
+    closeSendInvoiceModal();
+    alert('Invoice sent to ' + email);
+    loadAdminInvoices();
+}
+
+// ---- Send Reminder ----
+function sendPaymentReminder(invoiceId) {
+    const invoice = getInvoiceById(invoiceId);
+    if (!invoice) return;
+    if (!confirm('Send a payment reminder to ' + (invoice.userEmail || 'the customer') + '?')) return;
+
+    if (typeof sendPaymentThankYouEmail === 'function') {
+        const users = getUsers();
+        const user = users.find(u => u.id === invoice.userId) || { email: invoice.userEmail };
+        sendPaymentThankYouEmail(user, invoice);
+    }
+
+    updateInvoice(invoiceId, { lastReminderAt: new Date().toISOString() });
+    alert('Payment reminder sent to ' + (invoice.userEmail || 'customer'));
+}
+
+// ---- Generate All Missing ----
 function generateAllInvoices() {
     if (typeof generateInvoicesForTransactions === 'function') {
         generateInvoicesForTransactions();
@@ -1546,34 +1975,113 @@ function generateAllInvoices() {
     }
 }
 
+// ---- Export ----
 function exportAllInvoices() {
-    const invoices = getInvoices();
+    const invoices = getFilteredInvoices();
     const users = getUsers();
-    
+
     const csv = [
-        ['Invoice #', 'Customer', 'Email', 'Date', 'Due Date', 'Amount', 'Status', 'Payment Method'],
+        ['Invoice #', 'Customer', 'Email', 'Date', 'Due Date', 'Amount', 'Tax', 'Total', 'Status', 'Payment Method'],
         ...invoices.map(inv => {
-            const user = users.find(u => u.id === inv.userId) || { email: 'Unknown', company: 'Unknown' };
+            const user = users.find(u => u.id === inv.userId) || { email: inv.userEmail || 'Unknown', company: inv.userCompany || 'Unknown' };
             return [
                 inv.invoiceNumber,
-                user.company || user.email,
+                '"' + (user.company || user.email).replace(/"/g, '""') + '"',
                 user.email,
                 formatDate(inv.date),
                 formatDate(inv.dueDate),
-                '$' + inv.total.toFixed(2),
+                '$' + (inv.subtotal || inv.total || 0).toFixed(2),
+                '$' + (inv.tax || 0).toFixed(2),
+                '$' + (inv.total || 0).toFixed(2),
                 inv.status,
-                inv.paymentMethod
+                inv.paymentMethod || 'N/A'
             ];
         })
     ].map(row => row.join(',')).join('\n');
-    
+
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `invoices-export-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
+    window.URL.revokeObjectURL(url);
 }
+
+// ---- Bulk Actions ----
+function toggleSelectAllInvoices() {
+    const checked = document.getElementById('selectAllInvoices').checked;
+    document.querySelectorAll('.invoice-select-cb').forEach(cb => { cb.checked = checked; });
+    updateBulkActions();
+}
+
+function updateBulkActions() {
+    const selected = document.querySelectorAll('.invoice-select-cb:checked');
+    const bar = document.getElementById('invoiceBulkActions');
+    const count = document.getElementById('invoiceSelectedCount');
+    if (selected.length > 0) {
+        bar.style.display = 'flex';
+        count.textContent = selected.length + ' selected';
+    } else {
+        bar.style.display = 'none';
+    }
+}
+
+function getSelectedInvoiceIds() {
+    return Array.from(document.querySelectorAll('.invoice-select-cb:checked')).map(cb => cb.value);
+}
+
+function bulkMarkInvoicesPaid() {
+    const ids = getSelectedInvoiceIds();
+    if (!ids.length) return;
+    if (!confirm('Mark ' + ids.length + ' invoice(s) as paid?')) return;
+    ids.forEach(id => updateInvoice(id, { status: 'paid' }));
+    loadAdminInvoices();
+}
+
+function bulkSendInvoices() {
+    const ids = getSelectedInvoiceIds();
+    if (!ids.length) return;
+    if (!confirm('Send ' + ids.length + ' invoice(s) to their respective customers?')) return;
+    ids.forEach(id => {
+        const inv = getInvoiceById(id);
+        if (inv && typeof sendPaymentThankYouEmail === 'function') {
+            const users = getUsers();
+            const user = users.find(u => u.id === inv.userId) || { email: inv.userEmail };
+            sendPaymentThankYouEmail(user, inv);
+            updateInvoice(id, { lastSentAt: new Date().toISOString() });
+        }
+    });
+    alert(ids.length + ' invoice(s) sent.');
+    loadAdminInvoices();
+}
+
+function bulkDeleteInvoices() {
+    const ids = getSelectedInvoiceIds();
+    if (!ids.length) return;
+    if (!confirm('Permanently delete ' + ids.length + ' invoice(s)? This cannot be undone.')) return;
+    ids.forEach(id => deleteInvoice(id));
+    loadAdminInvoices();
+}
+
+// ---- Dropdown Menu ----
+function toggleInvoiceMenu(btn) {
+    const menu = btn.nextElementSibling;
+    document.querySelectorAll('.invoice-dropdown-menu.show').forEach(m => { if (m !== menu) m.classList.remove('show'); });
+    menu.classList.toggle('show');
+}
+
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.invoice-action-dropdown')) {
+        document.querySelectorAll('.invoice-dropdown-menu.show').forEach(m => m.classList.remove('show'));
+    }
+});
+
+document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('invoice-select-cb')) {
+        updateBulkActions();
+    }
+});
 
 // Package Management
 const PACKAGES_KEY = 'cargotrack_packages';
@@ -1815,8 +2323,36 @@ function viewTransaction(txnId) {
     const transactions = getPaymentTransactions();
     const txn = transactions.find(t => t.id === txnId);
     if (!txn) return;
-    
-    alert(`Transaction Details:\n\nID: ${txn.id}\nUser: ${txn.userEmail}\nPackage: ${txn.package}\nAmount: ${txn.amount}\nMethod: ${txn.method}\nStatus: ${txn.status}\nDate: ${formatDate(txn.date)}`);
+
+    const modal = document.getElementById('adminDeviceModal') || createTempModal();
+    const title = modal.querySelector('.modal-header h2') || modal.querySelector('h2');
+    const body = modal.querySelector('.modal-body') || modal.querySelector('[id$="ModalBody"]');
+    if (!title || !body) {
+        showNotification(`Transaction ${txn.id}: ${txn.userEmail} - $${txn.amount} (${txn.status})`, 'info');
+        return;
+    }
+    title.textContent = 'Transaction Details';
+    body.innerHTML = `
+        <div class="settings-form">
+            <div class="form-row">
+                <div class="form-group"><label>Transaction ID</label><input type="text" value="${txn.id}" readonly></div>
+                <div class="form-group"><label>Date</label><input type="text" value="${formatDate(txn.date)}" readonly></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>User</label><input type="text" value="${txn.userEmail || 'Unknown'}" readonly></div>
+                <div class="form-group"><label>Package</label><input type="text" value="${txn.package || 'N/A'}" readonly></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Amount</label><input type="text" value="$${txn.amount}" readonly></div>
+                <div class="form-group"><label>Method</label><input type="text" value="${txn.method || 'N/A'}" readonly></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Status</label><input type="text" value="${txn.status}" readonly></div>
+                <div class="form-group"><label>Invoice</label><input type="text" value="${txn.invoiceId || 'N/A'}" readonly></div>
+            </div>
+        </div>
+    `;
+    modal.style.display = 'flex';
 }
 
 // Financial & Analytics
@@ -2311,30 +2847,35 @@ function exportFinancialReport() {
 }
 
 // All Devices
-function loadAllDevices() {
+async function loadAllDevices() {
+    await fetchAdminDevices();
     const devices = getAllDevices();
     const tableBody = document.getElementById('allDevicesTable');
     if (!tableBody) return;
     
-    const users = getUsers();
-    
     tableBody.innerHTML = devices.map(device => {
-        // Try to find device owner
-        const owner = users.find(u => u.id === device.ownerId || device.id.includes(u.id.substring(0, 4))) || { email: 'Unknown', company: 'Unknown' };
+        const ownerEmail = device.ownerEmail || 'Unknown';
+        const ownerCompany = device.ownerCompany || 'Unknown';
         const networks = device.networks || [];
         
         return `
             <tr>
                 <td>${device.id}</td>
-                <td>${owner.email}</td>
+                <td>${ownerEmail}</td>
                 <td>${device.name}</td>
                 <td>${device.type || 'Standard'}</td>
                 <td><span class="status-badge ${device.status}">${device.status}</span></td>
                 <td>${networks.slice(0, 2).join(', ')}${networks.length > 2 ? '...' : ''}</td>
                 <td>${formatTime(device.lastUpdate)}</td>
                 <td>
-                    <button class="btn-icon-small view" onclick="viewDeviceAdmin('${device.id}')" title="View">
+                    <button class="btn btn-outline btn-small" onclick="viewDeviceAdmin('${device.id}')" title="View">
                         <i class="fas fa-eye"></i>
+                    </button>
+                    <button class="btn btn-outline btn-small" onclick="editDeviceAdmin('${device.id}')" title="Edit">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-outline btn-small" onclick="deleteDeviceAdmin('${device.id}')" title="Delete">
+                        <i class="fas fa-trash"></i>
                     </button>
                 </td>
             </tr>
@@ -2343,18 +2884,518 @@ function loadAllDevices() {
 }
 
 function getAllDevices() {
-    // Get devices from all users
-    const devicesKey = 'cargotrack_devices';
-    const devices = localStorage.getItem(devicesKey);
-    return devices ? JSON.parse(devices) : [];
+    return adminDevicesCache;
+}
+
+function initAdminDeviceManagement() {
+    const addBtn = document.getElementById('adminAddDeviceBtn');
+    if (addBtn) {
+        addBtn.addEventListener('click', () => showAdminDeviceForm());
+    }
+    const exportBtn = document.getElementById('exportDevicesBtn');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', exportAdminDevices);
+    }
+    const closeBtn = document.getElementById('closeAdminDeviceModal');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', closeAdminDeviceModal);
+    }
+    const modal = document.getElementById('adminDeviceModal');
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeAdminDeviceModal();
+        });
+    }
+}
+
+function exportAdminDevices() {
+    const devices = getAllDevices();
+    if (!devices.length) {
+        showNotification('No devices to export.', 'warning');
+        return;
+    }
+    const csv = [
+        ['Device ID', 'Name', 'Type', 'Status', 'Owner', 'Company', 'Tenant', 'Lat', 'Lng', 'Last Update'].join(','),
+        ...devices.map(d => [
+            d.id, d.name, d.type || '', d.status || '',
+            d.ownerEmail || '', d.ownerCompany || '', d.tenantName || d.tenantId || '',
+            d.latitude || '', d.longitude || '', d.lastUpdate || ''
+        ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `devices-export-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showNotification('Devices exported successfully.', 'success');
+}
+
+function closeAdminDeviceModal() {
+    const modal = document.getElementById('adminDeviceModal');
+    if (modal) modal.style.display = 'none';
 }
 
 function viewDeviceAdmin(deviceId) {
     const devices = getAllDevices();
     const device = devices.find(d => d.id === deviceId);
     if (!device) return;
-    
-    alert(`Device Details:\n\nID: ${device.id}\nName: ${device.name}\nType: ${device.type}\nStatus: ${device.status}\nLocation: ${device.location}\nNetworks: ${(device.networks || []).join(', ')}`);
+
+    const modal = document.getElementById('adminDeviceModal');
+    const title = document.getElementById('adminDeviceModalTitle');
+    const body = document.getElementById('adminDeviceModalBody');
+    if (!modal || !body) return;
+
+    title.textContent = 'Device Details';
+    body.innerHTML = `
+        <div class="settings-form">
+            <div class="form-row">
+                <div class="form-group"><label>Device ID</label><input type="text" value="${device.id || ''}" readonly></div>
+                <div class="form-group"><label>Name</label><input type="text" value="${device.name || ''}" readonly></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Type</label><input type="text" value="${device.type || 'Standard'}" readonly></div>
+                <div class="form-group"><label>Status</label><input type="text" value="${device.status || 'unknown'}" readonly></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Owner</label><input type="text" value="${device.ownerEmail || 'Unknown'}" readonly></div>
+                <div class="form-group"><label>Company</label><input type="text" value="${device.ownerCompany || 'Unknown'}" readonly></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Tenant</label><input type="text" value="${device.tenantName || device.tenantId || 'N/A'}" readonly></div>
+                <div class="form-group"><label>Namespace</label><input type="text" value="${device.ownerNamespace || 'N/A'}" readonly></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Latitude</label><input type="text" value="${device.latitude ?? 'N/A'}" readonly></div>
+                <div class="form-group"><label>Longitude</label><input type="text" value="${device.longitude ?? 'N/A'}" readonly></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Temperature</label><input type="text" value="${device.temperature ?? 'N/A'}" readonly></div>
+                <div class="form-group"><label>Battery</label><input type="text" value="${device.battery ?? 'N/A'}" readonly></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Signal</label><input type="text" value="${device.signalStrength ?? 'N/A'}" readonly></div>
+                <div class="form-group"><label>Last Update</label><input type="text" value="${device.lastUpdate ? formatTime(device.lastUpdate) : 'N/A'}" readonly></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1"><label>Networks</label><input type="text" value="${(device.networks || []).join(', ') || 'None'}" readonly></div>
+            </div>
+            <div style="display:flex;gap:0.5rem;margin-top:1rem;">
+                <button class="btn btn-primary btn-small" onclick="editDeviceAdmin('${device.id}')"><i class="fas fa-edit"></i> Edit</button>
+                <button class="btn btn-outline btn-small" onclick="deleteDeviceAdmin('${device.id}')"><i class="fas fa-trash"></i> Delete</button>
+            </div>
+        </div>
+    `;
+    modal.style.display = 'flex';
+}
+
+function showAdminDeviceForm(deviceId) {
+    const devices = getAllDevices();
+    const device = deviceId ? devices.find(d => d.id === deviceId) : null;
+    const isEdit = !!device;
+
+    const modal = document.getElementById('adminDeviceModal');
+    const title = document.getElementById('adminDeviceModalTitle');
+    const body = document.getElementById('adminDeviceModalBody');
+    if (!modal || !body) return;
+
+    title.textContent = isEdit ? 'Edit Device' : 'Add New Device';
+
+    const namespaceOptions = getAvailableNamespaceOptions();
+
+    body.innerHTML = `
+        <form id="adminDeviceForm" class="settings-form" onsubmit="return false;">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="adminDeviceId">Device ID *</label>
+                    <input type="text" id="adminDeviceId" value="${device ? device.id : ''}" ${isEdit ? 'readonly' : 'required'} placeholder="e.g. TRK-001">
+                </div>
+                <div class="form-group">
+                    <label for="adminDeviceName">Name *</label>
+                    <input type="text" id="adminDeviceName" value="${device ? (device.name || '') : ''}" required placeholder="e.g. Truck A GPS">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="adminDeviceType">Type</label>
+                    <select id="adminDeviceType">
+                        <option value="Tracker" ${device && device.type === 'Tracker' ? 'selected' : ''}>Tracker</option>
+                        <option value="Sensor" ${device && device.type === 'Sensor' ? 'selected' : ''}>Sensor</option>
+                        <option value="Gateway" ${device && device.type === 'Gateway' ? 'selected' : ''}>Gateway</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="adminDeviceStatus">Status</label>
+                    <select id="adminDeviceStatus">
+                        <option value="active" ${!device || device.status === 'active' ? 'selected' : ''}>Active</option>
+                        <option value="inactive" ${device && device.status === 'inactive' ? 'selected' : ''}>Inactive</option>
+                        <option value="maintenance" ${device && device.status === 'maintenance' ? 'selected' : ''}>Maintenance</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="adminDeviceNamespace">Tenant Namespace *</label>
+                    <select id="adminDeviceNamespace" required>
+                        ${namespaceOptions}
+                    </select>
+                    ${isEdit ? `<small>Current: ${device.ownerNamespace || 'N/A'}</small>` : ''}
+                </div>
+                <div class="form-group">
+                    <label for="adminDeviceGroup">Group</label>
+                    <input type="text" id="adminDeviceGroup" value="${device ? (device.group || '') : ''}" placeholder="e.g. Fleet A">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="adminDeviceLat">Latitude</label>
+                    <input type="number" step="any" id="adminDeviceLat" value="${device && device.latitude != null ? device.latitude : ''}" placeholder="e.g. 56.946">
+                </div>
+                <div class="form-group">
+                    <label for="adminDeviceLng">Longitude</label>
+                    <input type="number" step="any" id="adminDeviceLng" value="${device && device.longitude != null ? device.longitude : ''}" placeholder="e.g. 24.105">
+                </div>
+            </div>
+            <div style="display:flex;gap:0.5rem;margin-top:1rem;">
+                <button type="button" class="btn btn-primary" onclick="saveAdminDevice('${isEdit ? device.id : ''}')"><i class="fas fa-save"></i> ${isEdit ? 'Update' : 'Create'} Device</button>
+                <button type="button" class="btn btn-outline" onclick="closeAdminDeviceModal()">Cancel</button>
+            </div>
+        </form>
+    `;
+
+    if (isEdit) {
+        const nsSelect = document.getElementById('adminDeviceNamespace');
+        if (nsSelect && device.ownerNamespace) {
+            nsSelect.value = device.ownerNamespace;
+        }
+    }
+
+    modal.style.display = 'flex';
+}
+
+function getAvailableNamespaceOptions() {
+    const tenants = resellerTenantsCache.length ? resellerTenantsCache : [];
+    if (!tenants.length) {
+        return '<option value="">No tenants available</option>';
+    }
+    return tenants.map(t => {
+        const ns = `tenant:${t.id}`;
+        return `<option value="${ns}">${t.name || t.id}</option>`;
+    }).join('');
+}
+
+function editDeviceAdmin(deviceId) {
+    closeAdminDeviceModal();
+    showAdminDeviceForm(deviceId);
+}
+
+async function saveAdminDevice(existingId) {
+    const id = existingId || (document.getElementById('adminDeviceId')?.value || '').trim();
+    const name = (document.getElementById('adminDeviceName')?.value || '').trim();
+    const type = document.getElementById('adminDeviceType')?.value || 'Tracker';
+    const status = document.getElementById('adminDeviceStatus')?.value || 'active';
+    const namespace = document.getElementById('adminDeviceNamespace')?.value || '';
+    const group = (document.getElementById('adminDeviceGroup')?.value || '').trim();
+    const lat = document.getElementById('adminDeviceLat')?.value;
+    const lng = document.getElementById('adminDeviceLng')?.value;
+
+    if (!id || !name) {
+        showNotification('Device ID and Name are required.', 'error');
+        return;
+    }
+    if (!namespace) {
+        showNotification('Please select a tenant namespace.', 'error');
+        return;
+    }
+
+    const payload = {
+        id,
+        name,
+        type,
+        status,
+        group: group || undefined,
+        latitude: lat ? parseFloat(lat) : undefined,
+        longitude: lng ? parseFloat(lng) : undefined
+    };
+
+    try {
+        const response = await fetch('/api/admin-devices', {
+            method: existingId ? 'PUT' : 'POST',
+            headers: { 'Content-Type': 'application/json', ...getApiAuthHeaders() },
+            body: JSON.stringify({ namespace, device: payload })
+        });
+        const result = await response.json();
+        if (!response.ok) {
+            showNotification(result.error || 'Failed to save device.', 'error');
+            return;
+        }
+        showNotification(`Device ${existingId ? 'updated' : 'created'} successfully.`, 'success');
+        closeAdminDeviceModal();
+        await loadAllDevices();
+        updateAdminGlobalMap();
+    } catch (error) {
+        console.error('Save device error:', error);
+        showNotification('Failed to save device.', 'error');
+    }
+}
+
+async function deleteDeviceAdmin(deviceId) {
+    const device = getAllDevices().find(d => d.id === deviceId);
+    if (!device) {
+        showNotification('Device not found.', 'error');
+        return;
+    }
+    if (!confirm(`Delete device "${device.name || deviceId}"? This action cannot be undone.`)) {
+        return;
+    }
+
+    const namespace = device.ownerNamespace;
+    if (!namespace) {
+        showNotification('Cannot determine device namespace.', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/admin-devices', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json', ...getApiAuthHeaders() },
+            body: JSON.stringify({ namespace, deviceId })
+        });
+        const result = await response.json();
+        if (!response.ok) {
+            showNotification(result.error || 'Failed to delete device.', 'error');
+            return;
+        }
+        showNotification('Device deleted successfully.', 'success');
+        closeAdminDeviceModal();
+        await loadAllDevices();
+        updateAdminGlobalMap();
+    } catch (error) {
+        console.error('Delete device error:', error);
+        showNotification('Failed to delete device.', 'error');
+    }
+}
+
+let resellerTenantsCache = [];
+let resellerUsersCache = [];
+
+function initResellerManagement() {
+    const form = document.getElementById('createTenantForm');
+    if (form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await createTenantWorkspace();
+        });
+    }
+    const userForm = document.getElementById('createTenantUserForm');
+    if (userForm) {
+        userForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await createTenantUser();
+        });
+    }
+}
+
+async function fetchTenants() {
+    const response = await fetch('/api/tenants', {
+        headers: getApiAuthHeaders(),
+        cache: 'no-store'
+    });
+    if (!response.ok) {
+        return [];
+    }
+    const data = await response.json();
+    resellerTenantsCache = Array.isArray(data.tenants) ? data.tenants : [];
+    return resellerTenantsCache;
+}
+
+async function fetchUsers() {
+    const response = await fetch('/api/users', {
+        headers: getApiAuthHeaders(),
+        cache: 'no-store'
+    });
+    if (!response.ok) {
+        return [];
+    }
+    const data = await response.json();
+    resellerUsersCache = Array.isArray(data.users) ? data.users : [];
+    return resellerUsersCache;
+}
+
+async function loadResellerData() {
+    const admin = typeof getCurrentAdmin === 'function' ? getCurrentAdmin() : null;
+    if (!admin) return;
+    if (admin.role !== 'reseller' && admin.role !== 'super_admin') {
+        return;
+    }
+    await fetchTenants();
+    await fetchUsers();
+    renderResellerTenants();
+    renderResellerUsers();
+    populateTenantSelect();
+}
+
+function renderResellerTenants() {
+    const table = document.getElementById('resellerTenantsTable');
+    if (!table) return;
+    if (!resellerTenantsCache.length) {
+        table.innerHTML = '<tr><td colspan="5">No workspaces found.</td></tr>';
+        return;
+    }
+    table.innerHTML = resellerTenantsCache.map((tenant) => `
+        <tr>
+            <td>${tenant.name}</td>
+            <td>${tenant.planTier || 'individual'}</td>
+            <td>${tenant.resellerId || 'Direct'}</td>
+            <td>${tenant.createdAt ? new Date(tenant.createdAt).toLocaleDateString() : '-'}</td>
+            <td>
+                <button class="btn btn-outline btn-small" onclick="editTenant('${tenant.id}')" title="Edit"><i class="fas fa-edit"></i></button>
+                <button class="btn btn-outline btn-small" onclick="deleteTenant('${tenant.id}')" title="Delete"><i class="fas fa-trash"></i></button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+async function editTenant(tenantId) {
+    const tenant = resellerTenantsCache.find(t => t.id === tenantId);
+    if (!tenant) return;
+    const newName = prompt('Tenant name:', tenant.name);
+    if (!newName || newName === tenant.name) return;
+    try {
+        const response = await fetch('/api/tenants', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', ...getApiAuthHeaders() },
+            body: JSON.stringify({ id: tenantId, name: newName })
+        });
+        if (!response.ok) {
+            const r = await response.json();
+            showNotification(r.error || 'Failed to update tenant.', 'error');
+            return;
+        }
+        showNotification('Tenant updated.', 'success');
+        await loadResellerData();
+    } catch (error) {
+        showNotification('Failed to update tenant.', 'error');
+    }
+}
+
+async function deleteTenant(tenantId) {
+    const tenant = resellerTenantsCache.find(t => t.id === tenantId);
+    if (!tenant) return;
+    if (!confirm(`Delete tenant "${tenant.name}"? This cannot be undone.`)) return;
+    try {
+        const response = await fetch(`/api/tenants?tenantId=${encodeURIComponent(tenantId)}`, {
+            method: 'DELETE',
+            headers: getApiAuthHeaders()
+        });
+        if (!response.ok) {
+            const r = await response.json();
+            showNotification(r.error || 'Failed to delete tenant.', 'error');
+            return;
+        }
+        showNotification('Tenant deleted.', 'success');
+        await loadResellerData();
+    } catch (error) {
+        showNotification('Failed to delete tenant.', 'error');
+    }
+}
+
+function renderResellerUsers() {
+    const table = document.getElementById('resellerUsersTable');
+    if (!table) return;
+    if (!resellerUsersCache.length) {
+        table.innerHTML = '<tr><td colspan="5">No users found.</td></tr>';
+        return;
+    }
+    const tenantMap = new Map(resellerTenantsCache.map((tenant) => [tenant.id, tenant]));
+    table.innerHTML = resellerUsersCache.map((user) => `
+        <tr>
+            <td>${user.email}</td>
+            <td>${tenantMap.get(user.tenantId)?.name || user.tenantId || '-'}</td>
+            <td>${user.planTier || user.package || 'individual'}</td>
+            <td>${user.isActive === false ? 'Inactive' : 'Active'}</td>
+            <td>
+                <button class="btn btn-outline btn-small" onclick="deleteTenantUser('${user.id}')" title="Delete"><i class="fas fa-trash"></i></button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+async function deleteTenantUser(userId) {
+    if (!confirm('Delete this user? This cannot be undone.')) return;
+    try {
+        const response = await fetch(`/api/users?userId=${encodeURIComponent(userId)}`, {
+            method: 'DELETE',
+            headers: getApiAuthHeaders()
+        });
+        if (!response.ok) {
+            const r = await response.json();
+            showNotification(r.error || 'Failed to delete user.', 'error');
+            return;
+        }
+        showNotification('User deleted.', 'success');
+        await loadResellerData();
+    } catch (error) {
+        showNotification('Failed to delete user.', 'error');
+    }
+}
+
+function populateTenantSelect() {
+    const select = document.getElementById('tenantUserWorkspace');
+    if (!select) return;
+    select.innerHTML = resellerTenantsCache.map((tenant) => `
+        <option value="${tenant.id}">${tenant.name} (${tenant.planTier || 'individual'})</option>
+    `).join('');
+}
+
+async function createTenantWorkspace() {
+    const name = document.getElementById('tenantName').value.trim();
+    const planTier = document.getElementById('tenantPlanTier').value;
+    if (!name) {
+        alert('Workspace name is required.');
+        return;
+    }
+    const response = await fetch('/api/tenants', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            ...getApiAuthHeaders()
+        },
+        body: JSON.stringify({ name, planTier })
+    });
+    if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        alert(text || 'Failed to create workspace.');
+        return;
+    }
+    document.getElementById('createTenantForm').reset();
+    await loadResellerData();
+}
+
+async function createTenantUser() {
+    const tenantId = document.getElementById('tenantUserWorkspace').value;
+    const email = document.getElementById('tenantUserEmail').value.trim();
+    const password = document.getElementById('tenantUserPassword').value.trim();
+    if (!tenantId || !email || !password) {
+        alert('Please complete all fields.');
+        return;
+    }
+    const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            ...getApiAuthHeaders()
+        },
+        body: JSON.stringify({ tenantId, email, password, planTier: 'individual' })
+    });
+    if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        alert(text || 'Failed to create user.');
+        return;
+    }
+    document.getElementById('createTenantUserForm').reset();
+    await loadResellerData();
 }
 
 // Security & Privacy
@@ -2521,37 +3562,98 @@ function initAdminSettings() {
             testLteConnection();
         });
     }
+
+    // LoRaWAN Settings
+    const lorawanForm = document.getElementById('lorawanSettingsForm');
+    if (lorawanForm) {
+        lorawanForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            saveLorawanSettings();
+        });
+        loadLorawanSettings();
+    }
+
+    const testLorawanBtn = document.getElementById('testLorawanConnection');
+    if (testLorawanBtn) {
+        testLorawanBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            testLorawanConnection();
+        });
+    }
+
+    // Load server-side maintenance mode status into the dropdown
+    fetch('/api/maintenance').then(r => r.json()).then(data => {
+        const el = document.getElementById('maintenanceMode');
+        if (el) el.value = data.enabled ? 'on' : 'off';
+    }).catch(() => {});
 }
 
-function saveAppSettings() {
+async function saveAppSettings() {
     const settings = {
         appName: document.getElementById('appName').value,
         supportEmail: document.getElementById('supportEmail').value,
         supportPhone: document.getElementById('supportPhone').value,
         maintenanceMode: document.getElementById('maintenanceMode').value
     };
-    
+
     localStorage.setItem('app_settings', JSON.stringify(settings));
+
+    // Sync maintenance mode to server so all visitors see it
+    try {
+        const token = localStorage.getItem('adminToken');
+        await fetch('/api/maintenance', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + (token || '')
+            },
+            body: JSON.stringify({
+                enabled: settings.maintenanceMode === 'on'
+            })
+        });
+    } catch (e) {
+        console.warn('Failed to sync maintenance mode to server:', e);
+    }
+
     alert('Application settings saved!');
 }
 
-function updateAdminAccount() {
+async function updateAdminAccount() {
     const currentAdmin = getCurrentAdmin();
+    if (!currentAdmin) {
+        showNotification('Admin session not found.', 'error');
+        return;
+    }
     const newPassword = document.getElementById('adminNewPassword').value;
     const confirmPassword = document.getElementById('adminConfirmPassword').value;
     
     if (newPassword) {
+        if (newPassword.length < 8) {
+            showNotification('Password must be at least 8 characters.', 'error');
+            return;
+        }
         if (newPassword !== confirmPassword) {
-            alert('Passwords do not match!');
+            showNotification('Passwords do not match!', 'error');
             return;
         }
         
-        const result = updateAdminPassword(currentAdmin.email, currentAdmin.password, newPassword);
-        if (result.success) {
-            alert('Password updated successfully!');
-            document.getElementById('adminAccountForm').reset();
-        } else {
-            alert(result.message);
+        try {
+            const response = await fetch('/api/admin-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...getApiAuthHeaders() },
+                body: JSON.stringify({ newPassword })
+            });
+            const result = await response.json();
+            if (!response.ok) {
+                showNotification(result.error || 'Password update failed.', 'error');
+                return;
+            }
+            showNotification('Password updated successfully!', 'success');
+            document.getElementById('adminNewPassword').value = '';
+            document.getElementById('adminConfirmPassword').value = '';
+        } catch (error) {
+            console.error('Password update error:', error);
+            showNotification('Failed to update password.', 'error');
         }
     }
 }
@@ -2673,6 +3775,82 @@ function saveLteSettings() {
     alert('LTE settings saved successfully!');
 }
 
+// LoRaWAN Settings
+function loadLorawanSettings() {
+    const settings = JSON.parse(localStorage.getItem('lorawan_settings') || '{}');
+    const fields = {
+        lorawanProvider: 'provider',
+        lorawanServerUrl: 'serverUrl',
+        lorawanApiKey: 'apiKey',
+        lorawanAppEui: 'appEui',
+        lorawanJoinEui: 'joinEui',
+        lorawanDeviceProfile: 'deviceProfile',
+        lorawanFreqPlan: 'freqPlan'
+    };
+    Object.entries(fields).forEach(([elId, key]) => {
+        const el = document.getElementById(elId);
+        if (el && settings[key]) el.value = settings[key];
+    });
+
+    // Auto-fill webhook URL
+    const webhookEl = document.getElementById('lorawanWebhookUrl');
+    if (webhookEl) webhookEl.value = window.location.origin + '/api/ingest';
+
+    const tokenEl = document.getElementById('lorawanWebhookToken');
+    if (tokenEl) tokenEl.value = 'Use your LTE_INGEST_TOKEN env variable';
+}
+
+function saveLorawanSettings() {
+    const settings = {
+        provider: document.getElementById('lorawanProvider')?.value || '',
+        serverUrl: document.getElementById('lorawanServerUrl')?.value.trim() || '',
+        apiKey: document.getElementById('lorawanApiKey')?.value.trim() || '',
+        appEui: document.getElementById('lorawanAppEui')?.value.trim() || '',
+        joinEui: document.getElementById('lorawanJoinEui')?.value.trim() || '',
+        deviceProfile: document.getElementById('lorawanDeviceProfile')?.value || 'classA',
+        freqPlan: document.getElementById('lorawanFreqPlan')?.value || 'EU868'
+    };
+    localStorage.setItem('lorawan_settings', JSON.stringify(settings));
+    alert('LoRaWAN settings saved successfully!');
+}
+
+function testLorawanConnection() {
+    const statusEl = document.getElementById('lorawanValidationStatus');
+    const testBtn = document.getElementById('testLorawanConnection');
+    if (!statusEl || !testBtn) return;
+
+    const provider = document.getElementById('lorawanProvider')?.value;
+    const serverUrl = document.getElementById('lorawanServerUrl')?.value.trim();
+
+    testBtn.disabled = true;
+    testBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
+    statusEl.style.display = 'block';
+    statusEl.style.background = '#fff3e0';
+    statusEl.style.borderLeft = '4px solid #ff9800';
+    statusEl.style.color = '#e65100';
+    statusEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validating LoRaWAN configuration...';
+
+    setTimeout(() => {
+        let isValid = true;
+        let message = '';
+        if (!provider) {
+            isValid = false;
+            message = 'Please select a network server provider.';
+        } else if (!serverUrl) {
+            isValid = false;
+            message = 'Please enter the network server URL.';
+        } else if (!/^https?:\/\//i.test(serverUrl)) {
+            isValid = false;
+            message = 'Server URL must start with http:// or https://';
+        } else {
+            message = 'Configuration looks valid. Webhook endpoint is set to ' + window.location.origin + '/api/ingest';
+        }
+        showValidationStatus(statusEl, isValid, message);
+        testBtn.disabled = false;
+        testBtn.innerHTML = '<i class="fas fa-plug"></i> Test Connection';
+    }, 800);
+}
+
 // Search functionality
 function handleAdminSearch(e) {
     const searchTerm = e.target.value.toLowerCase();
@@ -2714,3 +3892,888 @@ function formatTime(isoString) {
     return date.toLocaleDateString();
 }
 
+// ============================================================
+// Tracker Library -- pre-built configuration profiles
+// ============================================================
+
+const TRACKER_PROFILES = [
+    {
+        id: 'dm-oyster3',
+        manufacturer: 'Digital Matter',
+        model: 'Oyster3',
+        protocol: 'HTTP',
+        compatibility: 'plug-and-play',
+        icon: 'fa-satellite-dish',
+        category: 'Asset',
+        connectivity: 'LTE-M / NB-IoT',
+        batteryLife: '~5 years',
+        sensors: ['GPS', 'Accelerometer'],
+        bestFor: 'Pallets, containers, non-powered assets',
+        apn: 'internet (carrier-specific)',
+        serverSetup: {
+            method: 'HTTP POST',
+            contentType: 'application/json',
+            authHeader: 'Bearer <LTE_INGEST_TOKEN>'
+        },
+        payloadExample: JSON.stringify({
+            deviceId: "OY3-861234567890",
+            latitude: 51.5074,
+            longitude: -0.1278,
+            timestamp: 1706792400,
+            battery: 98,
+            speed: 0,
+            heading: 180,
+            satellites: 12
+        }, null, 2),
+        fieldMapping: [
+            ['deviceId', 'deviceId / serial'],
+            ['latitude / longitude', 'latitude / longitude'],
+            ['timestamp', 'timestamp (Unix)'],
+            ['battery', 'battery (%)'],
+            ['speed', 'speed (km/h)'],
+            ['heading', 'heading (degrees)']
+        ],
+        setupSteps: [
+            'Log in to the Digital Matter OEM Server or your device management portal.',
+            'Navigate to System Parameters > Server settings.',
+            'Set the server URL to your Aurion ingest endpoint.',
+            'Set Upload Code to JSON and enable HTTP POST mode.',
+            'Under Headers, add Authorization: Bearer <your_LTE_INGEST_TOKEN>.',
+            'Set the tracking interval (e.g. 15 minutes for asset tracking).',
+            'Configure APN settings to match your SIM carrier.',
+            'Save and reboot the device. Data should appear within one reporting cycle.'
+        ],
+        notes: 'IP67 rated. Ideal for long-life unattended asset tracking. Configure movement detection to extend battery life.'
+    },
+    {
+        id: 'dm-yabby-edge',
+        manufacturer: 'Digital Matter',
+        model: 'Yabby Edge',
+        protocol: 'HTTP',
+        compatibility: 'plug-and-play',
+        icon: 'fa-satellite-dish',
+        category: 'Asset',
+        connectivity: 'LTE-M / NB-IoT',
+        batteryLife: '~5 years',
+        sensors: ['GPS', 'Wi-Fi positioning', 'Accelerometer'],
+        bestFor: 'Small packages, returnable crates, tools',
+        apn: 'internet (carrier-specific)',
+        serverSetup: {
+            method: 'HTTP POST',
+            contentType: 'application/json',
+            authHeader: 'Bearer <LTE_INGEST_TOKEN>'
+        },
+        payloadExample: JSON.stringify({
+            deviceId: "YBE-861234567891",
+            latitude: 48.8566,
+            longitude: 2.3522,
+            timestamp: 1706792400,
+            battery: 95
+        }, null, 2),
+        fieldMapping: [
+            ['deviceId', 'deviceId / serial'],
+            ['latitude / longitude', 'latitude / longitude'],
+            ['timestamp', 'timestamp (Unix)'],
+            ['battery', 'battery (%)']
+        ],
+        setupSteps: [
+            'Access Yabby Edge settings via the Digital Matter OEM portal.',
+            'Set server URL to your Aurion /api/ingest endpoint.',
+            'Enable JSON payload format under Upload settings.',
+            'Add Authorization header: Bearer <your_LTE_INGEST_TOKEN>.',
+            'Set tracking interval and movement thresholds.',
+            'Configure APN for your carrier.',
+            'Save settings. Device will report on next scheduled upload.'
+        ],
+        notes: 'Ultra-compact form factor. Combines GPS with Wi-Fi positioning for indoor/outdoor use.'
+    },
+    {
+        id: 'dm-sensornode',
+        manufacturer: 'Digital Matter',
+        model: 'SensorNode',
+        protocol: 'HTTP',
+        compatibility: 'plug-and-play',
+        icon: 'fa-temperature-half',
+        category: 'Sensor',
+        connectivity: 'LTE-M / NB-IoT',
+        batteryLife: '~3 years',
+        sensors: ['GPS', 'Temperature', 'Humidity', 'Accelerometer'],
+        bestFor: 'Cold chain, pharma, food logistics',
+        apn: 'internet (carrier-specific)',
+        serverSetup: {
+            method: 'HTTP POST',
+            contentType: 'application/json',
+            authHeader: 'Bearer <LTE_INGEST_TOKEN>'
+        },
+        payloadExample: JSON.stringify({
+            deviceId: "SN-861234567892",
+            latitude: 52.5200,
+            longitude: 13.4050,
+            timestamp: 1706792400,
+            temperature: 4.5,
+            humidity: 62,
+            battery: 88
+        }, null, 2),
+        fieldMapping: [
+            ['deviceId', 'deviceId / serial'],
+            ['latitude / longitude', 'latitude / longitude'],
+            ['timestamp', 'timestamp (Unix)'],
+            ['temperature', 'temperature (C)'],
+            ['humidity', 'humidity (%)'],
+            ['battery', 'battery (%)']
+        ],
+        setupSteps: [
+            'Access SensorNode via Digital Matter OEM Server.',
+            'Set server URL to your /api/ingest endpoint.',
+            'Enable JSON POST mode.',
+            'Add Authorization: Bearer <your_LTE_INGEST_TOKEN>.',
+            'Enable temperature and humidity sensor reporting.',
+            'Set sensor sampling interval (e.g. every 5 minutes).',
+            'Configure temperature thresholds if alerting is needed on the tracker side.',
+            'Set APN for your carrier and save.'
+        ],
+        notes: 'Purpose-built for environmental monitoring. Supports external probe sensors for precise cold-chain compliance.'
+    },
+    {
+        id: 'queclink-gl320mg',
+        manufacturer: 'Queclink',
+        model: 'GL320MG',
+        protocol: 'HTTP',
+        compatibility: 'plug-and-play',
+        icon: 'fa-location-dot',
+        category: 'Asset',
+        connectivity: 'LTE-M / 2G fallback',
+        batteryLife: '~4 years',
+        sensors: ['GPS', 'Accelerometer', 'Temperature (optional)'],
+        bestFor: 'Trailers, containers, heavy equipment',
+        apn: 'internet (carrier-specific)',
+        serverSetup: {
+            method: 'HTTP POST',
+            contentType: 'application/json',
+            authHeader: 'Bearer <LTE_INGEST_TOKEN>'
+        },
+        payloadExample: JSON.stringify({
+            deviceId: "GL320-353234567890123",
+            imei: "353234567890123",
+            latitude: 40.7128,
+            longitude: -74.0060,
+            timestamp: "2026-02-01T14:30:00Z",
+            battery: 75,
+            speed: 0,
+            temperature: 22.3
+        }, null, 2),
+        fieldMapping: [
+            ['deviceId / imei', 'deviceId or IMEI'],
+            ['latitude / longitude', 'latitude / longitude'],
+            ['timestamp', 'timestamp (ISO 8601)'],
+            ['battery', 'batteryLevel (%)'],
+            ['speed', 'speed (km/h)'],
+            ['temperature', 'temperature (C, optional)']
+        ],
+        setupSteps: [
+            'Connect to the GL320MG via Queclink Tool or AT commands over USB.',
+            'Set the backend protocol to HTTP using the AT+GTBSI command.',
+            'Set the server URL: AT+GTSRI=... with your /api/ingest endpoint.',
+            'Configure the authorization header with your ingest token.',
+            'Set reporting interval with AT+GTFRI (e.g. 900 for 15 min).',
+            'Configure APN: AT+GTQSS=... with your carrier APN.',
+            'Save and restart the device.'
+        ],
+        notes: 'IP67 waterproof. Supports optional temperature sensor via Bluetooth. 2G fallback for areas without LTE-M coverage.'
+    },
+    {
+        id: 'queclink-gv300',
+        manufacturer: 'Queclink',
+        model: 'GV300',
+        protocol: 'HTTP',
+        compatibility: 'plug-and-play',
+        icon: 'fa-truck',
+        category: 'Vehicle',
+        connectivity: '2G/3G/4G',
+        batteryLife: 'Vehicle powered',
+        sensors: ['GPS', 'Accelerometer', 'OBD-II (optional)'],
+        bestFor: 'Fleet vehicles, trucks, vans',
+        apn: 'internet (carrier-specific)',
+        serverSetup: {
+            method: 'HTTP POST',
+            contentType: 'application/json',
+            authHeader: 'Bearer <LTE_INGEST_TOKEN>'
+        },
+        payloadExample: JSON.stringify({
+            deviceId: "GV300-862345678901234",
+            imei: "862345678901234",
+            latitude: 34.0522,
+            longitude: -118.2437,
+            timestamp: "2026-02-01T10:15:00Z",
+            speed: 65,
+            heading: 270,
+            battery: 100,
+            satellites: 14
+        }, null, 2),
+        fieldMapping: [
+            ['deviceId / imei', 'deviceId or IMEI'],
+            ['latitude / longitude', 'latitude / longitude'],
+            ['timestamp', 'timestamp (ISO 8601)'],
+            ['speed', 'speed (km/h)'],
+            ['heading', 'heading (degrees)'],
+            ['battery', 'battery (%)'],
+            ['satellites', 'satellites']
+        ],
+        setupSteps: [
+            'Wire the GV300 to the vehicle power supply (9-36V DC).',
+            'Connect via Queclink Tool over USB.',
+            'Set protocol to HTTP POST and enter your /api/ingest URL.',
+            'Add Authorization: Bearer <your_LTE_INGEST_TOKEN>.',
+            'Configure tracking: AT+GTFRI for fixed interval reporting.',
+            'Set ignition detection if needed (AT+GTIGN/AT+GTIGF).',
+            'Configure APN for your SIM carrier.',
+            'Save and verify data flow to your dashboard.'
+        ],
+        notes: 'Hardwired vehicle tracker. Supports harsh acceleration, braking, and cornering events. Can connect to OBD-II for fuel/engine data.'
+    },
+    {
+        id: 'teltonika-fmb120',
+        manufacturer: 'Teltonika',
+        model: 'FMB120',
+        protocol: 'TCP',
+        compatibility: 'gateway-required',
+        icon: 'fa-car',
+        category: 'Vehicle',
+        connectivity: '2G (GSM)',
+        batteryLife: 'Vehicle powered + backup battery',
+        sensors: ['GPS', 'GLONASS', 'Accelerometer', 'Digital I/O'],
+        bestFor: 'Budget fleet tracking, light vehicles',
+        apn: 'internet (carrier-specific)',
+        serverSetup: {
+            method: 'TCP (Codec 8 Extended)',
+            port: '(gateway-defined)',
+            authHeader: 'N/A -- device uses IMEI as identifier'
+        },
+        payloadExample: '// Teltonika Codec 8E binary protocol\n// Gateway converts to JSON:\n' + JSON.stringify({
+            imei: "352094080745317",
+            latitude: 54.6872,
+            longitude: 25.2797,
+            timestamp: 1706792400,
+            speed: 55,
+            heading: 130,
+            satellites: 10,
+            battery: 100
+        }, null, 2),
+        fieldMapping: [
+            ['imei', 'IMEI (auto-identified)'],
+            ['latitude / longitude', 'GPS coordinates'],
+            ['timestamp', 'timestamp (Unix ms)'],
+            ['speed', 'speed (km/h)'],
+            ['heading', 'angle (degrees)'],
+            ['satellites', 'satellite count'],
+            ['battery', 'external voltage mapped']
+        ],
+        setupSteps: [
+            'Connect FMB120 to a vehicle (OBD or hardwire 10-30V DC).',
+            'Access the device via Teltonika Configurator over USB or Bluetooth.',
+            'Navigate to GPRS settings and set the APN for your SIM carrier.',
+            'Under Server Settings, set Domain/IP and Port to your TCP gateway server.',
+            'Set protocol to Codec 8 Extended (TCP).',
+            'Configure Data Acquisition to set which I/O elements to send.',
+            'Set tracking interval (e.g. on-moving: 30s, on-stop: 5 min).',
+            'Save and verify that data reaches the gateway and is forwarded to /api/ingest.'
+        ],
+        notes: 'Requires a TCP-to-HTTP gateway (e.g. Traccar, flespi, or custom) to convert Codec 8E binary data to JSON POST for the Aurion ingest API. Very cost-effective for large fleet rollouts.'
+    },
+    {
+        id: 'teltonika-fmb920',
+        manufacturer: 'Teltonika',
+        model: 'FMB920',
+        protocol: 'TCP',
+        compatibility: 'gateway-required',
+        icon: 'fa-car',
+        category: 'Vehicle',
+        connectivity: '2G (GSM)',
+        batteryLife: 'Vehicle powered + 170 mAh backup',
+        sensors: ['GPS', 'GLONASS', 'Accelerometer', 'Bluetooth'],
+        bestFor: 'Compact fleet tracking, ride-sharing',
+        apn: 'internet (carrier-specific)',
+        serverSetup: {
+            method: 'TCP (Codec 8 Extended)',
+            port: '(gateway-defined)',
+            authHeader: 'N/A -- device uses IMEI as identifier'
+        },
+        payloadExample: '// Teltonika Codec 8E binary protocol\n// Gateway converts to JSON:\n' + JSON.stringify({
+            imei: "352094081234567",
+            latitude: 52.2297,
+            longitude: 21.0122,
+            timestamp: 1706792400,
+            speed: 42,
+            heading: 88,
+            satellites: 8,
+            battery: 100
+        }, null, 2),
+        fieldMapping: [
+            ['imei', 'IMEI (auto-identified)'],
+            ['latitude / longitude', 'GPS coordinates'],
+            ['timestamp', 'timestamp (Unix ms)'],
+            ['speed', 'speed (km/h)'],
+            ['heading', 'angle (degrees)'],
+            ['satellites', 'satellite count']
+        ],
+        setupSteps: [
+            'Install FMB920 in the vehicle (OBD-II plug or hardwire).',
+            'Configure via Teltonika Configurator (USB/Bluetooth).',
+            'Set APN under GPRS settings.',
+            'Set server Domain/IP and Port to your TCP gateway.',
+            'Set protocol to Codec 8 Extended.',
+            'Enable Bluetooth if using BLE sensors (temperature beacons).',
+            'Set tracking intervals and save configuration.',
+            'Verify data flow through your gateway to /api/ingest.'
+        ],
+        notes: 'Smallest Teltonika tracker. Bluetooth 4.0 support allows connecting external temperature/humidity BLE beacons. Requires a TCP gateway.'
+    },
+    {
+        id: 'teltonika-fmc130',
+        manufacturer: 'Teltonika',
+        model: 'FMC130',
+        protocol: 'TCP',
+        compatibility: 'gateway-required',
+        icon: 'fa-truck',
+        category: 'Vehicle',
+        connectivity: '4G LTE (Cat 1) + 2G fallback',
+        batteryLife: 'Vehicle powered + 170 mAh backup',
+        sensors: ['GPS', 'GLONASS', 'Galileo', 'Accelerometer', 'Bluetooth', 'CAN data'],
+        bestFor: 'Heavy fleet, trucks, advanced telematics',
+        apn: 'internet (carrier-specific)',
+        serverSetup: {
+            method: 'TCP (Codec 8 Extended)',
+            port: '(gateway-defined)',
+            authHeader: 'N/A -- device uses IMEI as identifier'
+        },
+        payloadExample: '// Teltonika Codec 8E binary protocol\n// Gateway converts to JSON:\n' + JSON.stringify({
+            imei: "352094089876543",
+            latitude: 55.6761,
+            longitude: 12.5683,
+            timestamp: 1706792400,
+            speed: 78,
+            heading: 310,
+            satellites: 16,
+            battery: 100,
+            temperature: 18.5
+        }, null, 2),
+        fieldMapping: [
+            ['imei', 'IMEI (auto-identified)'],
+            ['latitude / longitude', 'GPS coordinates'],
+            ['timestamp', 'timestamp (Unix ms)'],
+            ['speed', 'speed (km/h)'],
+            ['heading', 'angle (degrees)'],
+            ['satellites', 'satellite count'],
+            ['temperature', 'via BLE sensor or 1-Wire (I/O element)']
+        ],
+        setupSteps: [
+            'Hardwire FMC130 to vehicle power (10-30V DC).',
+            'Configure via Teltonika Configurator over USB.',
+            'Set APN under GPRS settings for your 4G SIM.',
+            'Set server IP/Domain and Port to your TCP gateway.',
+            'Set protocol to Codec 8 Extended.',
+            'Configure CAN bus parameters if needed for fuel/RPM data.',
+            'Enable Bluetooth and pair BLE temperature beacons if needed.',
+            'Set I/O elements and tracking intervals. Save and deploy.',
+            'Verify data reaches your gateway and forwards to /api/ingest.'
+        ],
+        notes: '4G LTE tracker with CAN bus support for engine diagnostics. Best for modern truck fleets. Requires a TCP-to-HTTP gateway (Traccar, flespi, etc.).'
+    },
+    {
+        id: 'concox-at4',
+        manufacturer: 'Concox',
+        model: 'AT4',
+        protocol: 'TCP',
+        compatibility: 'gateway-required',
+        icon: 'fa-box',
+        category: 'Asset',
+        connectivity: '4G LTE (Cat 1)',
+        batteryLife: '~3 years (10,000 mAh)',
+        sensors: ['GPS', 'Wi-Fi positioning', 'Accelerometer', 'Light sensor'],
+        bestFor: 'High-value cargo, containers, equipment',
+        apn: 'internet (carrier-specific)',
+        serverSetup: {
+            method: 'TCP (proprietary protocol)',
+            port: '(gateway-defined)',
+            authHeader: 'N/A -- device uses IMEI'
+        },
+        payloadExample: '// Concox proprietary binary protocol\n// Gateway converts to JSON:\n' + JSON.stringify({
+            imei: "868345678901234",
+            latitude: 1.3521,
+            longitude: 103.8198,
+            timestamp: 1706792400,
+            battery: 85,
+            speed: 0
+        }, null, 2),
+        fieldMapping: [
+            ['imei', 'IMEI (auto-identified)'],
+            ['latitude / longitude', 'GPS coordinates'],
+            ['timestamp', 'timestamp (Unix)'],
+            ['battery', 'battery (%)'],
+            ['speed', 'speed (km/h)']
+        ],
+        setupSteps: [
+            'Configure AT4 using Concox SMS commands or the CXTRACK app.',
+            'Set APN via SMS: APN,<apn_name>#',
+            'Set server address: SERVER,1,<gateway_ip>,<port>,0#',
+            'Set reporting interval: TIMER,<seconds>#',
+            'Enable motion detection for smart reporting.',
+            'Verify connection status via SMS: STATUS#',
+            'Ensure gateway forwards parsed data to /api/ingest as JSON POST.'
+        ],
+        notes: 'Large battery for multi-year deployments. Light sensor detects container opening. IP67 waterproof. Requires a TCP gateway (Traccar, flespi, etc.).'
+    },
+    {
+        id: 'ruptela-fmpro4',
+        manufacturer: 'Ruptela',
+        model: 'FM-Pro4',
+        protocol: 'TCP',
+        compatibility: 'gateway-required',
+        icon: 'fa-truck',
+        category: 'Vehicle',
+        connectivity: '4G LTE (Cat 1) + 2G',
+        batteryLife: 'Vehicle powered + backup',
+        sensors: ['GPS', 'GLONASS', 'Accelerometer', 'CAN', 'RS-232/RS-485', '1-Wire'],
+        bestFor: 'Advanced fleet telematics, fuel monitoring',
+        apn: 'internet (carrier-specific)',
+        serverSetup: {
+            method: 'TCP (Ruptela binary protocol)',
+            port: '(gateway-defined)',
+            authHeader: 'N/A -- device uses IMEI'
+        },
+        payloadExample: '// Ruptela binary protocol\n// Gateway converts to JSON:\n' + JSON.stringify({
+            imei: "867456789012345",
+            latitude: 56.9496,
+            longitude: 24.1052,
+            timestamp: 1706792400,
+            speed: 60,
+            heading: 45,
+            battery: 100,
+            temperature: 7.2
+        }, null, 2),
+        fieldMapping: [
+            ['imei', 'IMEI (auto-identified)'],
+            ['latitude / longitude', 'GPS coordinates'],
+            ['timestamp', 'timestamp (Unix)'],
+            ['speed', 'speed (km/h)'],
+            ['heading', 'heading (degrees)'],
+            ['temperature', 'via 1-Wire / CAN sensor']
+        ],
+        setupSteps: [
+            'Install FM-Pro4 in the vehicle (10-32V DC).',
+            'Configure via Ruptela Device Center software over USB.',
+            'Set APN under Operator settings.',
+            'Set server IP and port to your TCP gateway.',
+            'Configure I/O parameters (fuel sensor, temperature, etc.).',
+            'Set data sending intervals.',
+            'Connect CAN bus or RS-232 sensors if needed.',
+            'Save and restart. Verify data reaches gateway and /api/ingest.'
+        ],
+        notes: 'Professional-grade fleet tracker with CAN bus, fuel sensors, and driver ID. 1-Wire port for Dallas temperature probes. Requires TCP gateway.'
+    },
+    {
+        id: 'calamp-lmu3640',
+        manufacturer: 'CalAmp',
+        model: 'LMU-3640',
+        protocol: 'MQTT',
+        compatibility: 'gateway-required',
+        icon: 'fa-truck-moving',
+        category: 'Vehicle',
+        connectivity: '4G LTE (Cat 1)',
+        batteryLife: 'Vehicle powered + internal backup',
+        sensors: ['GPS', 'GLONASS', 'Accelerometer', 'OBD-II'],
+        bestFor: 'Heavy-duty vehicles, regulatory compliance',
+        apn: 'internet (carrier-specific)',
+        serverSetup: {
+            method: 'MQTT (CalAmp LM Direct)',
+            broker: '(CalAmp cloud or custom)',
+            authHeader: 'N/A -- device uses ESN/IMEI'
+        },
+        payloadExample: '// CalAmp LM Direct / MQTT protocol\n// Bridge converts to JSON:\n' + JSON.stringify({
+            deviceId: "LMU-012345678",
+            imei: "354123456789012",
+            latitude: 37.7749,
+            longitude: -122.4194,
+            timestamp: 1706792400,
+            speed: 45,
+            heading: 200,
+            battery: 100
+        }, null, 2),
+        fieldMapping: [
+            ['deviceId / imei', 'ESN or IMEI'],
+            ['latitude / longitude', 'GPS coordinates'],
+            ['timestamp', 'timestamp (Unix)'],
+            ['speed', 'speed (km/h)'],
+            ['heading', 'heading (degrees)']
+        ],
+        setupSteps: [
+            'Install LMU-3640 in the vehicle (hardwire 8-32V DC or OBD-II).',
+            'Provision the device via CalAmp Application Management platform.',
+            'Set the MQTT broker to your MQTT-to-HTTP bridge, or use CalAmp cloud.',
+            'Configure reporting rules and PEG scripts for event types.',
+            'Set APN for your carrier SIM.',
+            'Create an MQTT bridge to forward messages as HTTP POST to /api/ingest.',
+            'Map CalAmp message fields to Aurion JSON fields.',
+            'Test and verify data flow to your dashboard.'
+        ],
+        notes: 'Enterprise-grade tracker used in regulated industries. Supports CalAmp PEG (Programmable Event Generator) for custom logic. Requires an MQTT-to-HTTP bridge for Aurion integration.'
+    },
+    {
+        id: 'abeeway-micro',
+        manufacturer: 'Abeeway (Actility)',
+        model: 'Micro Tracker',
+        protocol: 'HTTP',
+        compatibility: 'plug-and-play',
+        icon: 'fa-location-crosshairs',
+        category: 'Asset',
+        connectivity: 'LoRaWAN + Wi-Fi + BLE + GPS',
+        batteryLife: '~2-5 years (usage dependent)',
+        sensors: ['GPS', 'Wi-Fi sniffing', 'BLE', 'Accelerometer', 'Temperature'],
+        bestFor: 'Parcels, pallets, high-value small assets, indoor/outdoor',
+        apn: 'N/A (LoRaWAN)',
+        serverSetup: {
+            method: 'HTTP POST (via ThingPark webhook)',
+            contentType: 'application/json',
+            authHeader: 'Bearer <LTE_INGEST_TOKEN>'
+        },
+        payloadExample: JSON.stringify({
+            deviceId: "ABEEWAY-0018B20000012345",
+            latitude: 48.8566,
+            longitude: 2.3522,
+            timestamp: "2026-02-01T12:00:00Z",
+            temperature: 21.5,
+            battery: 92
+        }, null, 2),
+        fieldMapping: [
+            ['deviceId', 'DevEUI / device identifier'],
+            ['latitude / longitude', 'latitude / longitude (resolved)'],
+            ['timestamp', 'timestamp (ISO 8601)'],
+            ['temperature', 'temperature (C)'],
+            ['battery', 'battery (%)']
+        ],
+        setupSteps: [
+            'Register the Micro Tracker on the Actility ThingPark platform (or your LoRaWAN network server).',
+            'Ensure the device is provisioned with the correct AppKey/AppEUI for OTAA join.',
+            'In ThingPark, go to Application Settings and create an HTTP connector (webhook).',
+            'Set the destination URL to your Aurion /api/ingest endpoint.',
+            'Add an HTTP header: Authorization: Bearer <your_LTE_INGEST_TOKEN>.',
+            'Configure the payload decoder to output JSON with deviceId, latitude, longitude, temperature, battery fields.',
+            'Use the Abeeway Device Manager to set the tracker profile (motion tracking, static, etc.).',
+            'Set geolocation strategy: GPS for outdoor, Wi-Fi/BLE scan for indoor.',
+            'Test by moving the device and verifying data appears on your dashboard.'
+        ],
+        notes: 'Multi-mode geolocation (GPS + Wi-Fi + BLE) enables indoor/outdoor tracking without infrastructure changes. Data flows: Tracker -> LoRaWAN Gateway -> ThingPark -> HTTP webhook -> Aurion. Use the Abeeway Device Manager for advanced configuration (geofencing, motion profiles, SOS button).'
+    },
+    {
+        id: 'abeeway-industrial',
+        manufacturer: 'Abeeway (Actility)',
+        model: 'Industrial Tracker',
+        protocol: 'HTTP',
+        compatibility: 'plug-and-play',
+        icon: 'fa-industry',
+        category: 'Asset',
+        connectivity: 'LoRaWAN + Wi-Fi + BLE + GPS',
+        batteryLife: '~5-7 years',
+        sensors: ['GPS', 'Wi-Fi sniffing', 'BLE', 'Accelerometer', 'Temperature'],
+        bestFor: 'Containers, heavy equipment, industrial assets, outdoor yards',
+        apn: 'N/A (LoRaWAN)',
+        serverSetup: {
+            method: 'HTTP POST (via ThingPark webhook)',
+            contentType: 'application/json',
+            authHeader: 'Bearer <LTE_INGEST_TOKEN>'
+        },
+        payloadExample: JSON.stringify({
+            deviceId: "ABEEWAY-IND-0018B20000067890",
+            latitude: 52.5200,
+            longitude: 13.4050,
+            timestamp: "2026-02-01T09:30:00Z",
+            temperature: 8.2,
+            battery: 97
+        }, null, 2),
+        fieldMapping: [
+            ['deviceId', 'DevEUI / device identifier'],
+            ['latitude / longitude', 'latitude / longitude (resolved)'],
+            ['timestamp', 'timestamp (ISO 8601)'],
+            ['temperature', 'temperature (C)'],
+            ['battery', 'battery (%)']
+        ],
+        setupSteps: [
+            'Register the Industrial Tracker on ThingPark or your LoRaWAN network server.',
+            'Provision with OTAA credentials (AppKey/AppEUI).',
+            'In ThingPark, create an HTTP connector with your /api/ingest endpoint URL.',
+            'Add Authorization: Bearer <your_LTE_INGEST_TOKEN> as an HTTP header.',
+            'Configure the payload decoder for JSON output.',
+            'Use the Abeeway Device Manager to set the operating mode (motion tracking, periodic, activity-based).',
+            'Set GPS timeout and scan strategies for your environment.',
+            'Mount the tracker on the asset (IP68 rated, use the mounting bracket).',
+            'Test and verify data flow to your Aurion dashboard.'
+        ],
+        notes: 'IP68 ruggedized for harsh environments. Very long battery life due to LoRaWAN low-power design. Ideal for assets that move between outdoor yards and warehouses. Supports BLE beacon scanning for zone-level indoor positioning.'
+    },
+    {
+        id: 'abeeway-compact',
+        manufacturer: 'Abeeway (Actility)',
+        model: 'Compact Tracker',
+        protocol: 'HTTP',
+        compatibility: 'plug-and-play',
+        icon: 'fa-cube',
+        category: 'Asset',
+        connectivity: 'LoRaWAN + Wi-Fi + BLE + GPS',
+        batteryLife: '~3-5 years',
+        sensors: ['GPS', 'Wi-Fi sniffing', 'BLE', 'Accelerometer', 'Temperature', 'Buzzer'],
+        bestFor: 'Reusable containers, roll cages, medical equipment',
+        apn: 'N/A (LoRaWAN)',
+        serverSetup: {
+            method: 'HTTP POST (via ThingPark webhook)',
+            contentType: 'application/json',
+            authHeader: 'Bearer <LTE_INGEST_TOKEN>'
+        },
+        payloadExample: JSON.stringify({
+            deviceId: "ABEEWAY-CMP-0018B20000098765",
+            latitude: 51.5074,
+            longitude: -0.1278,
+            timestamp: "2026-02-01T15:45:00Z",
+            temperature: 19.8,
+            battery: 88
+        }, null, 2),
+        fieldMapping: [
+            ['deviceId', 'DevEUI / device identifier'],
+            ['latitude / longitude', 'latitude / longitude (resolved)'],
+            ['timestamp', 'timestamp (ISO 8601)'],
+            ['temperature', 'temperature (C)'],
+            ['battery', 'battery (%)']
+        ],
+        setupSteps: [
+            'Register on ThingPark or your LoRaWAN network server with OTAA.',
+            'Create an HTTP webhook connector in ThingPark pointing to /api/ingest.',
+            'Set the Authorization header to Bearer <your_LTE_INGEST_TOKEN>.',
+            'Decode the uplink payload to JSON (use Actility/Abeeway standard decoder).',
+            'Configure the tracker via Abeeway Device Manager:',
+            '  - Set operating mode (motion tracking recommended for logistics).',
+            '  - Configure geofence alerts if needed.',
+            '  - Enable the buzzer for asset-finding scenarios.',
+            'Attach to the asset and verify data on your dashboard.'
+        ],
+        notes: 'Mid-size form factor with an audible buzzer for "find my asset" functionality. Supports angle detection for tilt monitoring. Same ThingPark webhook integration as other Abeeway devices -- configure once and all Abeeway devices use the same data pipeline.'
+    },
+    {
+        id: 'abeeway-smart-badge',
+        manufacturer: 'Abeeway (Actility)',
+        model: 'Smart Badge',
+        protocol: 'HTTP',
+        compatibility: 'plug-and-play',
+        icon: 'fa-id-badge',
+        category: 'Personnel',
+        connectivity: 'LoRaWAN + Wi-Fi + BLE + GPS',
+        batteryLife: '~1-3 months (rechargeable)',
+        sensors: ['GPS', 'Wi-Fi sniffing', 'BLE', 'Accelerometer', 'SOS button'],
+        bestFor: 'Worker safety, lone worker tracking, visitor management',
+        apn: 'N/A (LoRaWAN)',
+        serverSetup: {
+            method: 'HTTP POST (via ThingPark webhook)',
+            contentType: 'application/json',
+            authHeader: 'Bearer <LTE_INGEST_TOKEN>'
+        },
+        payloadExample: JSON.stringify({
+            deviceId: "ABEEWAY-SB-0018B20000054321",
+            latitude: 45.7640,
+            longitude: 4.8357,
+            timestamp: "2026-02-01T08:15:00Z",
+            battery: 74
+        }, null, 2),
+        fieldMapping: [
+            ['deviceId', 'DevEUI / device identifier'],
+            ['latitude / longitude', 'latitude / longitude (resolved)'],
+            ['timestamp', 'timestamp (ISO 8601)'],
+            ['battery', 'battery (%)']
+        ],
+        setupSteps: [
+            'Register the Smart Badge on ThingPark.',
+            'Set up the HTTP webhook to /api/ingest with Bearer token auth.',
+            'Configure the payload decoder for JSON output.',
+            'Use Abeeway Device Manager to configure the badge profile:',
+            '  - Set tracking mode (motion, periodic, or on-demand).',
+            '  - Configure the SOS button behavior.',
+            '  - Set BLE scanning for indoor zone tracking.',
+            'Charge the badge and distribute to personnel.',
+            'Test SOS alert and location reporting on the dashboard.'
+        ],
+        notes: 'Wearable form factor with an SOS button for emergency alerts. Rechargeable via USB-C. Best suited for personnel tracking and lone-worker safety. Uses the same ThingPark webhook as other Abeeway devices.'
+    }
+];
+
+function getIngestUrl() {
+    return window.location.origin + '/api/ingest';
+}
+
+function initTrackerLibrary() {
+    const container = document.getElementById('trackerLibraryGrid');
+    if (!container) return;
+
+    renderTrackerCards(TRACKER_PROFILES);
+
+    const searchInput = document.getElementById('trackerSearch');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            filterTrackerLibrary();
+        });
+    }
+
+    const filterBtns = document.querySelectorAll('.tracker-filter-btn');
+    filterBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            filterBtns.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            filterTrackerLibrary();
+        });
+    });
+}
+
+function filterTrackerLibrary() {
+    const searchVal = (document.getElementById('trackerSearch')?.value || '').toLowerCase();
+    const activeFilter = document.querySelector('.tracker-filter-btn.active');
+    const protocolFilter = activeFilter ? activeFilter.dataset.filter : 'all';
+
+    const filtered = TRACKER_PROFILES.filter(t => {
+        const matchesSearch = !searchVal ||
+            t.manufacturer.toLowerCase().includes(searchVal) ||
+            t.model.toLowerCase().includes(searchVal) ||
+            t.category.toLowerCase().includes(searchVal) ||
+            t.connectivity.toLowerCase().includes(searchVal) ||
+            t.bestFor.toLowerCase().includes(searchVal);
+
+        const matchesProtocol = protocolFilter === 'all' || t.protocol === protocolFilter;
+
+        return matchesSearch && matchesProtocol;
+    });
+
+    renderTrackerCards(filtered);
+}
+
+function renderTrackerCards(profiles) {
+    const container = document.getElementById('trackerLibraryGrid');
+    if (!container) return;
+
+    if (profiles.length === 0) {
+        container.innerHTML = '<p style="text-align:center;color:var(--text-light);padding:2rem;">No trackers match your search.</p>';
+        return;
+    }
+
+    container.innerHTML = profiles.map(t => `
+        <div class="tracker-card" onclick="showTrackerConfig('${t.id}')">
+            <div class="tracker-card-icon"><i class="fas ${t.icon}"></i></div>
+            <div class="tracker-card-body">
+                <div class="tracker-card-title">${t.model}</div>
+                <div class="tracker-card-manufacturer">${t.manufacturer}</div>
+                <div class="tracker-card-tags">
+                    <span class="tracker-badge tracker-badge-${t.protocol.toLowerCase()}">${t.protocol}</span>
+                    <span class="tracker-badge tracker-badge-${t.compatibility === 'plug-and-play' ? 'ok' : 'gw'}">${t.compatibility === 'plug-and-play' ? 'Plug & Play' : 'Gateway'}</span>
+                </div>
+                <div class="tracker-card-meta">${t.category} &middot; ${t.connectivity}</div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function showTrackerConfig(trackerId) {
+    const t = TRACKER_PROFILES.find(p => p.id === trackerId);
+    if (!t) return;
+
+    const ingestUrl = getIngestUrl();
+
+    const modal = document.getElementById('trackerConfigModal');
+    if (!modal) return;
+
+    document.getElementById('tcmTitle').textContent = t.manufacturer + ' ' + t.model;
+
+    const body = document.getElementById('tcmBody');
+    body.innerHTML = `
+        <div class="tracker-detail-header">
+            <span class="tracker-badge tracker-badge-${t.protocol.toLowerCase()}">${t.protocol}</span>
+            <span class="tracker-badge tracker-badge-${t.compatibility === 'plug-and-play' ? 'ok' : 'gw'}">${t.compatibility === 'plug-and-play' ? 'Plug & Play' : 'Requires Gateway'}</span>
+            <span class="tracker-badge">${t.category}</span>
+            <span class="tracker-badge">${t.connectivity}</span>
+        </div>
+
+        <div class="tracker-detail-section">
+            <h4><i class="fas fa-info-circle"></i> Overview</h4>
+            <table class="tracker-specs-table">
+                <tr><td>Best for</td><td>${t.bestFor}</td></tr>
+                <tr><td>Battery</td><td>${t.batteryLife}</td></tr>
+                <tr><td>Sensors</td><td>${t.sensors.join(', ')}</td></tr>
+                <tr><td>Default APN</td><td>${t.apn}</td></tr>
+            </table>
+        </div>
+
+        <div class="tracker-detail-section">
+            <h4><i class="fas fa-server"></i> Server Configuration</h4>
+            <table class="tracker-specs-table">
+                <tr><td>Method</td><td>${t.serverSetup.method}</td></tr>
+                <tr>
+                    <td>${t.protocol === 'HTTP' ? 'Endpoint URL' : 'Server'}</td>
+                    <td>
+                        <code id="tcmIngestUrl">${t.protocol === 'HTTP' ? ingestUrl : (t.serverSetup.broker || t.serverSetup.port || 'See setup steps')}</code>
+                        ${t.protocol === 'HTTP' ? `<button class="btn-copy" onclick="copyTrackerConfig('tcmIngestUrl')" title="Copy"><i class="fas fa-copy"></i></button>` : ''}
+                    </td>
+                </tr>
+                <tr><td>Auth</td><td><code>${t.serverSetup.authHeader || 'N/A'}</code></td></tr>
+            </table>
+        </div>
+
+        <div class="tracker-detail-section">
+            <h4><i class="fas fa-code"></i> Payload Example</h4>
+            <pre class="tracker-code" id="tcmPayload">${escapeHtml(t.payloadExample)}</pre>
+            <button class="btn btn-outline btn-small" onclick="copyTrackerConfig('tcmPayload')"><i class="fas fa-copy"></i> Copy Payload</button>
+        </div>
+
+        <div class="tracker-detail-section">
+            <h4><i class="fas fa-exchange-alt"></i> Field Mapping</h4>
+            <table class="tracker-specs-table">
+                <tr><th>Aurion Field</th><th>Tracker Field</th></tr>
+                ${t.fieldMapping.map(([ctField, trackerField]) => `<tr><td><code>${ctField}</code></td><td>${trackerField}</td></tr>`).join('')}
+            </table>
+        </div>
+
+        <div class="tracker-detail-section">
+            <h4><i class="fas fa-list-ol"></i> Setup Steps</h4>
+            <ol class="tracker-setup-steps">
+                ${t.setupSteps.map(step => `<li>${step.replace(/<LTE_INGEST_TOKEN>/g, '&lt;LTE_INGEST_TOKEN&gt;').replace(/\/api\/ingest/g, '<code>' + ingestUrl + '</code>')}</li>`).join('')}
+            </ol>
+        </div>
+
+        <div class="tracker-detail-section tracker-notes">
+            <h4><i class="fas fa-sticky-note"></i> Notes</h4>
+            <p>${t.notes}</p>
+        </div>
+    `;
+
+    modal.style.display = 'flex';
+}
+
+function closeTrackerConfigModal() {
+    const modal = document.getElementById('trackerConfigModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function copyTrackerConfig(elementId) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    const text = el.textContent || el.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+        showNotification('Copied to clipboard!', 'success');
+    }).catch(() => {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        showNotification('Copied to clipboard!', 'success');
+    });
+}
+
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
