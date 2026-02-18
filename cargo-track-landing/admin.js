@@ -1144,6 +1144,9 @@ async function deleteUser(userId) {
     saveUsers(filtered);
     logSecurityEvent('user_deletion', user.email, 'success');
     loadAllUsers();
+    fetchTenants().then(() => {
+        if (typeof renderResellerTenants === 'function') renderResellerTenants();
+    }).catch(() => {});
     alert('User deleted successfully!');
 }
 
