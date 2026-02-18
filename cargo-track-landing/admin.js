@@ -3096,7 +3096,8 @@ function showAdminDeviceForm(deviceId) {
 
     title.textContent = isEdit ? 'Edit Device' : 'Add New Device';
 
-    const namespaceOptions = getAvailableNamespaceOptions();
+    const currentNs = device ? (device.ownerNamespace || '') : '';
+    const namespaceOptions = getAvailableNamespaceOptions(currentNs);
 
     body.innerHTML = `
         <form id="adminDeviceForm" class="settings-form" onsubmit="return false;">
@@ -3130,11 +3131,11 @@ function showAdminDeviceForm(deviceId) {
             </div>
             <div class="form-row">
                 <div class="form-group">
-                    <label for="adminDeviceNamespace">Tenant Namespace *</label>
+                    <label for="adminDeviceNamespace">Assign To *</label>
                     <select id="adminDeviceNamespace" required>
                         ${namespaceOptions}
                     </select>
-                    ${isEdit ? `<small>Current: ${device.ownerNamespace || 'N/A'}</small>` : ''}
+                    <small>Select the user or tenant workspace that owns this device</small>
                 </div>
                 <div class="form-group">
                     <label for="adminDeviceGroup">Group</label>
@@ -3158,25 +3159,52 @@ function showAdminDeviceForm(deviceId) {
         </form>
     `;
 
-    if (isEdit) {
+    if (isEdit && device.ownerNamespace) {
         const nsSelect = document.getElementById('adminDeviceNamespace');
-        if (nsSelect && device.ownerNamespace) {
+        if (nsSelect) {
             nsSelect.value = device.ownerNamespace;
+            if (!nsSelect.value && device.ownerEmail) {
+                const allUsers = getUsers();
+                const matchUser = allUsers.find(u => u.email === device.ownerEmail);
+                if (matchUser) nsSelect.value = 'user:' + matchUser.id;
+            }
         }
     }
 
     modal.style.display = 'flex';
 }
 
-function getAvailableNamespaceOptions() {
-    const tenants = resellerTenantsCache.length ? resellerTenantsCache : [];
-    if (!tenants.length) {
-        return '<option value="">No tenants available</option>';
+function getAvailableNamespaceOptions(selectedValue) {
+    let options = '<option value="">Select owner...</option>';
+
+    const users = getUsers();
+    if (users.length > 0) {
+        options += '<optgroup label="Users">';
+        users.forEach(u => {
+            const val = `user:${u.id}`;
+            const sel = selectedValue === val ? ' selected' : '';
+            const label = (u.company ? u.company + ' — ' : '') + u.email;
+            options += `<option value="${val}"${sel}>${label}</option>`;
+        });
+        options += '</optgroup>';
     }
-    return tenants.map(t => {
-        const ns = `tenant:${t.id}`;
-        return `<option value="${ns}">${t.name || t.id}</option>`;
-    }).join('');
+
+    const tenants = resellerTenantsCache.length ? resellerTenantsCache : [];
+    if (tenants.length > 0) {
+        options += '<optgroup label="Tenant Workspaces">';
+        tenants.forEach(t => {
+            const val = `tenant:${t.id}`;
+            const sel = selectedValue === val ? ' selected' : '';
+            options += `<option value="${val}"${sel}>${t.name || t.id}</option>`;
+        });
+        options += '</optgroup>';
+    }
+
+    if (users.length === 0 && tenants.length === 0) {
+        options = '<option value="">No users or tenants available</option>';
+    }
+
+    return options;
 }
 
 function editDeviceAdmin(deviceId) {
@@ -3199,7 +3227,7 @@ async function saveAdminDevice(existingId) {
         return;
     }
     if (!namespace) {
-        showNotification('Please select a tenant namespace.', 'error');
+        showNotification('Please select an owner for the device.', 'error');
         return;
     }
 
@@ -3212,6 +3240,16 @@ async function saveAdminDevice(existingId) {
         latitude: lat ? parseFloat(lat) : undefined,
         longitude: lng ? parseFloat(lng) : undefined
     };
+
+    if (namespace.startsWith('user:')) {
+        const userId = namespace.replace('user:', '');
+        const allUsers = getUsers();
+        const owner = allUsers.find(u => u.id === userId);
+        if (owner) {
+            payload.ownerEmail = owner.email;
+            payload.ownerCompany = owner.company || '';
+        }
+    }
 
     try {
         const response = await fetch('/api/admin-devices', {
