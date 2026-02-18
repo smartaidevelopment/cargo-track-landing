@@ -122,10 +122,10 @@
                 
                 <div class="stat-card">
                     <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
-                        <i class="fas fa-dollar-sign"></i>
+                        <i class="fas fa-euro-sign"></i>
                     </div>
                     <div class="stat-content">
-                        <h3 id="adminTotalRevenue">$0</h3>
+                        <h3 id="adminTotalRevenue">&euro;0</h3>
                         <p>Total Revenue</p>
                         <span class="stat-change" id="adminRevenueChange"></span>
                     </div>
@@ -263,9 +263,9 @@
                         <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-dark);">Filter by Package:</label>
                         <select id="filterUserPackage" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.25rem;">
                             <option value="all">All Packages</option>
-                            <option value="basic">Basic</option>
-                            <option value="professional">Professional</option>
-                            <option value="enterprise">Enterprise</option>
+                            <option value="track">Track</option>
+                            <option value="monitor">Monitor</option>
+                            <option value="predict">Predict</option>
                         </select>
                     </div>
                     <div class="filter-group" style="flex: 2; min-width: 200px;">
@@ -362,16 +362,16 @@
                             <div class="form-group">
                                 <label for="newUserPackage">Package *</label>
                                 <select id="newUserPackage" name="package" required>
-                                    <option value="basic">Basic - $99/month</option>
-                                    <option value="professional" selected>Professional - $249/month</option>
-                                    <option value="enterprise">Enterprise - $499/month</option>
+                                    <option value="track">Track (&euro;9.95/asset/mo)</option>
+                                    <option value="monitor" selected>Monitor (&euro;14.95/asset/mo)</option>
+                                    <option value="predict">Predict (&euro;24.95/asset/mo)</option>
                                 </select>
                             </div>
                             
                             <div class="form-group">
-                                <label for="newUserDevices">Number of Devices</label>
+                                <label for="newUserDevices">Number of Assets</label>
                                 <input type="number" id="newUserDevices" name="devices" min="1" value="1" required>
-                                <small>Initial number of devices for this user</small>
+                                <small>Number of tracked assets (free hardware with 24-month plan)</small>
                             </div>
                             
                             <div class="form-group checkbox-group">
@@ -429,9 +429,9 @@
                             <div class="form-group">
                                 <label for="editUserPackage">Package *</label>
                                 <select id="editUserPackage" name="package" required>
-                                    <option value="basic">Basic - $99/month</option>
-                                    <option value="professional">Professional - $249/month</option>
-                                    <option value="enterprise">Enterprise - $499/month</option>
+                                    <option value="track">Track (&euro;9.95/asset/mo)</option>
+                                    <option value="monitor">Monitor (&euro;14.95/asset/mo)</option>
+                                    <option value="predict">Predict (&euro;24.95/asset/mo)</option>
                                 </select>
                             </div>
                             
@@ -477,15 +477,17 @@
                     </div>
                 </div>
                 
+                <p style="margin-bottom:1rem;color:var(--text-light);">Pricing per asset per month. Free hardware with every 24-month plan. Packages match the landing page tiers.</p>
                 <div class="table-container">
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th>Package Name</th>
-                                <th>Price/Month</th>
-                                <th>Max Devices</th>
-                                <th>Extra Device Price</th>
+                                <th>Package</th>
+                                <th>Price / Asset</th>
+                                <th>Tracking &amp; Data</th>
+                                <th>Max Assets</th>
                                 <th>Status</th>
+                                <th>Features</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -614,15 +616,15 @@
                     <div class="payment-stats">
                         <div class="stat-item">
                             <span class="stat-label">Total Revenue</span>
-                            <span class="stat-value" id="totalRevenue">$0</span>
+                            <span class="stat-value" id="totalRevenue">&euro;0</span>
                         </div>
                         <div class="stat-item">
                             <span class="stat-label">This Month</span>
-                            <span class="stat-value" id="monthlyRevenue">$0</span>
+                            <span class="stat-value" id="monthlyRevenue">&euro;0</span>
                         </div>
                         <div class="stat-item">
                             <span class="stat-label">Pending</span>
-                            <span class="stat-value" id="pendingRevenue">$0</span>
+                            <span class="stat-value" id="pendingRevenue">&euro;0</span>
                         </div>
                         <div class="stat-item">
                             <span class="stat-label">Failed</span>
@@ -753,7 +755,7 @@
                         </div>
                         <div class="stat-item">
                             <span class="stat-label">Total Revenue</span>
-                            <span class="stat-value" id="adminInvoiceRevenue">$0</span>
+                            <span class="stat-value" id="adminInvoiceRevenue">&euro;0</span>
                         </div>
                         <div class="stat-item">
                             <span class="stat-label">Paid Invoices</span>
@@ -786,10 +788,10 @@
             <div class="stats-grid">
                 <div class="stat-card financial">
                     <div class="stat-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                        <i class="fas fa-dollar-sign"></i>
+                        <i class="fas fa-euro-sign"></i>
                     </div>
                     <div class="stat-content">
-                        <h3 id="totalRevenueAnalytics">$0</h3>
+                        <h3 id="totalRevenueAnalytics">&euro;0</h3>
                         <p>Total Revenue</p>
                         <span class="stat-change" id="revenueChange"></span>
                     </div>
@@ -800,7 +802,7 @@
                         <i class="fas fa-calendar-check"></i>
                     </div>
                     <div class="stat-content">
-                        <h3 id="monthlyRecurringRevenue">$0</h3>
+                        <h3 id="monthlyRecurringRevenue">&euro;0</h3>
                         <p>Monthly Recurring Revenue (MRR)</p>
                         <span class="stat-change" id="mrrChange"></span>
                     </div>
@@ -811,7 +813,7 @@
                         <i class="fas fa-chart-line"></i>
                     </div>
                     <div class="stat-content">
-                        <h3 id="averageRevenuePerUser">$0</h3>
+                        <h3 id="averageRevenuePerUser">&euro;0</h3>
                         <p>Average Revenue Per User (ARPU)</p>
                         <span class="stat-change" id="arpuChange"></span>
                     </div>
@@ -902,19 +904,19 @@
                             <h3><i class="fas fa-money-bill-wave"></i> Revenue Analysis</h3>
                             <div class="breakdown-item">
                                 <span class="breakdown-label">Total Revenue (All Time)</span>
-                                <span class="breakdown-value" id="breakdownTotalRevenue">$0</span>
+                                <span class="breakdown-value" id="breakdownTotalRevenue">&euro;0</span>
                             </div>
                             <div class="breakdown-item">
                                 <span class="breakdown-label">This Month</span>
-                                <span class="breakdown-value" id="breakdownMonthlyRevenue">$0</span>
+                                <span class="breakdown-value" id="breakdownMonthlyRevenue">&euro;0</span>
                             </div>
                             <div class="breakdown-item">
                                 <span class="breakdown-label">Last Month</span>
-                                <span class="breakdown-value" id="breakdownLastMonthRevenue">$0</span>
+                                <span class="breakdown-value" id="breakdownLastMonthRevenue">&euro;0</span>
                             </div>
                             <div class="breakdown-item">
                                 <span class="breakdown-label">This Year</span>
-                                <span class="breakdown-value" id="breakdownYearlyRevenue">$0</span>
+                                <span class="breakdown-value" id="breakdownYearlyRevenue">&euro;0</span>
                             </div>
                             <div class="breakdown-item highlight">
                                 <span class="breakdown-label">Growth Rate (MoM)</span>
@@ -942,23 +944,23 @@
                             </div>
                             <div class="breakdown-item highlight">
                                 <span class="breakdown-label">Customer Lifetime Value (CLV)</span>
-                                <span class="breakdown-value" id="breakdownCLV">$0</span>
+                                <span class="breakdown-value" id="breakdownCLV">&euro;0</span>
                             </div>
                         </div>
                         
                         <div class="breakdown-section">
                             <h3><i class="fas fa-box"></i> Package Performance</h3>
                             <div class="breakdown-item">
-                                <span class="breakdown-label">Basic Package Revenue</span>
-                                <span class="breakdown-value" id="breakdownBasicRevenue">$0</span>
+                                <span class="breakdown-label"><span style="display:inline-block;width:8px;height:8px;background:#3b82f6;border-radius:50%;margin-right:0.4rem;"></span>Track Revenue</span>
+                                <span class="breakdown-value" id="breakdownTrackRevenue">&euro;0</span>
                             </div>
                             <div class="breakdown-item">
-                                <span class="breakdown-label">Professional Revenue</span>
-                                <span class="breakdown-value" id="breakdownProRevenue">$0</span>
+                                <span class="breakdown-label"><span style="display:inline-block;width:8px;height:8px;background:#10b981;border-radius:50%;margin-right:0.4rem;"></span>Monitor Revenue</span>
+                                <span class="breakdown-value" id="breakdownMonitorRevenue">&euro;0</span>
                             </div>
                             <div class="breakdown-item">
-                                <span class="breakdown-label">Enterprise Revenue</span>
-                                <span class="breakdown-value" id="breakdownEnterpriseRevenue">$0</span>
+                                <span class="breakdown-label"><span style="display:inline-block;width:8px;height:8px;background:#f59e0b;border-radius:50%;margin-right:0.4rem;"></span>Predict Revenue</span>
+                                <span class="breakdown-value" id="breakdownPredictRevenue">&euro;0</span>
                             </div>
                             <div class="breakdown-item">
                                 <span class="breakdown-label">Most Popular Package</span>
@@ -966,7 +968,7 @@
                             </div>
                             <div class="breakdown-item highlight">
                                 <span class="breakdown-label">Average Package Value</span>
-                                <span class="breakdown-value" id="breakdownAvgPackageValue">$0</span>
+                                <span class="breakdown-value" id="breakdownAvgPackageValue">&euro;0</span>
                             </div>
                         </div>
                     </div>
@@ -1544,47 +1546,71 @@
 
     <!-- Package Form Modal -->
     <div id="packageFormModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width:600px;">
             <div class="modal-header">
                 <h2 id="packageFormTitle">Add Package</h2>
                 <button class="modal-close" id="closePackageModal">&times;</button>
             </div>
             <div class="modal-body">
                 <form id="packageForm">
-                    <div class="form-group">
-                        <label>Package ID *</label>
-                        <input type="text" id="packageId" name="packageId" required placeholder="e.g., basic, professional, enterprise">
-                        <small>Unique identifier (lowercase, no spaces)</small>
-                    </div>
-                    <div class="form-group">
-                        <label>Package Name *</label>
-                        <input type="text" id="packageName" name="packageName" required placeholder="e.g., Basic, Professional">
+                    <div class="form-row" style="display:flex;gap:1rem;">
+                        <div class="form-group" style="flex:1;">
+                            <label>Package ID *</label>
+                            <input type="text" id="packageId" name="packageId" required placeholder="e.g., track, monitor, predict">
+                            <small>Unique identifier (lowercase, no spaces)</small>
+                        </div>
+                        <div class="form-group" style="flex:1;">
+                            <label>Package Name *</label>
+                            <input type="text" id="packageName" name="packageName" required placeholder="e.g., Track, Monitor, Predict">
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>Description</label>
-                        <input type="text" id="packageDescription" name="packageDescription" placeholder="e.g., Basic - $99/month">
+                        <input type="text" id="packageDescription" name="packageDescription" placeholder="Short description of what's included">
                     </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Monthly Price ($) *</label>
-                            <input type="number" id="packagePrice" name="packagePrice" required min="0" step="0.01" placeholder="99.00">
+                    <div class="form-row" style="display:flex;gap:1rem;">
+                        <div class="form-group" style="flex:1;">
+                            <label>Price per Asset/Month (&euro;) *</label>
+                            <input type="number" id="packagePrice" name="packagePrice" required min="0" step="0.01" placeholder="14.95">
                         </div>
-                        <div class="form-group">
-                            <label>Max Devices *</label>
-                            <input type="number" id="packageMaxDevices" name="packageMaxDevices" required min="1" placeholder="10">
-                            <small>Use 0 for unlimited</small>
+                        <div class="form-group" style="flex:1;">
+                            <label>Annual Price per Asset (&euro;)</label>
+                            <input type="number" id="packageAnnualPrice" name="packageAnnualPrice" min="0" step="0.01" placeholder="179.40">
+                            <small>Leave empty to calculate as price &times; 12</small>
+                        </div>
+                    </div>
+                    <div class="form-row" style="display:flex;gap:1rem;">
+                        <div class="form-group" style="flex:1;">
+                            <label>Tracking Interval</label>
+                            <input type="text" id="packageInterval" name="packageInterval" placeholder="e.g., 5 min, 1 min, 10 sec">
+                        </div>
+                        <div class="form-group" style="flex:1;">
+                            <label>Data Allowance</label>
+                            <input type="text" id="packageData" name="packageData" placeholder="e.g., 50 MB, 200 MB, 500 MB">
                         </div>
                     </div>
                     <div class="form-group">
-                        <label>Extra Device Price ($) *</label>
-                        <input type="number" id="packageExtraDevicePrice" name="packageExtraDevicePrice" required min="0" step="0.01" placeholder="10.00">
-                        <small>Price per device when exceeding max devices</small>
+                        <label>Max Assets</label>
+                        <input type="number" id="packageMaxDevices" name="packageMaxDevices" min="0" value="0" placeholder="0">
+                        <small>0 = unlimited (per-asset pricing applies)</small>
                     </div>
-                    <div class="form-group checkbox-group">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="packageActive" checked>
-                            <span>Active (visible to customers)</span>
-                        </label>
+                    <div class="form-group">
+                        <label>Features <small style="font-weight:normal;color:var(--text-light);">(one per line)</small></label>
+                        <textarea id="packageFeatures" rows="5" placeholder="Live GPS fleet map&#10;Basic geofence alerts&#10;Device management&#10;Mobile app access" style="width:100%;padding:0.5rem;border:1px solid var(--border-color);border-radius:0.25rem;font-family:inherit;resize:vertical;"></textarea>
+                    </div>
+                    <div style="display:flex;gap:1.5rem;margin-bottom:1rem;">
+                        <div class="form-group checkbox-group" style="margin-bottom:0;">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="packageFeatured">
+                                <span>Popular / Featured</span>
+                            </label>
+                        </div>
+                        <div class="form-group checkbox-group" style="margin-bottom:0;">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="packageActive" checked>
+                                <span>Active (visible to customers)</span>
+                            </label>
+                        </div>
                     </div>
                     <div class="form-actions">
                         <button type="button" class="btn btn-outline" onclick="closePackageModal()">Cancel</button>
@@ -1707,15 +1733,15 @@
                                     <td><input type="text" class="item-description" placeholder="Item description" required></td>
                                     <td><input type="number" class="item-quantity" min="1" value="1" onchange="recalcInvoiceItemRow(this)"></td>
                                     <td><input type="number" class="item-unit-price" min="0" step="0.01" value="0" placeholder="0.00" onchange="recalcInvoiceItemRow(this)"></td>
-                                    <td class="item-total">$0.00</td>
+                                    <td class="item-total">&euro;0.00</td>
                                     <td><button type="button" class="btn-icon-small delete" onclick="removeInvoiceLineItem(this)" title="Remove"><i class="fas fa-times"></i></button></td>
                                 </tr>
                             </tbody>
                         </table>
                         <div class="invoice-form-totals">
-                            <div class="total-line"><span>Subtotal:</span> <span id="invoiceFormSubtotal">$0.00</span></div>
-                            <div class="total-line"><span>Tax:</span> <span id="invoiceFormTax">$0.00</span></div>
-                            <div class="total-line grand"><span>Total:</span> <span id="invoiceFormTotal">$0.00</span></div>
+                            <div class="total-line"><span>Subtotal:</span> <span id="invoiceFormSubtotal">&euro;0.00</span></div>
+                            <div class="total-line"><span>Tax:</span> <span id="invoiceFormTax">&euro;0.00</span></div>
+                            <div class="total-line grand"><span>Total:</span> <span id="invoiceFormTotal">&euro;0.00</span></div>
                         </div>
                     </div>
 

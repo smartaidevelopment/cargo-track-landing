@@ -408,7 +408,7 @@ function loadAdminDashboard() {
     
     const completedPayments = payments.filter(p => p.status === 'completed');
     const totalRevenue = completedPayments.reduce((sum, p) => sum + parseAmount(p.amount), 0);
-    document.getElementById('adminTotalRevenue').textContent = '$' + totalRevenue.toLocaleString();
+    document.getElementById('adminTotalRevenue').textContent = formatEurAdmin(totalRevenue);
 
     const now = new Date();
     const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -482,7 +482,7 @@ function loadRecentUsers(users) {
                     </div>
                 </div>
             </td>
-            <td><span class="status-badge">${user.package || 'Professional'}</span></td>
+            <td><span class="status-badge">${resolvePackageName(user.package)}</span></td>
             <td>${formatDate(user.createdAt)}</td>
             <td><span class="status-badge ${user.isActive ? 'active' : 'inactive'}">${user.isActive ? 'Active' : 'Inactive'}</span></td>
         </tr>
@@ -733,11 +733,10 @@ async function loadAllUsers() {
 
     tableBody.innerHTML = users.map(user => {
         const packageColors = {
-            'basic': '#667eea',
-            'professional': '#f093fb',
-            'enterprise': '#4facfe'
+            'track': '#3b82f6', 'monitor': '#10b981', 'predict': '#f59e0b',
+            'basic': '#3b82f6', 'professional': '#10b981', 'enterprise': '#f59e0b'
         };
-        const packageColor = packageColors[user.package] || '#667eea';
+        const packageColor = packageColors[resolvePackageId(user.package)] || '#3b82f6';
         
         return `
         <tr style="transition: background 0.2s; cursor: pointer;" onclick="viewUserDetails('${user.id}')" onmouseover="this.style.background='var(--bg-light)'" onmouseout="this.style.background=''">
@@ -758,7 +757,7 @@ async function loadAllUsers() {
             <td>${user.company || '<span style="color: var(--text-light);">-</span>'}</td>
             <td>
                 <span class="status-badge" style="background: ${packageColor}; color: white; text-transform: capitalize;">
-                    ${(user.package || 'Professional').charAt(0).toUpperCase() + (user.package || 'Professional').slice(1)}
+                    ${resolvePackageName(user.package)}
                 </span>
             </td>
             <td>
@@ -823,7 +822,7 @@ function filterUsers() {
     }
     
     if (packageFilter !== 'all') {
-        filtered = filtered.filter(u => (u.package || 'professional').toLowerCase() === packageFilter);
+        filtered = filtered.filter(u => resolvePackageId(u.package) === packageFilter);
     }
     
     if (searchTerm) {
@@ -856,15 +855,14 @@ function filterUsers() {
     }
     
     const packageColors = {
-        'basic': '#667eea',
-        'professional': '#f093fb',
-        'enterprise': '#4facfe'
+        'track': '#3b82f6', 'monitor': '#10b981', 'predict': '#f59e0b',
+        'basic': '#3b82f6', 'professional': '#10b981', 'enterprise': '#f59e0b'
     };
     
     const renderFilteredEmailBadge = (u) => u.emailVerified ? '<span style="display:inline-block;margin-left:0.4rem;font-size:0.7rem;padding:0.1rem 0.4rem;background:#dcfce7;color:#166534;border-radius:9999px;font-weight:500;vertical-align:middle;">Verified</span>' : '<span style="display:inline-block;margin-left:0.4rem;font-size:0.7rem;padding:0.1rem 0.4rem;background:#fef3c7;color:#92400e;border-radius:9999px;font-weight:500;vertical-align:middle;">Unverified</span>';
 
     tableBody.innerHTML = filtered.map(user => {
-        const packageColor = packageColors[user.package] || '#667eea';
+        const packageColor = packageColors[resolvePackageId(user.package)] || '#3b82f6';
         return `
         <tr style="transition: background 0.2s; cursor: pointer;" onclick="viewUserDetails('${user.id}')" onmouseover="this.style.background='var(--bg-light)'" onmouseout="this.style.background=''">
             <td>
@@ -884,7 +882,7 @@ function filterUsers() {
             <td>${user.company || '<span style="color: var(--text-light);">-</span>'}</td>
             <td>
                 <span class="status-badge" style="background: ${packageColor}; color: white; text-transform: capitalize;">
-                    ${(user.package || 'Professional').charAt(0).toUpperCase() + (user.package || 'Professional').slice(1)}
+                    ${resolvePackageName(user.package)}
                 </span>
             </td>
             <td>
@@ -932,11 +930,10 @@ function viewUserDetails(userId) {
     const devices = getAllDevicesFn ? getAllDevicesFn().filter(d => d.userId === userId) : [];
     
     const packageColors = {
-        'basic': '#667eea',
-        'professional': '#f093fb',
-        'enterprise': '#4facfe'
+        'track': '#3b82f6', 'monitor': '#10b981', 'predict': '#f59e0b',
+        'basic': '#3b82f6', 'professional': '#10b981', 'enterprise': '#f59e0b'
     };
-    const packageColor = packageColors[user.package] || '#667eea';
+    const packageColor = packageColors[resolvePackageId(user.package)] || '#3b82f6';
     
     document.getElementById('userDetailsTitle').textContent = `User Profile: ${user.email}`;
     const modalBody = document.getElementById('userDetailsBody');
@@ -952,7 +949,7 @@ function viewUserDetails(userId) {
                 <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
                     <span class="status-badge ${user.isActive !== false ? 'active' : 'inactive'}">${user.isActive !== false ? 'Active' : 'Inactive'}</span>
                     <span class="status-badge" style="background: ${packageColor}; color: white; text-transform: capitalize;">
-                        ${(user.package || 'Professional').charAt(0).toUpperCase() + (user.package || 'Professional').slice(1)}
+                        ${resolvePackageName(user.package)}
                     </span>
                 </div>
             </div>
@@ -989,7 +986,7 @@ function viewUserDetails(userId) {
                     <span class="detail-label" style="display: block; font-weight: 600; margin-bottom: 0.25rem; color: var(--text-light);">Package:</span>
                     <span class="detail-value" style="font-size: 1rem;">
                         <span class="status-badge" style="background: ${packageColor}; color: white; text-transform: capitalize;">
-                            ${(user.package || 'Professional').charAt(0).toUpperCase() + (user.package || 'Professional').slice(1)}
+                            ${resolvePackageName(user.package)}
                         </span>
                     </span>
                 </div>
@@ -1074,7 +1071,7 @@ function showEditUserForm(userId) {
     document.getElementById('editUserEmail').value = user.email;
     document.getElementById('editUserCompany').value = user.company || '';
     document.getElementById('editUserPhone').value = user.phone || '';
-    document.getElementById('editUserPackage').value = user.package || 'professional';
+    document.getElementById('editUserPackage').value = resolvePackageId(user.package);
     document.getElementById('editUserDevices').value = user.devices || 1;
     document.getElementById('editUserActive').checked = user.isActive !== false;
     document.getElementById('editUserPassword').value = '';
@@ -1504,7 +1501,7 @@ function loadPaymentTransactions() {
                 <td>${txn.id}</td>
                 <td>${txn.userEmail || 'N/A'}</td>
                 <td><span class="status-badge">${txn.package || 'N/A'}</span></td>
-                <td><strong>${txn.amount || '$0'}</strong></td>
+                <td><strong>${txn.amount || '\u20ac0'}</strong></td>
                 <td>${txn.method || 'N/A'}</td>
                 <td><span class="status-badge ${txn.status === 'completed' ? 'active' : (txn.status === 'pending' ? 'warning' : 'error')}">${txn.status || 'unknown'}</span></td>
                 <td>${formatDate(txn.date)}</td>
@@ -1522,7 +1519,7 @@ function loadPaymentTransactions() {
 
 function parseAmount(amt) {
     if (!amt) return 0;
-    return parseFloat(String(amt).replace('$', '').replace(',', '')) || 0;
+    return parseFloat(String(amt).replace(/[\$\u20ac]/g, '').replace(',', '')) || 0;
 }
 
 function updatePaymentStats(transactions = null) {
@@ -1543,9 +1540,9 @@ function updatePaymentStats(transactions = null) {
     const pending = transactions.filter(t => t.status === 'pending');
     const pendingRevenue = pending.reduce((sum, t) => sum + parseAmount(t.amount), 0);
     
-    document.getElementById('totalRevenue').textContent = '$' + totalRevenue.toLocaleString();
-    document.getElementById('monthlyRevenue').textContent = '$' + monthlyRevenue.toLocaleString();
-    document.getElementById('pendingRevenue').textContent = '$' + pendingRevenue.toLocaleString();
+    document.getElementById('totalRevenue').textContent = formatEurAdmin(totalRevenue);
+    document.getElementById('monthlyRevenue').textContent = formatEurAdmin(monthlyRevenue);
+    document.getElementById('pendingRevenue').textContent = formatEurAdmin(pendingRevenue);
     document.getElementById('failedPayments').textContent = transactions.filter(t => t.status === 'failed').length;
 }
 
@@ -1652,7 +1649,7 @@ function updateInvoiceStatistics(invoices) {
     const totalRevenue = paid.reduce((sum, inv) => sum + inv.total, 0);
 
     document.getElementById('adminTotalInvoices').textContent = invoices.length;
-    document.getElementById('adminInvoiceRevenue').textContent = '$' + totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    document.getElementById('adminInvoiceRevenue').textContent = formatEurAdmin(totalRevenue);
     document.getElementById('adminPaidInvoices').textContent = paid.length;
     document.getElementById('adminPendingInvoices').textContent = pending.length;
 
@@ -1836,7 +1833,7 @@ function recalcInvoiceItemRow(input) {
     const row = input.closest('tr');
     const qty = parseFloat(row.querySelector('.item-quantity').value) || 0;
     const price = parseFloat(row.querySelector('.item-unit-price').value) || 0;
-    row.querySelector('.item-total').textContent = '$' + (qty * price).toFixed(2);
+    row.querySelector('.item-total').textContent = '\u20ac' + (qty * price).toFixed(2);
     recalcAllInvoiceItems();
 }
 
@@ -1852,9 +1849,9 @@ function recalcAllInvoiceItems() {
     const tax = subtotal * (taxRate / 100);
     const total = subtotal + tax;
 
-    document.getElementById('invoiceFormSubtotal').textContent = '$' + subtotal.toFixed(2);
-    document.getElementById('invoiceFormTax').textContent = '$' + tax.toFixed(2);
-    document.getElementById('invoiceFormTotal').textContent = '$' + total.toFixed(2);
+    document.getElementById('invoiceFormSubtotal').textContent = '\u20ac' + subtotal.toFixed(2);
+    document.getElementById('invoiceFormTax').textContent = '\u20ac' + tax.toFixed(2);
+    document.getElementById('invoiceFormTotal').textContent = '\u20ac' + total.toFixed(2);
 }
 
 function resetInvoiceItems() {
@@ -2118,9 +2115,9 @@ function exportAllInvoices() {
                 user.email,
                 formatDate(inv.date),
                 formatDate(inv.dueDate),
-                '$' + (inv.subtotal || inv.total || 0).toFixed(2),
-                '$' + (inv.tax || 0).toFixed(2),
-                '$' + (inv.total || 0).toFixed(2),
+                '\u20ac' + (inv.subtotal || inv.total || 0).toFixed(2),
+                '\u20ac' + (inv.tax || 0).toFixed(2),
+                '\u20ac' + (inv.total || 0).toFixed(2),
                 inv.status,
                 inv.paymentMethod || 'N/A'
             ];
@@ -2219,44 +2216,117 @@ function initPackageManagement() {
     document.getElementById('packageForm').addEventListener('submit', savePackage);
     document.getElementById('closePackageModal').addEventListener('click', closePackageModal);
     
-    // Initialize default packages if none exist
     initDefaultPackages();
+    populatePackageDropdowns();
 }
 
 function initDefaultPackages() {
     const storedPackages = localStorage.getItem(PACKAGES_KEY);
-    if (!storedPackages) {
+    const needsMigration = storedPackages && (() => {
+        try {
+            const p = JSON.parse(storedPackages);
+            return p.basic || p.professional || p.enterprise;
+        } catch (_) { return false; }
+    })();
+    if (!storedPackages || needsMigration) {
         const defaultPackages = {
-            basic: {
-                id: 'basic',
-                name: 'Basic',
-                price: 99,
-                maxDevices: 10,
-                extraDevicePrice: 10,
-                description: 'Basic - $99/month',
+            track: {
+                id: 'track',
+                name: 'Track',
+                price: 9.95,
+                annualPrice: 119.40,
+                interval: '5 min',
+                data: '50 MB',
+                maxDevices: 0,
+                description: 'Live GPS fleet map, basic geofence alerts, device management, mobile app access, email notifications',
+                features: ['Live GPS fleet map', 'Basic geofence alerts', 'Device management', 'Mobile app access', 'Email notifications'],
                 active: true
             },
-            professional: {
-                id: 'professional',
-                name: 'Professional',
-                price: 249,
-                maxDevices: 50,
-                extraDevicePrice: 10,
-                description: 'Professional - $249/month',
+            monitor: {
+                id: 'monitor',
+                name: 'Monitor',
+                price: 14.95,
+                annualPrice: 179.40,
+                interval: '1 min',
+                data: '200 MB',
+                maxDevices: 0,
+                description: 'Everything in Track plus delay intelligence, route replay, condition monitoring, compliance reports, analytics dashboard',
+                features: ['Everything in Track', 'Delay intelligence & SLA tracking', 'Route replay & proof reports', 'Condition monitoring (temp, humidity)', 'Compliance reports & audit trails', 'Analytics dashboard', 'Automated alert rules'],
+                featured: true,
                 active: true
             },
-            enterprise: {
-                id: 'enterprise',
-                name: 'Enterprise',
-                price: 499,
-                maxDevices: 0, // 0 = unlimited
-                extraDevicePrice: 0,
-                description: 'Enterprise - $499/month',
+            predict: {
+                id: 'predict',
+                name: 'Predict',
+                price: 24.95,
+                annualPrice: 299.40,
+                interval: '10 sec',
+                data: '500 MB',
+                maxDevices: 0,
+                description: 'Everything in Monitor plus AI risk engine, smart insurance pricing, API access, dedicated account manager, priority support',
+                features: ['Everything in Monitor', 'AI risk engine & predictive analytics', 'Smart insurance pricing', 'API access & custom integrations', 'Dedicated account manager', 'Priority 24/7 support'],
                 active: true
             }
         };
         localStorage.setItem(PACKAGES_KEY, JSON.stringify(defaultPackages));
     }
+}
+
+const PACKAGE_ALIASES = {
+    basic: 'track', professional: 'monitor', enterprise: 'predict',
+    locate: 'track', manage: 'monitor', protect: 'predict',
+    comply: 'track', validate: 'monitor', certify: 'predict',
+    assess: 'track', underwrite: 'monitor', secure: 'track',
+    optimise: 'monitor', command: 'predict'
+};
+
+function resolvePackageId(raw) {
+    const key = (raw || '').toString().toLowerCase().trim();
+    return PACKAGE_ALIASES[key] || key || 'monitor';
+}
+
+function resolvePackageName(raw) {
+    const id = resolvePackageId(raw);
+    const names = { track: 'Track', monitor: 'Monitor', predict: 'Predict' };
+    return names[id] || id.charAt(0).toUpperCase() + id.slice(1);
+}
+
+function resolvePackagePrice(raw) {
+    const id = resolvePackageId(raw);
+    const prices = { track: 9.95, monitor: 14.95, predict: 24.95 };
+    return prices[id] || 14.95;
+}
+
+function formatEurAdmin(value) {
+    return '\u20ac' + Number(value).toLocaleString('en-IE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function populatePackageDropdowns() {
+    const packages = getPackages();
+    const selectors = ['#newUserPackage', '#editUserPackage', '#filterUserPackage'];
+    selectors.forEach(sel => {
+        const el = document.querySelector(sel);
+        if (!el) return;
+        const current = el.value;
+        const isFilter = sel.includes('filter');
+        el.innerHTML = '';
+        if (isFilter) {
+            const allOpt = document.createElement('option');
+            allOpt.value = 'all';
+            allOpt.textContent = 'All Packages';
+            el.appendChild(allOpt);
+        }
+        Object.values(packages).filter(p => p.active !== false).forEach(pkg => {
+            const opt = document.createElement('option');
+            opt.value = pkg.id;
+            opt.textContent = `${pkg.name} (\u20ac${Number(pkg.price).toFixed(2)}/asset/mo)`;
+            if (pkg.featured && !isFilter) opt.selected = true;
+            el.appendChild(opt);
+        });
+        if (current && el.querySelector(`option[value="${current}"]`)) {
+            el.value = current;
+        }
+    });
 }
 
 function getPackages() {
@@ -2286,19 +2356,40 @@ function loadPackages() {
     if (packagesArray.length === 0) {
         tableBody.innerHTML = `
             <tr>
-                <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-light);">
+                <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-light);">
                     No packages found. Click "Add Package" to create one.
                 </td>
             </tr>
         `;
     } else {
-        tableBody.innerHTML = packagesArray.map(pkg => `
+        const tierColors = { track: '#3b82f6', monitor: '#10b981', predict: '#f59e0b' };
+        tableBody.innerHTML = packagesArray.map(pkg => {
+            const color = tierColors[pkg.id] || '#6b7280';
+            const featuresHtml = Array.isArray(pkg.features) && pkg.features.length
+                ? `<div style="margin-top:0.5rem;">${pkg.features.map(f => `<span style="display:inline-block;font-size:0.7rem;padding:0.15rem 0.5rem;background:${color}18;color:${color};border-radius:9999px;margin:0.15rem 0.25rem 0.15rem 0;">${f}</span>`).join('')}</div>`
+                : '';
+            return `
             <tr>
-                <td><strong>${pkg.name}</strong><br><small style="color: var(--text-light);">ID: ${pkg.id}</small></td>
-                <td>$${pkg.price.toFixed(2)}</td>
-                <td>${pkg.maxDevices === 0 ? 'Unlimited' : pkg.maxDevices}</td>
-                <td>$${pkg.extraDevicePrice.toFixed(2)}</td>
+                <td>
+                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                        <span style="width:4px;height:2.5rem;background:${color};border-radius:4px;display:inline-block;"></span>
+                        <div>
+                            <strong>${pkg.name}</strong>${pkg.featured ? ' <span style="font-size:0.65rem;padding:0.1rem 0.4rem;background:#fef3c7;color:#92400e;border-radius:9999px;">Popular</span>' : ''}
+                            <br><small style="color: var(--text-light);">ID: ${pkg.id}</small>
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    <strong>\u20ac${Number(pkg.price).toFixed(2)}</strong><span style="color:var(--text-light);font-size:0.8rem;">/asset/mo</span>
+                    <br><small style="color:var(--text-light);">\u20ac${Number(pkg.annualPrice || pkg.price * 12).toFixed(2)}/asset/yr</small>
+                </td>
+                <td>
+                    <span style="display:inline-flex;align-items:center;gap:0.3rem;"><i class="fas fa-clock" style="color:${color};font-size:0.75rem;"></i> ${pkg.interval || '-'}</span>
+                    <br><span style="display:inline-flex;align-items:center;gap:0.3rem;font-size:0.85rem;color:var(--text-light);"><i class="fas fa-database" style="font-size:0.7rem;"></i> ${pkg.data || '-'}</span>
+                </td>
+                <td>${pkg.maxDevices === 0 || !pkg.maxDevices ? '<span style="color:#10b981;">Unlimited</span>' : pkg.maxDevices}</td>
                 <td><span class="status-badge ${pkg.active ? 'active' : 'inactive'}">${pkg.active ? 'Active' : 'Inactive'}</span></td>
+                <td style="max-width:280px;">${featuresHtml || '<span style="color:var(--text-light);font-size:0.85rem;">—</span>'}</td>
                 <td>
                     <div class="user-actions">
                         <button class="btn-icon-small edit" onclick="editPackage('${pkg.id}')" title="Edit">
@@ -2309,8 +2400,8 @@ function loadPackages() {
                         </button>
                     </div>
                 </td>
-            </tr>
-        `).join('');
+            </tr>`;
+        }).join('');
     }
 }
 
@@ -2319,6 +2410,7 @@ function showAddPackageForm() {
     document.getElementById('packageForm').reset();
     document.getElementById('packageId').disabled = false;
     document.getElementById('packageActive').checked = true;
+    document.getElementById('packageFeatured').checked = false;
     document.getElementById('packageFormModal').classList.add('active');
 }
 
@@ -2332,13 +2424,18 @@ function editPackage(packageId) {
     
     document.getElementById('packageFormTitle').textContent = 'Edit Package';
     document.getElementById('packageId').value = pkg.id;
-    document.getElementById('packageId').disabled = true; // Can't change ID
+    document.getElementById('packageId').disabled = true;
     document.getElementById('packageName').value = pkg.name;
     document.getElementById('packageDescription').value = pkg.description || '';
     document.getElementById('packagePrice').value = pkg.price;
-    document.getElementById('packageMaxDevices').value = pkg.maxDevices;
-    document.getElementById('packageExtraDevicePrice').value = pkg.extraDevicePrice;
+    document.getElementById('packageAnnualPrice').value = pkg.annualPrice || '';
+    document.getElementById('packageInterval').value = pkg.interval || '';
+    document.getElementById('packageData').value = pkg.data || '';
+    document.getElementById('packageMaxDevices').value = pkg.maxDevices || 0;
+    document.getElementById('packageFeatured').checked = pkg.featured === true;
     document.getElementById('packageActive').checked = pkg.active !== false;
+    const featuresEl = document.getElementById('packageFeatures');
+    if (featuresEl) featuresEl.value = Array.isArray(pkg.features) ? pkg.features.join('\n') : '';
     
     document.getElementById('packageFormModal').classList.add('active');
 }
@@ -2346,60 +2443,57 @@ function editPackage(packageId) {
 function savePackage(e) {
     e.preventDefault();
     
-    const packageId = document.getElementById('packageId').value.trim().toLowerCase();
+    const packageId = document.getElementById('packageId').value.trim().toLowerCase().replace(/\s+/g, '-');
     const packageName = document.getElementById('packageName').value.trim();
     const packageDescription = document.getElementById('packageDescription').value.trim();
     const packagePrice = parseFloat(document.getElementById('packagePrice').value);
-    const packageMaxDevices = parseInt(document.getElementById('packageMaxDevices').value);
-    const packageExtraDevicePrice = parseFloat(document.getElementById('packageExtraDevicePrice').value);
+    const packageAnnualPrice = parseFloat(document.getElementById('packageAnnualPrice').value) || (packagePrice * 12);
+    const packageInterval = document.getElementById('packageInterval').value.trim();
+    const packageData = document.getElementById('packageData').value.trim();
+    const packageMaxDevices = parseInt(document.getElementById('packageMaxDevices').value) || 0;
+    const packageFeatured = document.getElementById('packageFeatured').checked;
     const packageActive = document.getElementById('packageActive').checked;
+    const featuresRaw = (document.getElementById('packageFeatures')?.value || '').trim();
+    const features = featuresRaw ? featuresRaw.split('\n').map(f => f.trim()).filter(Boolean) : [];
     
-    // Validation
     if (!packageId || !packageName) {
         alert('Please fill in all required fields');
         return;
     }
     
     if (isNaN(packagePrice) || packagePrice < 0) {
-        alert('Please enter a valid price');
-        return;
-    }
-    
-    if (isNaN(packageMaxDevices) || packageMaxDevices < 0) {
-        alert('Please enter a valid max devices (use 0 for unlimited)');
-        return;
-    }
-    
-    if (isNaN(packageExtraDevicePrice) || packageExtraDevicePrice < 0) {
-        alert('Please enter a valid extra device price');
+        alert('Please enter a valid price per asset');
         return;
     }
     
     const packages = getPackages();
     const isEditing = document.getElementById('packageId').disabled;
     
-    // Check if ID already exists (only for new packages)
     if (!isEditing && packages[packageId]) {
         alert('Package ID already exists. Please use a different ID.');
         return;
     }
     
-    // Save package
     packages[packageId] = {
         id: packageId,
         name: packageName,
-        description: packageDescription || `${packageName} - $${packagePrice}/month`,
+        description: packageDescription || `${packageName} — \u20ac${packagePrice.toFixed(2)}/asset/mo`,
         price: packagePrice,
+        annualPrice: packageAnnualPrice,
+        interval: packageInterval,
+        data: packageData,
         maxDevices: packageMaxDevices,
-        extraDevicePrice: packageExtraDevicePrice,
+        features: features,
+        featured: packageFeatured,
         active: packageActive
     };
     
     savePackages(packages);
     closePackageModal();
     loadPackages();
+    populatePackageDropdowns();
     
-    alert('Package saved successfully! The changes will be reflected in the order form.');
+    showNotification('Package saved successfully.', 'success');
 }
 
 function deletePackage(packageId) {
@@ -2415,7 +2509,8 @@ function deletePackage(packageId) {
         delete packages[packageId];
         savePackages(packages);
         loadPackages();
-        alert('Package deleted successfully!');
+        populatePackageDropdowns();
+        showNotification('Package deleted successfully.', 'success');
     }
 }
 
@@ -2471,7 +2566,7 @@ function viewTransaction(txnId) {
                 <div class="form-group"><label>Package</label><input type="text" value="${txn.package || 'N/A'}" readonly></div>
             </div>
             <div class="form-row">
-                <div class="form-group"><label>Amount</label><input type="text" value="$${txn.amount}" readonly></div>
+                <div class="form-group"><label>Amount</label><input type="text" value="\u20ac${txn.amount}" readonly></div>
                 <div class="form-group"><label>Method</label><input type="text" value="${txn.method || 'N/A'}" readonly></div>
             </div>
             <div class="form-row">
@@ -2524,8 +2619,8 @@ function loadFinancialAnalytics() {
     // Calculate MRR (Monthly Recurring Revenue)
     const activeUsers = users.filter(u => u.isActive !== false);
     const mrr = activeUsers.reduce((sum, u) => {
-        const packages = { basic: 99, professional: 249, enterprise: 499 };
-        return sum + (packages[u.package] || 249);
+        const assetCount = Math.max(parseInt(u.devices) || 1, 1);
+        return sum + (resolvePackagePrice(u.package) * assetCount);
     }, 0);
     
     // Calculate ARPU (Average Revenue Per User)
@@ -2536,9 +2631,9 @@ function loadFinancialAnalytics() {
     const churnRate = users.length > 0 ? (churned / users.length) * 100 : 0;
     
     // Update main stats
-    document.getElementById('totalRevenueAnalytics').textContent = '$' + totalRevenue.toLocaleString();
-    document.getElementById('monthlyRecurringRevenue').textContent = '$' + mrr.toLocaleString();
-    document.getElementById('averageRevenuePerUser').textContent = '$' + Math.round(arpu).toLocaleString();
+    document.getElementById('totalRevenueAnalytics').textContent = formatEurAdmin(totalRevenue);
+    document.getElementById('monthlyRecurringRevenue').textContent = formatEurAdmin(mrr);
+    document.getElementById('averageRevenuePerUser').textContent = formatEurAdmin(Math.round(arpu));
     document.getElementById('churnRate').textContent = churnRate.toFixed(1) + '%';
     
     const revenueGrowth = lastMonthRevenue > 0 ? ((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : (monthlyRevenue > 0 ? 100 : 0);
@@ -2550,8 +2645,8 @@ function loadFinancialAnalytics() {
     });
     const lastMonthActiveUsers = lastMonthUsers.filter(u => u.isActive !== false);
     const lastMrr = lastMonthActiveUsers.reduce((sum, u) => {
-        const pkgs = { basic: 99, professional: 249, enterprise: 499 };
-        return sum + (pkgs[u.package] || 249);
+        const assetCount = Math.max(parseInt(u.devices) || 1, 1);
+        return sum + (resolvePackagePrice(u.package) * assetCount);
     }, 0);
     const mrrGrowth = lastMrr > 0 ? ((mrr - lastMrr) / lastMrr) * 100 : (mrr > 0 ? 100 : 0);
 
@@ -2566,10 +2661,10 @@ function loadFinancialAnalytics() {
     setChangeIndicator('churnChange', churnChange);
     
     // Update breakdown
-    document.getElementById('breakdownTotalRevenue').textContent = '$' + totalRevenue.toLocaleString();
-    document.getElementById('breakdownMonthlyRevenue').textContent = '$' + monthlyRevenue.toLocaleString();
-    document.getElementById('breakdownLastMonthRevenue').textContent = '$' + lastMonthRevenue.toLocaleString();
-    document.getElementById('breakdownYearlyRevenue').textContent = '$' + yearlyRevenue.toLocaleString();
+    document.getElementById('breakdownTotalRevenue').textContent = formatEurAdmin(totalRevenue);
+    document.getElementById('breakdownMonthlyRevenue').textContent = formatEurAdmin(monthlyRevenue);
+    document.getElementById('breakdownLastMonthRevenue').textContent = formatEurAdmin(lastMonthRevenue);
+    document.getElementById('breakdownYearlyRevenue').textContent = formatEurAdmin(yearlyRevenue);
     document.getElementById('breakdownGrowthRate').textContent = revenueGrowth.toFixed(1) + '%';
     
     document.getElementById('breakdownTotalCustomers').textContent = users.length;
@@ -2585,30 +2680,30 @@ function loadFinancialAnalytics() {
     const avgMonthlyRevenue = monthlyRevenue / Math.max(activeUsers.length, 1);
     const avgLifetimeMonths = 12; // Simplified assumption
     const clv = avgMonthlyRevenue * avgLifetimeMonths;
-    document.getElementById('breakdownCLV').textContent = '$' + Math.round(clv).toLocaleString();
+    document.getElementById('breakdownCLV').textContent = formatEurAdmin(Math.round(clv));
     
     // Package performance
-    const packageRevenue = { basic: 0, professional: 0, enterprise: 0 };
-    const packageCounts = { basic: 0, professional: 0, enterprise: 0 };
+    const packageRevenue = { track: 0, monitor: 0, predict: 0 };
+    const packageCounts = { track: 0, monitor: 0, predict: 0 };
     
     completedTransactions.forEach(txn => {
         const amount = parseAmount(txn.amount);
-        const pkg = txn.package || 'professional';
+        const pkg = resolvePackageId(txn.package);
         if (packageRevenue[pkg] !== undefined) {
             packageRevenue[pkg] += amount;
             packageCounts[pkg]++;
         }
     });
     
-    document.getElementById('breakdownBasicRevenue').textContent = '$' + packageRevenue.basic.toLocaleString();
-    document.getElementById('breakdownProRevenue').textContent = '$' + packageRevenue.professional.toLocaleString();
-    document.getElementById('breakdownEnterpriseRevenue').textContent = '$' + packageRevenue.enterprise.toLocaleString();
+    document.getElementById('breakdownTrackRevenue').textContent = formatEurAdmin(packageRevenue.track);
+    document.getElementById('breakdownMonitorRevenue').textContent = formatEurAdmin(packageRevenue.monitor);
+    document.getElementById('breakdownPredictRevenue').textContent = formatEurAdmin(packageRevenue.predict);
     
-    const popularPackage = Object.keys(packageCounts).reduce((a, b) => packageCounts[a] > packageCounts[b] ? a : b, 'professional');
-    document.getElementById('breakdownPopularPackage').textContent = popularPackage.charAt(0).toUpperCase() + popularPackage.slice(1);
+    const popularPackage = Object.keys(packageCounts).reduce((a, b) => packageCounts[a] > packageCounts[b] ? a : b, 'monitor');
+    document.getElementById('breakdownPopularPackage').textContent = resolvePackageName(popularPackage);
     
     const avgPackageValue = Object.values(packageRevenue).reduce((a, b) => a + b, 0) / Math.max(Object.values(packageCounts).reduce((a, b) => a + b, 0), 1);
-    document.getElementById('breakdownAvgPackageValue').textContent = '$' + Math.round(avgPackageValue).toLocaleString();
+    document.getElementById('breakdownAvgPackageValue').textContent = formatEurAdmin(avgPackageValue);
     
     const payingUsers = completedTransactions.map(t => t.userId).filter((v, i, a) => a.indexOf(v) === i).length;
     const conversionRate = users.length > 0 ? (payingUsers / users.length) * 100 : 0;
@@ -2684,7 +2779,7 @@ function initRevenueTrendChart(transactions) {
                     beginAtZero: true,
                     ticks: {
                         callback: function(value) {
-                            return '$' + value.toLocaleString();
+                            return '\u20ac' + value.toLocaleString();
                         }
                     }
                 }
@@ -2704,11 +2799,11 @@ function initRevenueByPackageChart(packageRevenue) {
     adminCharts.revenueByPackage = new Chart(ctx, {
         type: 'doughnut',
         data: {
-            labels: ['Basic', 'Professional', 'Enterprise'],
+            labels: ['Track', 'Monitor', 'Predict'],
             datasets: [{
-                data: [packageRevenue.basic, packageRevenue.professional, packageRevenue.enterprise],
+                data: [packageRevenue.track, packageRevenue.monitor, packageRevenue.predict],
                 backgroundColor: [
-                    'rgba(37, 99, 235, 0.8)',
+                    'rgba(59, 130, 246, 0.8)',
                     'rgba(16, 185, 129, 0.8)',
                     'rgba(245, 158, 11, 0.8)'
                 ],
@@ -2799,9 +2894,9 @@ function initSubscriptionDistributionChart(users) {
     const ctx = document.getElementById('subscriptionDistributionChart');
     if (!ctx) return;
     
-    const packageCounts = { basic: 0, professional: 0, enterprise: 0 };
+    const packageCounts = { track: 0, monitor: 0, predict: 0 };
     users.forEach(u => {
-        const pkg = u.package || 'professional';
+        const pkg = resolvePackageId(u.package);
         if (packageCounts[pkg] !== undefined) {
             packageCounts[pkg]++;
         }
@@ -2814,12 +2909,12 @@ function initSubscriptionDistributionChart(users) {
     adminCharts.subscriptionDistribution = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: ['Basic', 'Professional', 'Enterprise'],
+            labels: ['Track', 'Monitor', 'Predict'],
             datasets: [{
                 label: 'Subscriptions',
-                data: [packageCounts.basic, packageCounts.professional, packageCounts.enterprise],
+                data: [packageCounts.track, packageCounts.monitor, packageCounts.predict],
                 backgroundColor: [
-                    'rgba(37, 99, 235, 0.8)',
+                    'rgba(59, 130, 246, 0.8)',
                     'rgba(16, 185, 129, 0.8)',
                     'rgba(245, 158, 11, 0.8)'
                 ]
@@ -2934,7 +3029,7 @@ function initRevenueForecastChart(currentRevenue, growthRate) {
                     beginAtZero: true,
                     ticks: {
                         callback: function(value) {
-                            return '$' + Math.round(value).toLocaleString();
+                            return '\u20ac' + Math.round(value).toLocaleString();
                         }
                     }
                 }

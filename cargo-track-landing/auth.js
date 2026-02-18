@@ -1,13 +1,25 @@
 // Authentication System
-// Simple localStorage-based authentication for demo purposes
+
+function _authSafeSetItem(k, v) { try { localStorage.setItem(k, v); } catch (e) { console.warn('localStorage write failed:', k, e); } }
 
 const AUTH_KEY = 'cargotrack_auth';
 const USERS_KEY = 'cargotrack_users';
+const SESSION_TOKEN_KEY = 'cargotrack_session_token';
+const SESSION_ROLE_KEY = 'cargotrack_session_role';
+
+function mapPackageToTier(value) {
+    const label = (value || '').toString().toLowerCase();
+    if (label === 'predict' || label === 'protect' || label === 'certify' || label === 'command') return 'enterprise';
+    if (label.includes('enterprise') || label.includes('large')) return 'enterprise';
+    if (label === 'monitor' || label === 'manage' || label === 'validate' || label === 'underwrite' || label === 'optimise') return 'smb';
+    if (label.includes('pro') || label.includes('business') || label.includes('smb')) return 'smb';
+    return 'individual';
+}
 
 // Initialize users storage if it doesn't exist
 function initUsersStorage() {
     if (!localStorage.getItem(USERS_KEY)) {
-        localStorage.setItem(USERS_KEY, JSON.stringify([]));
+        _authSafeSetItem(USERS_KEY, JSON.stringify([]));
     }
 }
 
@@ -19,7 +31,7 @@ function getUsers() {
 
 // Save users
 function saveUsers(users) {
-    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    _authSafeSetItem(USERS_KEY, JSON.stringify(users));
 }
 
 // Create a new user account
@@ -40,6 +52,8 @@ function createUser(userData) {
         company: userData.company,
         phone: userData.phone,
         package: userData.package,
+        planTier: mapPackageToTier(userData.package),
+        role: 'user',
         devices: userData.devices || 1,
         createdAt: new Date().toISOString(),
         isActive: true
@@ -47,6 +61,17 @@ function createUser(userData) {
     
     users.push(user);
     saveUsers(users);
+
+    // Best-effort server registration for multi-tenant storage
+    if (typeof fetch === 'function') {
+        fetch('/api/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(userData)
+        }).catch(() => {
+            // Ignore background registration errors
+        });
+    }
     
     return { success: true, user };
 }
@@ -63,12 +88,14 @@ function authenticateUser(email, password) {
             email: user.email,
             company: user.company,
             package: user.package,
+            planTier: user.planTier || mapPackageToTier(user.package),
+            tenantId: user.tenantId || null,
             loginTime: new Date().toISOString()
         };
         
         try {
             // Save session and verify it was saved
-            localStorage.setItem(AUTH_KEY, JSON.stringify(session));
+            _authSafeSetItem(AUTH_KEY, JSON.stringify(session));
             
             // Verify the session was actually saved
             const savedSession = localStorage.getItem(AUTH_KEY);
@@ -109,6 +136,8 @@ function isAuthenticated() {
 // Logout user
 function logout() {
     localStorage.removeItem(AUTH_KEY);
+    localStorage.removeItem(SESSION_TOKEN_KEY);
+    localStorage.removeItem(SESSION_ROLE_KEY);
     window.location.replace('login.html');
 }
 
@@ -140,7 +169,7 @@ function updateUserSettings(userId, settings) {
         const session = JSON.parse(localStorage.getItem(AUTH_KEY));
         session.company = settings.company || session.company;
         session.email = settings.email || session.email;
-        localStorage.setItem(AUTH_KEY, JSON.stringify(session));
+        _authSafeSetItem(AUTH_KEY, JSON.stringify(session));
     }
     
     return { success: true, user: users[userIndex] };
@@ -165,6 +194,98 @@ function changePassword(userId, currentPassword, newPassword) {
     return { success: true };
 }
 
+async function requestSessionToken(role, email, password) {
+    if (!role || !email || !password) {
+        return { success: false, message: 'Missing credentials for session token.' };
+    }
+    const bootstrapUserRegistration = async () => {
+        if (role !== 'user' || typeof fetch !== 'function') return false;
+        try {
+            const users = getUsers();
+            const localUser = Array.isArray(users)
+                ? users.find((item) => item.email === email && item.password === password)
+                : null;
+            if (!localUser) return false;
+
+            const registerResponse = await fetch('/api/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    email: localUser.email,
+                    password: localUser.password,
+                    company: localUser.company || '',
+                    phone: localUser.phone || '',
+                    package: localUser.package || 'starter',
+                    devices: localUser.devices || 1
+                })
+            });
+            return registerResponse.ok;
+        } catch (error) {
+            console.warn('User bootstrap registration failed:', error);
+            return false;
+        }
+    };
+
+    const issueToken = async () => {
+        const response = await fetch('/api/session', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ role, email, password })
+        });
+        if (response.ok) {
+            const data = await response.json();
+            if (!data || !data.token) {
+                return { success: false, message: 'Session token not returned.' };
+            }
+            _authSafeSetItem(SESSION_TOKEN_KEY, data.token);
+            _authSafeSetItem(SESSION_ROLE_KEY, role);
+            return { success: true, token: data.token };
+        }
+        const text = await response.text().catch(() => '');
+        return {
+            success: false,
+            status: response.status,
+            message: text || 'Session token request failed.'
+        };
+    };
+
+    try {
+        const firstAttempt = await issueToken();
+        if (firstAttempt.success) return firstAttempt;
+
+        if (role === 'user' && firstAttempt.status === 401) {
+            const bootstrapped = await bootstrapUserRegistration();
+            if (bootstrapped) {
+                const retryAttempt = await issueToken();
+                if (retryAttempt.success) return retryAttempt;
+                return { success: false, message: retryAttempt.message || 'Session token request failed.' };
+            }
+        }
+
+        return { success: false, message: firstAttempt.message || 'Session token request failed.' };
+    } catch (error) {
+        console.warn('Session token request failed:', error);
+        return { success: false, message: 'Session token request failed.' };
+    }
+}
+
+function getSessionToken() {
+    return localStorage.getItem(SESSION_TOKEN_KEY);
+}
+
+function getSessionAuthHeaders() {
+    const token = getSessionToken();
+    if (!token) return {};
+    return {
+        Authorization: `Bearer ${token}`,
+        'x-session-token': token
+    };
+}
+
 // Make functions globally available
 if (typeof window !== 'undefined') {
     window.getUsers = getUsers;
@@ -178,5 +299,8 @@ if (typeof window !== 'undefined') {
     window.changePassword = changePassword;
     window.saveUsers = saveUsers;
     window.initUsersStorage = initUsersStorage;
+    window.requestSessionToken = requestSessionToken;
+    window.getSessionToken = getSessionToken;
+    window.getSessionAuthHeaders = getSessionAuthHeaders;
 }
 
