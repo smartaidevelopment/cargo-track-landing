@@ -568,6 +568,12 @@
     color: #ef4444;
 }
 
+.kpi-subtext {
+    font-size: 0.7rem;
+    color: var(--text-light);
+    margin-top: 0.25rem;
+}
+
 .stat-change.negative {
     color: #ef4444;
 }

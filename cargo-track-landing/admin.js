@@ -40,6 +40,21 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    // One-time cleanup of seeded sample data
+    if (!localStorage.getItem('cargotrack_fake_data_cleaned')) {
+        var txns = JSON.parse(localStorage.getItem('cargotrack_payments') || '[]');
+        if (Array.isArray(txns) && txns.length > 0) {
+            txns = txns.filter(function(t) { return !/^TXN-0{5}\d$/.test(t.id); });
+            localStorage.setItem('cargotrack_payments', JSON.stringify(txns));
+        }
+        var reqs = JSON.parse(localStorage.getItem('cargotrack_privacy_requests') || '[]');
+        if (Array.isArray(reqs) && reqs.length > 0) {
+            reqs = reqs.filter(function(r) { return !/^PR-0{5}\d$/.test(r.id); });
+            localStorage.setItem('cargotrack_privacy_requests', JSON.stringify(reqs));
+        }
+        localStorage.setItem('cargotrack_fake_data_cleaned', '1');
+    }
+
     // Initialize navigation
     initAdminNavigation();
     
@@ -392,11 +407,9 @@ function loadAdminDashboard() {
     document.getElementById('adminActiveSubscriptions').textContent = activeUsers.length;
     
     const completedPayments = payments.filter(p => p.status === 'completed');
-    const totalRevenue = completedPayments
-        .reduce((sum, p) => sum + parseFloat((p.amount || '0').replace('$', '').replace(',', '')), 0);
+    const totalRevenue = completedPayments.reduce((sum, p) => sum + parseAmount(p.amount), 0);
     document.getElementById('adminTotalRevenue').textContent = '$' + totalRevenue.toLocaleString();
 
-    // Compute real change indicators
     const now = new Date();
     const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -408,10 +421,10 @@ function loadAdminDashboard() {
 
     const revenueThisMonth = completedPayments
         .filter(p => p.date && new Date(p.date) >= thisMonthStart)
-        .reduce((sum, p) => sum + parseFloat((p.amount || '0').replace('$', '').replace(',', '')), 0);
+        .reduce((sum, p) => sum + parseAmount(p.amount), 0);
     const revenueLastMonth = completedPayments
         .filter(p => p.date && new Date(p.date) >= lastMonthStart && new Date(p.date) <= lastMonthEnd)
-        .reduce((sum, p) => sum + parseFloat((p.amount || '0').replace('$', '').replace(',', '')), 0);
+        .reduce((sum, p) => sum + parseAmount(p.amount), 0);
     const revenuePct = revenueLastMonth > 0 ? Math.round(((revenueThisMonth - revenueLastMonth) / revenueLastMonth) * 100) : (revenueThisMonth > 0 ? 100 : 0);
     renderChangeIndicator('adminRevenueChange', revenuePct, 'this month', false, true);
 
@@ -441,6 +454,17 @@ function renderChangeIndicator(elementId, value, label, isCount, isPercent) {
     el.innerHTML = '<i class="' + icon + '"></i> ' + prefix + value + suffix + ' ' + label;
 }
 
+function setChangeIndicator(elementId, pctValue) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    const v = parseFloat(pctValue) || 0;
+    const isPositive = v > 0;
+    const isNeutral = v === 0;
+    el.className = 'stat-change ' + (isNeutral ? 'neutral' : (isPositive ? 'positive' : 'negative'));
+    const icon = isNeutral ? 'fas fa-minus' : (isPositive ? 'fas fa-arrow-up' : 'fas fa-arrow-down');
+    el.innerHTML = '<i class="' + icon + '"></i> ' + (isPositive ? '+' : '') + Math.abs(v).toFixed(1) + '%';
+}
+
 function loadRecentUsers(users) {
     const tableBody = document.getElementById('recentUsersTable');
     if (!tableBody) return;
@@ -468,15 +492,54 @@ function loadRecentUsers(users) {
 function loadAdminActivity() {
     const activityList = document.getElementById('adminActivityList');
     if (!activityList) return;
-    
-    const activities = [
-        { title: 'New user registered', description: 'Company: ABC Corp', icon: 'fas fa-user-plus', color: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', time: '5 min ago' },
-        { title: 'Payment received', description: '$249 from Professional package', icon: 'fas fa-dollar-sign', color: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)', time: '15 min ago' },
-        { title: 'Device added', description: 'New device registered by user', icon: 'fas fa-microchip', color: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', time: '1 hour ago' },
-        { title: 'Security alert', description: 'Failed login attempt detected', icon: 'fas fa-shield-alt', color: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', time: '2 hours ago' }
-    ];
-    
-    activityList.innerHTML = activities.map(activity => `
+
+    const activities = [];
+    const iconMap = {
+        admin_login: { icon: 'fas fa-sign-in-alt', color: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' },
+        user_created: { icon: 'fas fa-user-plus', color: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' },
+        user_updated: { icon: 'fas fa-user-edit', color: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' },
+        user_deletion: { icon: 'fas fa-user-times', color: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' },
+        user_status_change: { icon: 'fas fa-user-cog', color: 'linear-gradient(135deg, #f59e0b 0%, #f97316 100%)' },
+        privacy_request_processed: { icon: 'fas fa-shield-alt', color: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)' },
+        settings_update: { icon: 'fas fa-cog', color: 'linear-gradient(135deg, #64748b 0%, #475569 100%)' }
+    };
+    const defaultIcon = { icon: 'fas fa-circle', color: 'linear-gradient(135deg, #94a3b8 0%, #64748b 100%)' };
+
+    const auditLog = typeof getSecurityAuditLog === 'function' ? getSecurityAuditLog(10) : [];
+    auditLog.forEach(entry => {
+        const mapping = iconMap[entry.event] || defaultIcon;
+        activities.push({
+            title: (entry.event || '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+            description: entry.user || '',
+            icon: mapping.icon,
+            color: mapping.color,
+            timestamp: entry.timestamp
+        });
+    });
+
+    const getUsersFn = window.getUsers || (typeof getUsers !== 'undefined' ? getUsers : null);
+    const users = getUsersFn ? getUsersFn() : [];
+    users.slice(-5).reverse().forEach(u => {
+        if (u.createdAt) {
+            activities.push({
+                title: 'User registered',
+                description: (u.company || u.email),
+                icon: 'fas fa-user-plus',
+                color: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                timestamp: u.createdAt
+            });
+        }
+    });
+
+    activities.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+    const display = activities.slice(0, 10);
+
+    if (display.length === 0) {
+        activityList.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-light);">No recent activity</div>';
+        return;
+    }
+
+    activityList.innerHTML = display.map(activity => `
         <div class="activity-item">
             <div class="activity-icon" style="background: ${activity.color};">
                 <i class="${activity.icon}"></i>
@@ -485,9 +548,20 @@ function loadAdminActivity() {
                 <h4>${activity.title}</h4>
                 <p>${activity.description}</p>
             </div>
-            <div class="activity-time">${activity.time}</div>
+            <div class="activity-time">${activity.timestamp ? timeAgo(activity.timestamp) : ''}</div>
         </div>
     `).join('');
+}
+
+function timeAgo(dateStr) {
+    const now = Date.now();
+    const then = new Date(dateStr).getTime();
+    const diff = now - then;
+    if (diff < 60000) return 'just now';
+    if (diff < 3600000) return Math.floor(diff / 60000) + ' min ago';
+    if (diff < 86400000) return Math.floor(diff / 3600000) + ' hour' + (Math.floor(diff / 3600000) > 1 ? 's' : '') + ' ago';
+    if (diff < 604800000) return Math.floor(diff / 86400000) + ' day' + (Math.floor(diff / 86400000) > 1 ? 's' : '') + ' ago';
+    return formatDate(dateStr);
 }
 
 function initRevenueChart(payments) {
@@ -511,8 +585,7 @@ function initRevenueChart(payments) {
         const paymentDate = new Date(payment.date);
         const daysAgo = Math.floor((Date.now() - paymentDate) / (1000 * 60 * 60 * 24));
         if (daysAgo >= 0 && daysAgo < 7) {
-            const amount = parseFloat(payment.amount.replace('$', '').replace(',', ''));
-            revenueByDay[6 - daysAgo] += amount;
+            revenueByDay[6 - daysAgo] += parseAmount(payment.amount);
         }
     });
     
@@ -1372,82 +1445,67 @@ function saveBankDetails() {
 
 function getPaymentTransactions() {
     const transactionsKey = 'cargotrack_payments';
-    const transactions = localStorage.getItem(transactionsKey);
-    
-    if (!transactions) {
-        // Generate sample transactions
-        const users = getUsers();
-        const sampleTransactions = users.slice(0, 10).map((user, index) => {
-            const packages = { basic: 99, professional: 249, enterprise: 499 };
-            const packageType = user.package || 'professional';
-            const amount = packages[packageType] || 249;
-            
-            return {
-                id: `TXN-${String(index + 1).padStart(6, '0')}`,
-                userId: user.id,
-                userEmail: user.email,
-                package: packageType,
-                amount: `$${amount}`,
-                method: index % 3 === 0 ? 'Stripe' : (index % 3 === 1 ? 'PayPal' : 'Bank Transfer'),
-                status: index < 8 ? 'completed' : (index === 8 ? 'pending' : 'failed'),
-                date: new Date(Date.now() - index * 24 * 3600000).toISOString()
-            };
-        });
-        localStorage.setItem(transactionsKey, JSON.stringify(sampleTransactions));
-        return sampleTransactions;
+    const raw = localStorage.getItem(transactionsKey);
+    if (!raw) return [];
+    try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+        return [];
     }
-    
-    return JSON.parse(transactions);
 }
 
 function loadPaymentTransactions() {
     const transactions = getPaymentTransactions();
     const tableBody = document.getElementById('paymentsTable');
     if (!tableBody) return;
-    
-    tableBody.innerHTML = transactions.map(txn => `
-        <tr>
-            <td>${txn.id}</td>
-            <td>${txn.userEmail}</td>
-            <td><span class="status-badge">${txn.package}</span></td>
-            <td><strong>${txn.amount}</strong></td>
-            <td>${txn.method}</td>
-            <td><span class="status-badge ${txn.status === 'completed' ? 'active' : (txn.status === 'pending' ? 'warning' : 'error')}">${txn.status}</span></td>
-            <td>${formatDate(txn.date)}</td>
-            <td>
-                <button class="btn-icon-small view" onclick="viewTransaction('${txn.id}')" title="View">
-                    <i class="fas fa-eye"></i>
-                </button>
-            </td>
-        </tr>
-    `).join('');
-    
+
+    if (transactions.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text-light);">No payment transactions yet</td></tr>';
+    } else {
+        tableBody.innerHTML = transactions.map(txn => `
+            <tr>
+                <td>${txn.id}</td>
+                <td>${txn.userEmail || 'N/A'}</td>
+                <td><span class="status-badge">${txn.package || 'N/A'}</span></td>
+                <td><strong>${txn.amount || '$0'}</strong></td>
+                <td>${txn.method || 'N/A'}</td>
+                <td><span class="status-badge ${txn.status === 'completed' ? 'active' : (txn.status === 'pending' ? 'warning' : 'error')}">${txn.status || 'unknown'}</span></td>
+                <td>${formatDate(txn.date)}</td>
+                <td>
+                    <button class="btn-icon-small view" onclick="viewTransaction('${txn.id}')" title="View">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
     updatePaymentStats(transactions);
+}
+
+function parseAmount(amt) {
+    if (!amt) return 0;
+    return parseFloat(String(amt).replace('$', '').replace(',', '')) || 0;
 }
 
 function updatePaymentStats(transactions = null) {
     if (!transactions) {
         transactions = getPaymentTransactions();
     }
-    
+
     const completed = transactions.filter(t => t.status === 'completed');
-    const totalRevenue = completed.reduce((sum, t) => {
-        return sum + parseFloat(t.amount.replace('$', '').replace(',', ''));
-    }, 0);
-    
+    const totalRevenue = completed.reduce((sum, t) => sum + parseAmount(t.amount), 0);
+
+    const now = new Date();
     const thisMonth = completed.filter(t => {
         const txnDate = new Date(t.date);
-        const now = new Date();
         return txnDate.getMonth() === now.getMonth() && txnDate.getFullYear() === now.getFullYear();
     });
-    const monthlyRevenue = thisMonth.reduce((sum, t) => {
-        return sum + parseFloat(t.amount.replace('$', '').replace(',', ''));
-    }, 0);
-    
+    const monthlyRevenue = thisMonth.reduce((sum, t) => sum + parseAmount(t.amount), 0);
+
     const pending = transactions.filter(t => t.status === 'pending');
-    const pendingRevenue = pending.reduce((sum, t) => {
-        return sum + parseFloat(t.amount.replace('$', '').replace(',', ''));
-    }, 0);
+    const pendingRevenue = pending.reduce((sum, t) => sum + parseAmount(t.amount), 0);
     
     document.getElementById('totalRevenue').textContent = '$' + totalRevenue.toLocaleString();
     document.getElementById('monthlyRevenue').textContent = '$' + monthlyRevenue.toLocaleString();
@@ -2405,36 +2463,27 @@ function loadFinancialAnalytics() {
     const transactions = getPaymentTransactions();
     const completedTransactions = transactions.filter(t => t.status === 'completed');
     
-    // Calculate financial metrics
-    const totalRevenue = completedTransactions.reduce((sum, t) => {
-        return sum + parseFloat(t.amount.replace('$', '').replace(',', ''));
-    }, 0);
-    
+    const totalRevenue = completedTransactions.reduce((sum, t) => sum + parseAmount(t.amount), 0);
+
     const now = new Date();
     const thisMonth = completedTransactions.filter(t => {
         const txnDate = new Date(t.date);
         return txnDate.getMonth() === now.getMonth() && txnDate.getFullYear() === now.getFullYear();
     });
-    const monthlyRevenue = thisMonth.reduce((sum, t) => {
-        return sum + parseFloat(t.amount.replace('$', '').replace(',', ''));
-    }, 0);
-    
+    const monthlyRevenue = thisMonth.reduce((sum, t) => sum + parseAmount(t.amount), 0);
+
     const lastMonth = completedTransactions.filter(t => {
         const txnDate = new Date(t.date);
         const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1);
         return txnDate.getMonth() === lastMonthDate.getMonth() && txnDate.getFullYear() === lastMonthDate.getFullYear();
     });
-    const lastMonthRevenue = lastMonth.reduce((sum, t) => {
-        return sum + parseFloat(t.amount.replace('$', '').replace(',', ''));
-    }, 0);
-    
+    const lastMonthRevenue = lastMonth.reduce((sum, t) => sum + parseAmount(t.amount), 0);
+
     const thisYear = completedTransactions.filter(t => {
         const txnDate = new Date(t.date);
         return txnDate.getFullYear() === now.getFullYear();
     });
-    const yearlyRevenue = thisYear.reduce((sum, t) => {
-        return sum + parseFloat(t.amount.replace('$', '').replace(',', ''));
-    }, 0);
+    const yearlyRevenue = thisYear.reduce((sum, t) => sum + parseAmount(t.amount), 0);
     
     // Calculate MRR (Monthly Recurring Revenue)
     const activeUsers = users.filter(u => u.isActive !== false);
@@ -2456,16 +2505,29 @@ function loadFinancialAnalytics() {
     document.getElementById('averageRevenuePerUser').textContent = '$' + Math.round(arpu).toLocaleString();
     document.getElementById('churnRate').textContent = churnRate.toFixed(1) + '%';
     
-    // Calculate growth rates
-    const revenueGrowth = lastMonthRevenue > 0 ? ((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : 0;
-    const mrrGrowth = 5.2; // Simulated
-    const arpuGrowth = 3.1; // Simulated
-    const churnChange = -0.5; // Simulated improvement
-    
-    document.getElementById('revenueChange').innerHTML = `<i class="fas fa-arrow-${revenueGrowth >= 0 ? 'up' : 'down'}"></i> ${Math.abs(revenueGrowth).toFixed(1)}%`;
-    document.getElementById('mrrChange').innerHTML = `<i class="fas fa-arrow-up"></i> ${mrrGrowth.toFixed(1)}%`;
-    document.getElementById('arpuChange').innerHTML = `<i class="fas fa-arrow-up"></i> ${arpuGrowth.toFixed(1)}%`;
-    document.getElementById('churnChange').innerHTML = `<i class="fas fa-arrow-down"></i> ${Math.abs(churnChange).toFixed(1)}%`;
+    const revenueGrowth = lastMonthRevenue > 0 ? ((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : (monthlyRevenue > 0 ? 100 : 0);
+
+    const lastMonthUsers = users.filter(u => {
+        const d = new Date(u.createdAt);
+        const lm = new Date(now.getFullYear(), now.getMonth() - 1);
+        return d.getMonth() === lm.getMonth() && d.getFullYear() === lm.getFullYear();
+    });
+    const lastMonthActiveUsers = lastMonthUsers.filter(u => u.isActive !== false);
+    const lastMrr = lastMonthActiveUsers.reduce((sum, u) => {
+        const pkgs = { basic: 99, professional: 249, enterprise: 499 };
+        return sum + (pkgs[u.package] || 249);
+    }, 0);
+    const mrrGrowth = lastMrr > 0 ? ((mrr - lastMrr) / lastMrr) * 100 : (mrr > 0 ? 100 : 0);
+
+    const lastArpu = lastMonthActiveUsers.length > 0 ? lastMonthRevenue / lastMonthActiveUsers.length : 0;
+    const arpuGrowth = lastArpu > 0 ? ((arpu - lastArpu) / lastArpu) * 100 : (arpu > 0 ? 100 : 0);
+
+    const churnChange = churnRate > 0 ? -churnRate : 0;
+
+    setChangeIndicator('revenueChange', revenueGrowth);
+    setChangeIndicator('mrrChange', mrrGrowth);
+    setChangeIndicator('arpuChange', arpuGrowth);
+    setChangeIndicator('churnChange', churnChange);
     
     // Update breakdown
     document.getElementById('breakdownTotalRevenue').textContent = '$' + totalRevenue.toLocaleString();
@@ -2494,7 +2556,7 @@ function loadFinancialAnalytics() {
     const packageCounts = { basic: 0, professional: 0, enterprise: 0 };
     
     completedTransactions.forEach(txn => {
-        const amount = parseFloat(txn.amount.replace('$', '').replace(',', ''));
+        const amount = parseAmount(txn.amount);
         const pkg = txn.package || 'professional';
         if (packageRevenue[pkg] !== undefined) {
             packageRevenue[pkg] += amount;
@@ -2512,12 +2574,14 @@ function loadFinancialAnalytics() {
     const avgPackageValue = Object.values(packageRevenue).reduce((a, b) => a + b, 0) / Math.max(Object.values(packageCounts).reduce((a, b) => a + b, 0), 1);
     document.getElementById('breakdownAvgPackageValue').textContent = '$' + Math.round(avgPackageValue).toLocaleString();
     
-    // KPIs
-    const conversionRate = 12.5; // Simulated
-    const retentionRate = 95.2; // Simulated
-    const ltvRatio = 3.2; // Simulated
+    const payingUsers = completedTransactions.map(t => t.userId).filter((v, i, a) => a.indexOf(v) === i).length;
+    const conversionRate = users.length > 0 ? (payingUsers / users.length) * 100 : 0;
+    const retentionRate = users.length > 0 ? (activeUsers.length / users.length) * 100 : 0;
+    const avgMonthlyRevenuePerUser = activeUsers.length > 0 ? mrr / activeUsers.length : 0;
+    const estimatedCac = 50;
+    const ltvRatio = estimatedCac > 0 ? (clv / estimatedCac) : 0;
     const monthlyGrowth = revenueGrowth;
-    
+
     document.getElementById('kpiConversionRate').textContent = conversionRate.toFixed(1) + '%';
     document.getElementById('kpiRetentionRate').textContent = retentionRate.toFixed(1) + '%';
     document.getElementById('kpiLTVRatio').textContent = ltvRatio.toFixed(1) + ':1';
@@ -2550,9 +2614,7 @@ function initRevenueTrendChart(transactions) {
             const txnDate = new Date(t.date);
             return txnDate.toDateString() === date.toDateString();
         });
-        const dayRevenue = dayTransactions.reduce((sum, t) => {
-            return sum + parseFloat(t.amount.replace('$', '').replace(',', ''));
-        }, 0);
+        const dayRevenue = dayTransactions.reduce((sum, t) => sum + parseAmount(t.amount), 0);
         data.push(dayRevenue);
     }
     
@@ -2850,10 +2912,8 @@ function exportFinancialReport() {
     const transactions = getPaymentTransactions();
     const completedTransactions = transactions.filter(t => t.status === 'completed');
     
-    const totalRevenue = completedTransactions.reduce((sum, t) => {
-        return sum + parseFloat(t.amount.replace('$', '').replace(',', ''));
-    }, 0);
-    
+    const totalRevenue = completedTransactions.reduce((sum, t) => sum + parseAmount(t.amount), 0);
+
     const report = {
         generated: new Date().toISOString(),
         summary: {
@@ -3498,30 +3558,22 @@ function savePrivacySettings() {
 
 function loadPrivacyRequests() {
     const requestsKey = 'cargotrack_privacy_requests';
-    let requests = JSON.parse(localStorage.getItem(requestsKey)) || [];
-    
-    // Generate sample requests if none exist
-    if (requests.length === 0) {
-        const users = getUsers().slice(0, 3);
-        requests = users.map((user, index) => ({
-            id: `PR-${String(index + 1).padStart(6, '0')}`,
-            userId: user.id,
-            userEmail: user.email,
-            type: index === 0 ? 'data_export' : (index === 1 ? 'data_deletion' : 'data_access'),
-            status: index === 0 ? 'pending' : (index === 1 ? 'completed' : 'processing'),
-            requested: new Date(Date.now() - index * 2 * 24 * 3600000).toISOString()
-        }));
-        localStorage.setItem(requestsKey, JSON.stringify(requests));
-    }
-    
+    let requests = [];
+    try { requests = JSON.parse(localStorage.getItem(requestsKey)) || []; } catch (_) {}
+
     const tableBody = document.getElementById('privacyRequestsTable');
     if (!tableBody) return;
-    
+
+    if (requests.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--text-light);">No privacy requests</td></tr>';
+        return;
+    }
+
     tableBody.innerHTML = requests.map(req => `
         <tr>
             <td>${req.id}</td>
             <td>${req.userEmail}</td>
-            <td>${req.type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</td>
+            <td>${(req.type || '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</td>
             <td><span class="status-badge ${req.status === 'completed' ? 'active' : (req.status === 'pending' ? 'warning' : 'info')}">${req.status}</span></td>
             <td>${formatDate(req.requested)}</td>
             <td>
