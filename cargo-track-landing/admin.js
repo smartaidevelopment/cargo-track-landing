@@ -3099,8 +3099,19 @@ function showAdminDeviceForm(deviceId) {
     const currentNs = device ? (device.ownerNamespace || '') : '';
     const namespaceOptions = getAvailableNamespaceOptions(currentNs);
 
+    const lte = device?.lte || {};
+    const logistics = device?.logistics || {};
+    const nets = device?.networks || ['GPS/GNSS'];
+    const sensorTypes = (device?.sensors || []).map(s => s.type || s);
+
+    function chk(arr, val) { return arr.includes(val) ? 'checked' : ''; }
+    function sel(a, b) { return a === b ? 'selected' : ''; }
+    function v(val, fallback) { return val != null ? val : (fallback != null ? fallback : ''); }
+
     body.innerHTML = `
         <form id="adminDeviceForm" class="settings-form" onsubmit="return false;">
+
+            <div class="form-section"><h4><i class="fas fa-info-circle"></i> Basic Information</h4>
             <div class="form-row">
                 <div class="form-group">
                     <label for="adminDeviceId">Device ID *</label>
@@ -3108,53 +3119,196 @@ function showAdminDeviceForm(deviceId) {
                 </div>
                 <div class="form-group">
                     <label for="adminDeviceName">Name *</label>
-                    <input type="text" id="adminDeviceName" value="${device ? (device.name || '') : ''}" required placeholder="e.g. Truck A GPS">
+                    <input type="text" id="adminDeviceName" value="${v(device?.name)}" required placeholder="e.g. Truck A GPS">
                 </div>
             </div>
             <div class="form-row">
                 <div class="form-group">
-                    <label for="adminDeviceType">Type</label>
+                    <label for="adminDeviceType">Device Type *</label>
                     <select id="adminDeviceType">
-                        <option value="Tracker" ${device && device.type === 'Tracker' ? 'selected' : ''}>Tracker</option>
-                        <option value="Sensor" ${device && device.type === 'Sensor' ? 'selected' : ''}>Sensor</option>
-                        <option value="Gateway" ${device && device.type === 'Gateway' ? 'selected' : ''}>Gateway</option>
+                        <option value="Tracker" ${sel(device?.type,'Tracker')}>Tracker</option>
+                        <option value="Sensor" ${sel(device?.type,'Sensor')}>Sensor</option>
+                        <option value="Gateway" ${sel(device?.type,'Gateway')}>Gateway</option>
                     </select>
                 </div>
+                <div class="form-group">
+                    <label for="adminDeviceModel">Device Model</label>
+                    <input type="text" id="adminDeviceModel" value="${v(device?.model || lte.model)}" placeholder="e.g. Teltonika FMB920">
+                </div>
+            </div>
+            <div class="form-row">
                 <div class="form-group">
                     <label for="adminDeviceStatus">Status</label>
                     <select id="adminDeviceStatus">
-                        <option value="active" ${!device || device.status === 'active' ? 'selected' : ''}>Active</option>
-                        <option value="inactive" ${device && device.status === 'inactive' ? 'selected' : ''}>Inactive</option>
-                        <option value="maintenance" ${device && device.status === 'maintenance' ? 'selected' : ''}>Maintenance</option>
+                        <option value="active" ${sel(device?.status,'active') || (!device ? 'selected' : '')}>Active</option>
+                        <option value="inactive" ${sel(device?.status,'inactive')}>Inactive</option>
+                        <option value="maintenance" ${sel(device?.status,'maintenance')}>Maintenance</option>
                     </select>
+                </div>
+                <div class="form-group">
+                    <label for="adminDeviceNamespace">Assign To *</label>
+                    <select id="adminDeviceNamespace" required>${namespaceOptions}</select>
+                    <small>User or tenant workspace that owns this device</small>
                 </div>
             </div>
             <div class="form-row">
                 <div class="form-group">
-                    <label for="adminDeviceNamespace">Assign To *</label>
-                    <select id="adminDeviceNamespace" required>
-                        ${namespaceOptions}
-                    </select>
-                    <small>Select the user or tenant workspace that owns this device</small>
+                    <label for="adminDeviceGroup">Group</label>
+                    <input type="text" id="adminDeviceGroup" value="${v(device?.group)}" placeholder="e.g. Fleet A">
                 </div>
                 <div class="form-group">
-                    <label for="adminDeviceGroup">Group</label>
-                    <input type="text" id="adminDeviceGroup" value="${device ? (device.group || '') : ''}" placeholder="e.g. Fleet A">
+                    <label for="adminDeviceAsset">Asset</label>
+                    <input type="text" id="adminDeviceAsset" value="${v(device?.asset)}" placeholder="e.g. Trailer T-100">
                 </div>
+            </div>
+            </div>
+
+            <div class="form-section"><h4><i class="fas fa-network-wired"></i> Network Connectivity</h4>
+            <p style="font-size:0.85rem;color:var(--text-light);margin-bottom:0.75rem;">Select all network types supported by this device</p>
+            <div class="checkbox-grid">
+                <label class="checkbox-item"><input type="checkbox" name="adNetworks" value="GPS/GNSS" ${chk(nets,'GPS/GNSS')}><span><i class="fas fa-satellite"></i> GPS/GNSS</span></label>
+                <label class="checkbox-item"><input type="checkbox" name="adNetworks" value="4G LTE" ${chk(nets,'4G LTE')}><span><i class="fas fa-signal"></i> 4G LTE</span></label>
+                <label class="checkbox-item"><input type="checkbox" name="adNetworks" value="2G" ${chk(nets,'2G')}><span><i class="fas fa-signal"></i> 2G</span></label>
+                <label class="checkbox-item"><input type="checkbox" name="adNetworks" value="3G" ${chk(nets,'3G')}><span><i class="fas fa-signal"></i> 3G</span></label>
+                <label class="checkbox-item"><input type="checkbox" name="adNetworks" value="5G" ${chk(nets,'5G')}><span><i class="fas fa-signal"></i> 5G</span></label>
+                <label class="checkbox-item"><input type="checkbox" name="adNetworks" value="LTE Cat-M1" ${chk(nets,'LTE Cat-M1')}><span><i class="fas fa-signal"></i> LTE Cat-M1</span></label>
+                <label class="checkbox-item"><input type="checkbox" name="adNetworks" value="BLE" ${chk(nets,'BLE')}><span><i class="fas fa-bluetooth"></i> BLE</span></label>
+                <label class="checkbox-item"><input type="checkbox" name="adNetworks" value="NFC" ${chk(nets,'NFC')}><span><i class="fas fa-credit-card"></i> NFC</span></label>
+            </div>
+            </div>
+
+            <div class="form-section"><h4><i class="fas fa-signal"></i> 4G LTE Tracker Settings</h4>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="adminLteImei">IMEI</label>
+                    <input type="text" id="adminLteImei" value="${v(lte.imei)}" placeholder="15-digit IMEI" pattern="[0-9]{15}">
+                </div>
+                <div class="form-group">
+                    <label for="adminLteSimIccid">SIM ICCID</label>
+                    <input type="text" id="adminLteSimIccid" value="${v(lte.simIccid)}" placeholder="18-22 digit ICCID" pattern="[0-9]{18,22}">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="adminLteCarrier">Carrier</label>
+                    <input type="text" id="adminLteCarrier" value="${v(lte.carrier)}" placeholder="e.g. AT&T, Vodafone">
+                </div>
+                <div class="form-group">
+                    <label for="adminLteApn">APN</label>
+                    <input type="text" id="adminLteApn" value="${v(lte.apn)}" placeholder="e.g. internet, iot">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="adminLteDataFormat">Data Format</label>
+                    <select id="adminLteDataFormat">
+                        <option value="json" ${sel(lte.dataFormat,'json')}>JSON</option>
+                        <option value="nmea" ${sel(lte.dataFormat,'nmea')}>NMEA</option>
+                        <option value="binary" ${sel(lte.dataFormat,'binary')}>Binary</option>
+                        <option value="codec8" ${sel(lte.dataFormat,'codec8')}>Codec 8</option>
+                        <option value="codec8ext" ${sel(lte.dataFormat,'codec8ext')}>Codec 8 Extended</option>
+                        <option value="auto" ${sel(lte.dataFormat,'auto')}>Auto-detect</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="adminLteFrequency">Reporting Interval (ms)</label>
+                    <input type="number" id="adminLteFrequency" value="${v(lte.dataLogFrequency, 5000)}" min="1000" max="60000" step="1000">
+                </div>
+            </div>
+            </div>
+
+            <div class="form-section"><h4><i class="fas fa-microchip"></i> Sensors</h4>
+            <p style="font-size:0.85rem;color:var(--text-light);margin-bottom:0.75rem;">Select sensors available on this device</p>
+            <div class="checkbox-grid">
+                <label class="checkbox-item"><input type="checkbox" name="adSensors" value="temperature" ${chk(sensorTypes,'temperature')}><span><i class="fas fa-thermometer-half"></i> Temperature</span></label>
+                <label class="checkbox-item"><input type="checkbox" name="adSensors" value="humidity" ${chk(sensorTypes,'humidity')}><span><i class="fas fa-tint"></i> Humidity</span></label>
+                <label class="checkbox-item"><input type="checkbox" name="adSensors" value="accelerometer" ${chk(sensorTypes,'accelerometer')}><span><i class="fas fa-compress-arrows-alt"></i> Accelerometer</span></label>
+                <label class="checkbox-item"><input type="checkbox" name="adSensors" value="gyroscope" ${chk(sensorTypes,'gyroscope')}><span><i class="fas fa-sync"></i> Gyroscope</span></label>
+                <label class="checkbox-item"><input type="checkbox" name="adSensors" value="magnetometer" ${chk(sensorTypes,'magnetometer')}><span><i class="fas fa-compass"></i> Magnetometer</span></label>
+                <label class="checkbox-item"><input type="checkbox" name="adSensors" value="pressure" ${chk(sensorTypes,'pressure')}><span><i class="fas fa-weight"></i> Pressure</span></label>
+                <label class="checkbox-item"><input type="checkbox" name="adSensors" value="light" ${chk(sensorTypes,'light')}><span><i class="fas fa-lightbulb"></i> Light</span></label>
+                <label class="checkbox-item"><input type="checkbox" name="adSensors" value="proximity" ${chk(sensorTypes,'proximity')}><span><i class="fas fa-hand-paper"></i> Proximity</span></label>
+            </div>
+            </div>
+
+            <div class="form-section"><h4><i class="fas fa-satellite"></i> GPS / Location</h4>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="adminGpsStatus">GPS Status</label>
+                    <select id="adminGpsStatus">
+                        <option value="Active" ${sel(device?.tracker?.gpsStatus,'Active') || (!device ? 'selected' : '')}>Active</option>
+                        <option value="Inactive" ${sel(device?.tracker?.gpsStatus,'Inactive')}>Inactive</option>
+                        <option value="Searching" ${sel(device?.tracker?.gpsStatus,'Searching')}>Searching</option>
+                    </select>
+                </div>
+                <div class="form-group"></div>
             </div>
             <div class="form-row">
                 <div class="form-group">
                     <label for="adminDeviceLat">Latitude</label>
-                    <input type="number" step="any" id="adminDeviceLat" value="${device && device.latitude != null ? device.latitude : ''}" placeholder="e.g. 56.946">
+                    <input type="number" step="any" id="adminDeviceLat" value="${device?.latitude != null ? device.latitude : ''}" placeholder="e.g. 56.946">
                 </div>
                 <div class="form-group">
                     <label for="adminDeviceLng">Longitude</label>
-                    <input type="number" step="any" id="adminDeviceLng" value="${device && device.longitude != null ? device.longitude : ''}" placeholder="e.g. 24.105">
+                    <input type="number" step="any" id="adminDeviceLng" value="${device?.longitude != null ? device.longitude : ''}" placeholder="e.g. 24.105">
                 </div>
             </div>
-            <div style="display:flex;gap:0.5rem;margin-top:1rem;">
-                <button type="button" class="btn btn-primary" onclick="saveAdminDevice('${isEdit ? device.id : ''}')"><i class="fas fa-save"></i> ${isEdit ? 'Update' : 'Create'} Device</button>
+            </div>
+
+            <div class="form-section"><h4><i class="fas fa-truck"></i> Logistics Monitoring</h4>
+            <div class="form-row">
+                <div class="form-group checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="adminLogisticsEnabled" ${logistics.monitoringEnabled !== false ? 'checked' : ''}>
+                        <span>Enable logistics monitoring for this device</span>
+                    </label>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="adminTempMin">Temperature Min (&deg;C)</label>
+                    <input type="number" step="0.1" id="adminTempMin" value="${v(logistics.tempMin, -10)}">
+                </div>
+                <div class="form-group">
+                    <label for="adminTempMax">Temperature Max (&deg;C)</label>
+                    <input type="number" step="0.1" id="adminTempMax" value="${v(logistics.tempMax, 30)}">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="adminHumidityMin">Humidity Min (%)</label>
+                    <input type="number" step="0.1" id="adminHumidityMin" value="${v(logistics.humidityMin, 20)}">
+                </div>
+                <div class="form-group">
+                    <label for="adminHumidityMax">Humidity Max (%)</label>
+                    <input type="number" step="0.1" id="adminHumidityMax" value="${v(logistics.humidityMax, 80)}">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="adminTiltMax">Max Tilt (deg)</label>
+                    <input type="number" step="0.1" id="adminTiltMax" value="${v(logistics.tiltMax, 30)}">
+                </div>
+                <div class="form-group">
+                    <label for="adminCollisionMaxG">Max Collision (g)</label>
+                    <input type="number" step="0.1" id="adminCollisionMaxG" value="${v(logistics.collisionMaxG, 2.5)}">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="adminDeliveryGrace">Delivery Grace (min)</label>
+                    <input type="number" id="adminDeliveryGrace" min="0" max="1440" step="5" value="${v(logistics.deliveryGraceMinutes, 30)}">
+                </div>
+                <div class="form-group">
+                    <label for="adminAlertCooldown">Alert Cooldown (min)</label>
+                    <input type="number" id="adminAlertCooldown" min="1" max="720" step="1" value="${v(logistics.alertCooldownMinutes, 15)}">
+                </div>
+            </div>
+            </div>
+
+            <div class="form-actions" style="margin-top:1.25rem;">
                 <button type="button" class="btn btn-outline" onclick="closeAdminDeviceModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveAdminDevice('${isEdit ? device.id : ''}')"><i class="fas fa-save"></i> ${isEdit ? 'Update' : 'Create'} Device</button>
             </div>
         </form>
     `;
@@ -3216,9 +3370,11 @@ async function saveAdminDevice(existingId) {
     const id = existingId || (document.getElementById('adminDeviceId')?.value || '').trim();
     const name = (document.getElementById('adminDeviceName')?.value || '').trim();
     const type = document.getElementById('adminDeviceType')?.value || 'Tracker';
+    const model = (document.getElementById('adminDeviceModel')?.value || '').trim();
     const status = document.getElementById('adminDeviceStatus')?.value || 'active';
     const namespace = document.getElementById('adminDeviceNamespace')?.value || '';
     const group = (document.getElementById('adminDeviceGroup')?.value || '').trim();
+    const asset = (document.getElementById('adminDeviceAsset')?.value || '').trim();
     const lat = document.getElementById('adminDeviceLat')?.value;
     const lng = document.getElementById('adminDeviceLng')?.value;
 
@@ -3231,14 +3387,76 @@ async function saveAdminDevice(existingId) {
         return;
     }
 
+    const selectedNetworks = [];
+    document.querySelectorAll('#adminDeviceForm input[name="adNetworks"]:checked').forEach(cb => selectedNetworks.push(cb.value));
+
+    const sensorDefs = {
+        'temperature': { name: 'Temperature Sensor', unit: '°C', description: 'Ambient temperature monitoring' },
+        'humidity': { name: 'Humidity Sensor', unit: '%', description: 'Relative humidity monitoring' },
+        'accelerometer': { name: 'Accelerometer', unit: 'g', description: 'Motion and vibration detection' },
+        'gyroscope': { name: 'Gyroscope', unit: '°/s', description: 'Angular velocity measurement' },
+        'magnetometer': { name: 'Magnetometer', unit: 'μT', description: 'Magnetic field detection' },
+        'pressure': { name: 'Pressure Sensor', unit: 'hPa', description: 'Atmospheric pressure monitoring' },
+        'light': { name: 'Light Sensor', unit: 'lux', description: 'Ambient light detection' },
+        'proximity': { name: 'Proximity Sensor', unit: 'cm', description: 'Object proximity detection' }
+    };
+    const selectedSensors = [];
+    document.querySelectorAll('#adminDeviceForm input[name="adSensors"]:checked').forEach(cb => {
+        const def = sensorDefs[cb.value];
+        if (def) selectedSensors.push({ type: cb.value, name: def.name, unit: def.unit, description: def.description, value: null });
+    });
+
+    const gpsStatus = document.getElementById('adminGpsStatus')?.value || 'Active';
+    const deviceStatus = gpsStatus.toLowerCase() === 'active' ? (status || 'active') : status;
+
+    const lteImei = (document.getElementById('adminLteImei')?.value || '').trim();
+    const lteSimIccid = (document.getElementById('adminLteSimIccid')?.value || '').trim();
+    const lteCarrier = (document.getElementById('adminLteCarrier')?.value || '').trim();
+    const lteApn = (document.getElementById('adminLteApn')?.value || '').trim();
+    const lteDataFormat = document.getElementById('adminLteDataFormat')?.value || 'json';
+    const lteFrequency = document.getElementById('adminLteFrequency')?.value || '5000';
+
+    const logisticsEnabled = document.getElementById('adminLogisticsEnabled')?.checked !== false;
+    const toNum = (id, fallback) => { const raw = document.getElementById(id)?.value; return raw !== '' && raw != null ? Number(raw) : fallback; };
+
     const payload = {
         id,
         name,
         type,
-        status,
+        model,
+        status: deviceStatus,
         group: group || undefined,
+        asset: asset || '',
         latitude: lat ? parseFloat(lat) : undefined,
-        longitude: lng ? parseFloat(lng) : undefined
+        longitude: lng ? parseFloat(lng) : undefined,
+        networks: selectedNetworks.length > 0 ? selectedNetworks : ['GPS/GNSS'],
+        sensors: selectedSensors,
+        tracker: {
+            gpsStatus,
+            satellites: null,
+            accuracy: null,
+            lastFix: existingId ? undefined : null
+        },
+        lte: {
+            model,
+            imei: lteImei,
+            simIccid: lteSimIccid,
+            carrier: lteCarrier,
+            apn: lteApn,
+            dataFormat: lteDataFormat,
+            dataLogFrequency: lteFrequency
+        },
+        logistics: {
+            monitoringEnabled: logisticsEnabled,
+            tempMin: toNum('adminTempMin', -10),
+            tempMax: toNum('adminTempMax', 30),
+            humidityMin: toNum('adminHumidityMin', 20),
+            humidityMax: toNum('adminHumidityMax', 80),
+            tiltMax: toNum('adminTiltMax', 30),
+            collisionMaxG: toNum('adminCollisionMaxG', 2.5),
+            deliveryGraceMinutes: toNum('adminDeliveryGrace', 30),
+            alertCooldownMinutes: toNum('adminAlertCooldown', 15)
+        }
     };
 
     if (namespace.startsWith('user:')) {
