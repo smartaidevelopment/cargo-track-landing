@@ -964,6 +964,10 @@ function viewUserDetails(userId) {
                     <i class="fas fa-info-circle" style="color: var(--primary-color);"></i> Contact Information
                 </h3>
                 <div class="detail-item" style="margin-bottom: 1rem;">
+                    <span class="detail-label" style="display: block; font-weight: 600; margin-bottom: 0.25rem; color: var(--text-light);">User ID:</span>
+                    <span class="detail-value" style="font-size: 0.9rem; color: var(--text-dark);"><code>${user.id}</code></span>
+                </div>
+                <div class="detail-item" style="margin-bottom: 1rem;">
                     <span class="detail-label" style="display: block; font-weight: 600; margin-bottom: 0.25rem; color: var(--text-light);">Email:</span>
                     <span class="detail-value" style="font-size: 1rem; color: var(--text-dark);">${user.email}</span>
                 </div>
@@ -1000,6 +1004,14 @@ function viewUserDetails(userId) {
                     <span class="detail-value" style="font-size: 1rem;">
                         <span class="status-badge ${user.isActive !== false ? 'active' : 'inactive'}">${user.isActive !== false ? 'Active' : 'Inactive'}</span>
                     </span>
+                </div>
+                <div class="detail-item" style="margin-bottom: 1rem;">
+                    <span class="detail-label" style="display: block; font-weight: 600; margin-bottom: 0.25rem; color: var(--text-light);">Plan Tier:</span>
+                    <span class="detail-value" style="font-size: 1rem; color: var(--text-dark);">${user.planTier || 'individual'}</span>
+                </div>
+                <div class="detail-item" style="margin-bottom: 1rem;">
+                    <span class="detail-label" style="display: block; font-weight: 600; margin-bottom: 0.25rem; color: var(--text-light);">Tenant ID:</span>
+                    <span class="detail-value" style="font-size: 0.9rem; color: var(--text-dark);"><code>${user.tenantId || 'None'}</code></span>
                 </div>
                 <div class="detail-item">
                     <span class="detail-label" style="display: block; font-weight: 600; margin-bottom: 0.25rem; color: var(--text-light);">Joined:</span>
