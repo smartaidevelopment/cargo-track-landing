@@ -694,7 +694,21 @@ function clearUserFilters() {
     filterUsers();
 }
 
-function loadAllUsers() {
+async function loadAllUsers() {
+    try {
+        const response = await fetch('/api/users', {
+            headers: getApiAuthHeaders(),
+            cache: 'no-store'
+        });
+        if (response.ok) {
+            const data = await response.json();
+            if (Array.isArray(data.users)) {
+                saveUsers(data.users);
+            }
+        }
+    } catch (e) {
+        // Fall back to localStorage
+    }
     const users = getUsers();
     const tableBody = document.getElementById('usersManagementTable');
     if (!tableBody) return;
@@ -1122,10 +1136,11 @@ function toggleUserStatus(userId) {
 async function deleteUser(userId) {
     const users = getUsers();
     const user = users.find(u => u.id === userId);
-    if (!user) return;
-    
-    if (!confirm(`Are you sure you want to delete user ${user.email}? This action cannot be undone.`)) return;
+    const userLabel = user ? user.email : userId;
 
+    if (!confirm(`Are you sure you want to delete user ${userLabel}? This action cannot be undone.`)) return;
+
+    let serverOk = false;
     try {
         const response = await fetch(`/api/users?userId=${encodeURIComponent(userId)}`, {
             method: 'DELETE',
@@ -1136,18 +1151,24 @@ async function deleteUser(userId) {
             alert('Failed to delete user: ' + (data.error || response.statusText));
             return;
         }
+        serverOk = true;
     } catch (err) {
-        console.warn('Server delete failed, removing locally:', err);
+        console.warn('Server delete request failed:', err);
+        alert('Failed to delete user: network error. Please try again.');
+        return;
     }
 
-    const filtered = users.filter(u => u.id !== userId);
-    saveUsers(filtered);
-    logSecurityEvent('user_deletion', user.email, 'success');
-    loadAllUsers();
-    fetchTenants().then(() => {
-        if (typeof renderResellerTenants === 'function') renderResellerTenants();
-    }).catch(() => {});
-    alert('User deleted successfully!');
+    if (serverOk) {
+        const freshUsers = getUsers();
+        const filtered = freshUsers.filter(u => u.id !== userId);
+        saveUsers(filtered);
+        logSecurityEvent('user_deletion', userLabel, 'success');
+        loadAllUsers();
+        fetchTenants().then(() => {
+            if (typeof renderResellerTenants === 'function') renderResellerTenants();
+        }).catch(() => {});
+        showNotification('User deleted successfully.', 'success');
+    }
 }
 
 function showAddUserForm() {
