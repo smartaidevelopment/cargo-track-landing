@@ -377,7 +377,6 @@ async function updateAdminGlobalMap() {
 }
 
 function loadAdminDashboard() {
-    // Safe function calls with fallbacks
     const getUsersFn = window.getUsers || (typeof getUsers !== 'undefined' ? getUsers : null);
     const getAllDevicesFn = window.getAllDevices || (typeof getAllDevices !== 'undefined' ? getAllDevices : null);
     const getPaymentTransactionsFn = window.getPaymentTransactions || (typeof getPaymentTransactions !== 'undefined' ? getPaymentTransactions : null);
@@ -385,26 +384,61 @@ function loadAdminDashboard() {
     const users = getUsersFn ? getUsersFn() : [];
     const devices = getAllDevicesFn ? getAllDevicesFn() : [];
     const payments = getPaymentTransactionsFn ? getPaymentTransactionsFn() : [];
+
+    const activeUsers = users.filter(u => u.isActive);
     
-    // Update stats
     document.getElementById('adminTotalUsers').textContent = users.length;
     document.getElementById('adminTotalDevices').textContent = devices.length;
-    document.getElementById('adminActiveSubscriptions').textContent = users.filter(u => u.isActive).length;
+    document.getElementById('adminActiveSubscriptions').textContent = activeUsers.length;
     
-    // Calculate revenue
-    const totalRevenue = payments
-        .filter(p => p.status === 'completed')
-        .reduce((sum, p) => sum + parseFloat(p.amount.replace('$', '').replace(',', '')), 0);
+    const completedPayments = payments.filter(p => p.status === 'completed');
+    const totalRevenue = completedPayments
+        .reduce((sum, p) => sum + parseFloat((p.amount || '0').replace('$', '').replace(',', '')), 0);
     document.getElementById('adminTotalRevenue').textContent = '$' + totalRevenue.toLocaleString();
-    
-    // Load recent users
+
+    // Compute real change indicators
+    const now = new Date();
+    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+
+    const newUsersThisWeek = users.filter(u => u.createdAt && new Date(u.createdAt) >= oneWeekAgo).length;
+    renderChangeIndicator('adminUsersChange', newUsersThisWeek, 'this week', true);
+
+    const revenueThisMonth = completedPayments
+        .filter(p => p.date && new Date(p.date) >= thisMonthStart)
+        .reduce((sum, p) => sum + parseFloat((p.amount || '0').replace('$', '').replace(',', '')), 0);
+    const revenueLastMonth = completedPayments
+        .filter(p => p.date && new Date(p.date) >= lastMonthStart && new Date(p.date) <= lastMonthEnd)
+        .reduce((sum, p) => sum + parseFloat((p.amount || '0').replace('$', '').replace(',', '')), 0);
+    const revenuePct = revenueLastMonth > 0 ? Math.round(((revenueThisMonth - revenueLastMonth) / revenueLastMonth) * 100) : (revenueThisMonth > 0 ? 100 : 0);
+    renderChangeIndicator('adminRevenueChange', revenuePct, 'this month', false, true);
+
+    const newDevicesThisMonth = devices.filter(d => {
+        const created = d.createdAt || d.addedAt;
+        return created && new Date(created) >= thisMonthStart;
+    }).length;
+    renderChangeIndicator('adminDevicesChange', newDevicesThisMonth, 'this month', true);
+
+    const activeRate = users.length > 0 ? Math.round((activeUsers.length / users.length) * 100) : 0;
+    renderChangeIndicator('adminSubscriptionsChange', activeRate, 'active rate', false, true);
+
     loadRecentUsers(users.slice(-5).reverse());
-    
-    // Load activity
     loadAdminActivity();
-    
-    // Initialize revenue chart
     initRevenueChart(payments);
+}
+
+function renderChangeIndicator(elementId, value, label, isCount, isPercent) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    const isPositive = value > 0;
+    const isNeutral = value === 0;
+    el.className = 'stat-change ' + (isNeutral ? 'neutral' : (isPositive ? 'positive' : 'negative'));
+    const icon = isNeutral ? 'fas fa-minus' : (isPositive ? 'fas fa-arrow-up' : 'fas fa-arrow-down');
+    const prefix = isCount ? (isPositive ? '+' : '') : (isPositive ? '+' : '');
+    const suffix = isPercent ? '%' : '';
+    el.innerHTML = '<i class="' + icon + '"></i> ' + prefix + value + suffix + ' ' + label;
 }
 
 function loadRecentUsers(users) {
