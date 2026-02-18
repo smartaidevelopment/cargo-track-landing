@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Check if already logged in (with a small delay to prevent race conditions)
     setTimeout(() => {
         if (isAuthenticated()) {
-            window.location.replace('dashboard.html');
+            window.location.replace('dashboard.html?v=20260213e');
             return;
         }
     }, 50);
@@ -43,82 +43,148 @@ document.addEventListener('DOMContentLoaded', function() {
         loadingOverlay.innerHTML = '<div style="text-align: center;"><div style="font-size: 2rem; margin-bottom: 1rem;">📦</div><div>Signing in...</div></div>';
         document.body.appendChild(loadingOverlay);
         
-        // Small delay to ensure UI updates before auth check
         setTimeout(async () => {
-            // Authenticate user
-            const result = authenticateUser(email, password);
-            
-            if (result.success) {
-                // Verify session was saved multiple times
-                let sessionVerified = false;
-                for (let i = 0; i < 5; i++) {
-                    const sessionCheck = localStorage.getItem('cargotrack_auth');
-                    if (sessionCheck) {
-                        try {
-                            const parsed = JSON.parse(sessionCheck);
-                            if (parsed && parsed.userId && parsed.email === email) {
-                                sessionVerified = true;
-                                break;
-                            }
-                        } catch (e) {
-                            console.error('Session parse error:', e);
-                        }
-                    }
-                    // Small delay between checks
-                    await new Promise(resolve => setTimeout(resolve, 50));
-                }
-                
-                if (!sessionVerified) {
-                    // Session not saved, try again
-                    document.body.classList.remove('logging-in');
-                    submitButton.disabled = false;
-                    submitButton.innerHTML = originalButtonText;
-                    loadingOverlay.remove();
-                    errorMessage.textContent = 'Login failed. Please try again.';
-                    errorMessage.style.display = 'block';
-                    return;
-                }
-                
-                // Update overlay message
-                loadingOverlay.innerHTML = '<div style="text-align: center;"><div style="font-size: 2rem; margin-bottom: 1rem;">✅</div><div>Login successful! Redirecting...</div></div>';
-                
-                // Clear redirect flags before redirecting
-                window.authRedirectInProgress = false;
-                window.authCheckDone = false;
-                window.authVerified = false;
-                
-                // Force a synchronous localStorage flush by reading it back
-                // This ensures the data is committed before redirect
-                try {
-                    const verifyAuth = localStorage.getItem('cargotrack_auth');
-                    if (!verifyAuth) {
-                        throw new Error('Session not saved');
-                    }
-                } catch (e) {
-                    console.error('Session verification failed:', e);
-                    document.body.classList.remove('logging-in');
-                    submitButton.disabled = false;
-                    submitButton.innerHTML = originalButtonText;
-                    loadingOverlay.remove();
-                    errorMessage.textContent = 'Login failed. Please try again.';
-                    errorMessage.style.display = 'block';
-                    return;
-                }
-                
-                // Session verified, redirect after a delay to ensure localStorage is synced
-                setTimeout(() => {
-                    // Use replace to avoid adding to history and prevent back button issues
-                    window.location.replace('dashboard.html');
-                }, 300); // Increased delay to ensure localStorage is fully synced across browser contexts
-            } else {
-                // Re-enable form and show error
+            const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+            const showError = (msg) => {
                 document.body.classList.remove('logging-in');
                 submitButton.disabled = false;
                 submitButton.innerHTML = originalButtonText;
                 loadingOverlay.remove();
-                errorMessage.textContent = result.message || 'Invalid email or password';
+                errorMessage.textContent = msg;
                 errorMessage.style.display = 'block';
+            };
+
+            const requestTokenWithRetry = async (role, loginEmail, loginPassword, maxAttempts = 3) => {
+                for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                    const tokenResult = await requestSessionToken(role, loginEmail, loginPassword);
+                    if (tokenResult && tokenResult.success) {
+                        return tokenResult;
+                    }
+                    if (attempt < maxAttempts) {
+                        await wait(250 * attempt);
+                    }
+                }
+                return { success: false, message: 'Unable to establish secure API session.' };
+            };
+
+            const serverLogin = async () => {
+                try {
+                    const resp = await fetch('/api/session', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ role: 'user', email, password })
+                    });
+                    if (!resp.ok) return null;
+                    const data = await resp.json();
+                    if (!data || !data.token) return null;
+                    return data;
+                } catch (e) {
+                    return null;
+                }
+            };
+
+            let result = authenticateUser(email, password);
+
+            if (!result.success) {
+                const serverData = await serverLogin();
+                if (serverData && serverData.token && serverData.user) {
+                    const u = serverData.user;
+                    const users = getUsers();
+                    if (!users.find(x => x.email === u.email)) {
+                        users.push({
+                            id: u.id,
+                            email: u.email,
+                            password: password,
+                            company: u.company || '',
+                            phone: u.phone || '',
+                            package: u.package || '',
+                            planTier: u.planTier || 'individual',
+                            tenantId: u.tenantId || null,
+                            role: 'user',
+                            devices: u.devices || 1,
+                            createdAt: u.createdAt || new Date().toISOString(),
+                            isActive: true
+                        });
+                        saveUsers(users);
+                    }
+                    const session = {
+                        userId: u.id,
+                        email: u.email,
+                        company: u.company || '',
+                        package: u.package || '',
+                        planTier: u.planTier || 'individual',
+                        tenantId: u.tenantId || null,
+                        loginTime: new Date().toISOString()
+                    };
+                    try { localStorage.setItem('cargotrack_auth', JSON.stringify(session)); } catch(e) {}
+                    try { localStorage.setItem('cargotrack_session_token', serverData.token); } catch(e) {}
+                    try { localStorage.setItem('cargotrack_session_role', 'user'); } catch(e) {}
+
+                    if (window.AurionStorageSync && typeof window.AurionStorageSync.refresh === 'function') {
+                        window.AurionStorageSync.refresh();
+                    }
+
+                    loadingOverlay.innerHTML = '<div style="text-align: center;"><div style="font-size: 2rem; margin-bottom: 1rem;">✅</div><div>Login successful! Redirecting...</div></div>';
+                    window.authRedirectInProgress = false;
+                    window.authCheckDone = false;
+                    window.authVerified = false;
+                    setTimeout(() => { window.location.replace('dashboard.html?v=20260213e'); }, 300);
+                    return;
+                }
+                showError(result.message || 'Invalid email or password');
+                return;
             }
+
+            let sessionVerified = false;
+            for (let i = 0; i < 5; i++) {
+                const sessionCheck = localStorage.getItem('cargotrack_auth');
+                if (sessionCheck) {
+                    try {
+                        const parsed = JSON.parse(sessionCheck);
+                        if (parsed && parsed.userId && parsed.email === email) {
+                            sessionVerified = true;
+                            break;
+                        }
+                    } catch (e) {}
+                }
+                await wait(50);
+            }
+
+            if (!sessionVerified) {
+                showError('Login failed. Please try again.');
+                return;
+            }
+
+            if (typeof requestSessionToken === 'function') {
+                const tokenResult = await requestTokenWithRetry('user', email, password, 3);
+                if (!tokenResult.success) {
+                    localStorage.removeItem('cargotrack_session_token');
+                    localStorage.removeItem('cargotrack_session_role');
+                    localStorage.removeItem('cargotrack_auth');
+                    showError('Secure session setup failed. Please try again.');
+                    return;
+                } else if (window.AurionStorageSync && typeof window.AurionStorageSync.refresh === 'function') {
+                    window.AurionStorageSync.refresh();
+                }
+            }
+
+            loadingOverlay.innerHTML = '<div style="text-align: center;"><div style="font-size: 2rem; margin-bottom: 1rem;">✅</div><div>Login successful! Redirecting...</div></div>';
+            window.authRedirectInProgress = false;
+            window.authCheckDone = false;
+            window.authVerified = false;
+
+            try {
+                const verifyAuth = localStorage.getItem('cargotrack_auth');
+                if (!verifyAuth) throw new Error('Session not saved');
+            } catch (e) {
+                showError('Login failed. Please try again.');
+                return;
+            }
+
+            setTimeout(() => {
+                window.location.replace('dashboard.html?v=20260213e');
+            }, 300);
         }, 100);
     });
 });
