@@ -3148,6 +3148,22 @@ async function loadAllDevices() {
 
         if (filter !== 'all' && conn.group !== filter) return;
 
+        if (!device.tenantName && device.ownerNamespace) {
+            if (device.ownerNamespace.startsWith('tenant:')) {
+                const tId = device.ownerNamespace.replace('tenant:', '');
+                const t = resellerTenantsCache.find(x => x.id === tId);
+                if (t) { device.tenantName = t.name; device.tenantId = tId; }
+            } else if (device.ownerNamespace.startsWith('user:')) {
+                const uId = device.ownerNamespace.replace('user:', '');
+                const allUsers = getUsers();
+                const u = allUsers.find(x => x.id === uId);
+                if (u?.tenantId) {
+                    const t = resellerTenantsCache.find(x => x.id === u.tenantId);
+                    if (t) { device.tenantName = t.name; device.tenantId = u.tenantId; }
+                }
+            }
+        }
+
         const searchStr = `${device.id} ${device.name} ${device.ownerEmail} ${device.tenantName || ''} ${device.type || ''}`.toLowerCase();
         if (search && !searchStr.includes(search)) return;
 
@@ -3283,6 +3299,22 @@ function viewDeviceAdmin(deviceId) {
     if (!modal || !body) return;
 
     title.textContent = `Device: ${device.name || device.id}`;
+
+    if (!device.tenantName && device.ownerNamespace) {
+        if (device.ownerNamespace.startsWith('tenant:')) {
+            const tId = device.ownerNamespace.replace('tenant:', '');
+            const t = resellerTenantsCache.find(x => x.id === tId);
+            if (t) { device.tenantName = t.name; device.tenantId = tId; }
+        } else if (device.ownerNamespace.startsWith('user:')) {
+            const uId = device.ownerNamespace.replace('user:', '');
+            const allUsers = getUsers();
+            const owner = allUsers.find(u => u.id === uId);
+            if (owner?.tenantId) {
+                const t = resellerTenantsCache.find(x => x.id === owner.tenantId);
+                if (t) { device.tenantName = t.name; device.tenantId = owner.tenantId; }
+            }
+        }
+    }
 
     const conn = adminConnectionStatus(device);
     const lastSeen = adminLastSeenText(device);
@@ -3873,7 +3905,17 @@ async function saveAdminDevice(existingId) {
         if (owner) {
             payload.ownerEmail = owner.email;
             payload.ownerCompany = owner.company || '';
+            if (owner.tenantId) {
+                payload.tenantId = owner.tenantId;
+                const tenant = resellerTenantsCache.find(t => t.id === owner.tenantId);
+                if (tenant) payload.tenantName = tenant.name;
+            }
         }
+    } else if (namespace.startsWith('tenant:')) {
+        const tId = namespace.replace('tenant:', '');
+        payload.tenantId = tId;
+        const tenant = resellerTenantsCache.find(t => t.id === tId);
+        if (tenant) payload.tenantName = tenant.name;
     }
 
     try {

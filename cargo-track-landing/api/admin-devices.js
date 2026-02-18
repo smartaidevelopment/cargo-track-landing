@@ -109,6 +109,12 @@ async function handleGet(req, res, session) {
                     tenantName = tenant?.name || null;
                 } else if (namespace.startsWith('user:')) {
                     ownerUserId = namespace.replace('user:', '');
+                    const owner = userMap.get(ownerUserId);
+                    if (owner?.tenantId) {
+                        tenantId = owner.tenantId;
+                        const tenant = tenantMap.get(tenantId);
+                        tenantName = tenant?.name || null;
+                    }
                 }
 
                 return parsed.map((device) => ({
