@@ -18,7 +18,7 @@
     const DEVICE_REGISTRY_KEY = 'cargotrack_device_registry';
     const ALERTS_LIST_KEY = 'cargotrack_alerts';
     const ALERTS_MAX_ENTRIES = 2000;
-    const EXCLUDED_KEYS = new Set(['cargotrack_auth', 'cargotrack_admin']);
+    const EXCLUDED_KEYS = new Set(['cargotrack_auth', 'cargotrack_admin', 'cargotrack_session_token', 'cargotrack_session_role']);
     const pendingSync = new Map();
     let isApplyingServerData = false;
     let hasCompletedInitialSync = false;

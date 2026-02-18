@@ -3,16 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="CargoTrack Pro Dashboard - Monitor your cargo tracking devices in real-time">
+    <meta name="description" content="Aurion Dashboard - Monitor your cargo tracking devices in real-time">
     <meta name="robots" content="noindex, nofollow">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
     <link rel="shortcut icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
-    <title>Dashboard - CargoTrack Pro</title>
+    <title>Dashboard - Aurion</title>
     <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="dashboard.css">
+    <link rel="stylesheet" href="dashboard.css?v=20260215a">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="auth.js"></script>
+    <script src="storage-sync.js?v=20260218a"></script>
+    <script src="auth.js?v=20260218a"></script>
     <script>
         // Check if using file:// protocol (won't work properly)
         if (window.location.protocol === 'file:') {
@@ -159,7 +160,7 @@
         }
     </style>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.js"></script>
 </head>
 <body class="dashboard">
     <!-- Loading overlay to prevent flicker during auth check -->
@@ -175,7 +176,6 @@
         <div class="sidebar-header">
             <div class="sidebar-brand">
                 <i class="fas fa-satellite-dish"></i>
-                <span>CargoTrack Pro</span>
             </div>
         </div>
         
@@ -186,7 +186,7 @@
             </a>
             <a href="#devices" class="nav-item" data-section="devices">
                 <i class="fas fa-map-marked-alt"></i>
-                <span>Live Tracking</span>
+                <span>Map</span>
             </a>
             <a href="#alerts" class="nav-item" data-section="alerts">
                 <i class="fas fa-bell"></i>
@@ -197,17 +197,61 @@
                 <i class="fas fa-chart-line"></i>
                 <span>Analytics</span>
             </a>
-            <a href="#devices-management" class="nav-item" data-section="devices-management">
-                <i class="fas fa-cog"></i>
-                <span>Devices</span>
-            </a>
+            <div class="nav-group" id="intelligenceNavGroup">
+                <button type="button" class="nav-item nav-item-toggle" data-toggle="intelligence-menu" aria-expanded="false">
+                    <i class="fas fa-brain"></i>
+                    <span>Intelligence</span>
+                </button>
+                <div class="nav-submenu" id="intelligence-menu">
+                    <a href="#risk-overview" class="nav-item nav-subitem" data-section="risk-overview">
+                        <i class="fas fa-shield-halved"></i>
+                        <span>Risk Overview</span>
+                    </a>
+                    <a href="#compliance-reports" class="nav-item nav-subitem" data-section="compliance-reports">
+                        <i class="fas fa-file-circle-check"></i>
+                        <span>Compliance</span>
+                    </a>
+                    <a href="#insurance-pricing" class="nav-item nav-subitem" data-section="insurance-pricing">
+                        <i class="fas fa-hand-holding-dollar"></i>
+                        <span>Insurance</span>
+                    </a>
+                </div>
+            </div>
+            <div class="nav-group" id="configNavGroup">
+                <button type="button" class="nav-item nav-item-toggle" data-toggle="config-menu" aria-expanded="false">
+                    <i class="fas fa-sliders-h"></i>
+                    <span>Configuration</span>
+                </button>
+                <div class="nav-submenu" id="config-menu">
+                    <a href="#devices-management" class="nav-item nav-subitem" data-section="devices-management">
+                        <i class="fas fa-microchip"></i>
+                        <span>Devices</span>
+                    </a>
+                    <a href="#config-deliveries" class="nav-item nav-subitem" data-section="config-deliveries">
+                        <i class="fas fa-calendar-check"></i>
+                        <span>Deliveries</span>
+                    </a>
+                    <a href="#config-areas" class="nav-item nav-subitem" data-section="config-areas">
+                        <i class="fas fa-draw-polygon"></i>
+                        <span>Areas</span>
+                    </a>
+                    <a href="#config-assets" class="nav-item nav-subitem" data-section="config-assets">
+                        <i class="fas fa-boxes"></i>
+                        <span>Assets</span>
+                    </a>
+                    <a href="#config-groups" class="nav-item nav-subitem" data-section="config-groups">
+                        <i class="fas fa-layer-group"></i>
+                        <span>Groups</span>
+                    </a>
+                    <a href="#config-users" class="nav-item nav-subitem" data-section="config-users">
+                        <i class="fas fa-users"></i>
+                        <span>Users</span>
+                    </a>
+                </div>
+            </div>
             <a href="#settings" class="nav-item" data-section="settings">
                 <i class="fas fa-user-cog"></i>
                 <span>Settings</span>
-            </a>
-            <a href="#privacy" class="nav-item" data-section="privacy">
-                <i class="fas fa-shield-alt"></i>
-                <span>Privacy & Data</span>
             </a>
             <a href="#billing" class="nav-item" data-section="billing">
                 <i class="fas fa-file-invoice-dollar"></i>
@@ -216,16 +260,7 @@
         </nav>
         
         <div class="sidebar-footer">
-            <div class="user-info">
-                <div class="user-avatar">
-                    <i class="fas fa-user"></i>
-                </div>
-                <div class="user-details">
-                    <span class="user-name" id="userName">User</span>
-                    <span class="user-email" id="userEmail">user@email.com</span>
-                </div>
-            </div>
-            <button class="btn btn-outline btn-small" id="logoutBtn">
+            <button class="btn btn-outline btn-small sidebar-logout-btn" id="logoutBtn">
                 <i class="fas fa-sign-out-alt"></i> Logout
             </button>
         </div>
@@ -233,119 +268,153 @@
 
     <!-- Main Content -->
     <main class="main-content">
-        <!-- Top Bar -->
-        <header class="topbar">
-            <div class="topbar-left">
-                <h1 class="page-title" id="pageTitle">Dashboard</h1>
+        <div id="emailVerifyBanner" class="email-verify-banner" style="display:none;">
+            <div class="email-verify-banner-content">
+                <i class="fas fa-envelope"></i>
+                <span>Please verify your email address. Check your inbox for a confirmation link.</span>
+                <button id="resendVerifyBtn" class="btn btn-small btn-outline" style="margin-left:0.75rem;">Resend email</button>
             </div>
-            <div class="topbar-right">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" placeholder="Search devices...">
-                </div>
-                <div class="notifications">
-                    <button class="notification-btn" id="notificationBtn" aria-haspopup="true" aria-expanded="false">
-                        <i class="fas fa-bell"></i>
-                        <span class="notification-count" id="notificationCount">0</span>
-                    </button>
-                    <div class="notification-dropdown" id="notificationDropdown" aria-hidden="true">
-                        <div class="notification-dropdown-header">
-                            <span>Notifications</span>
-                            <div class="notification-dropdown-actions">
-                                <button class="notification-action" type="button" id="notificationMarkAllRead">Mark all read</button>
-                                <button class="notification-action" type="button" id="notificationViewAll">View All</button>
-                            </div>
-                        </div>
-                        <div class="notification-dropdown-body" id="notificationDropdownBody">
-                            <p class="empty-state">No alerts at this time</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </header>
+            <button id="dismissVerifyBanner" class="email-verify-dismiss" title="Dismiss"><i class="fas fa-times"></i></button>
+        </div>
+        <input type="text" id="deviceSearchInput" class="dashboard-search-proxy" aria-hidden="true" tabindex="-1">
 
         <!-- Dashboard Section -->
-        <section id="dashboard" class="content-section active">
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                        <i class="fas fa-shipping-fast"></i>
-                    </div>
-                    <div class="stat-content">
-                        <h3 id="totalDevices">0</h3>
-                        <p>Active Devices</p>
-                    </div>
-                </div>
-                
-                <div class="stat-card">
-                    <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
-                        <i class="fas fa-map-marker-alt"></i>
-                    </div>
-                    <div class="stat-content">
-                        <h3 id="activeShipments">0</h3>
-                        <p>Active Shipments</p>
-                    </div>
-                </div>
-                
-                <div class="stat-card">
-                    <div class="stat-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
-                        <i class="fas fa-exclamation-triangle"></i>
-                    </div>
-                    <div class="stat-content">
-                        <h3 id="activeAlerts">0</h3>
-                        <p>Active Alerts</p>
-                    </div>
-                </div>
-                
-                <div class="stat-card">
-                    <div class="stat-icon" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
-                        <i class="fas fa-check-circle"></i>
-                    </div>
-                    <div class="stat-content">
-                        <h3 id="completedShipments">0</h3>
-                        <p>Completed Today</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="dashboard-toolbar">
+        <section id="dashboard" class="content-section active dashboard-home">
+            <div class="dashboard-toolbar executive-toolbar">
                 <div class="dashboard-toolbar-left">
-                    <span class="dashboard-hint">Drag cards to reorder your dashboard.</span>
+                    <div class="dashboard-home-search">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="dashboardHomeSearch" placeholder="Search shipments, routes, devices...">
+                    </div>
                 </div>
                 <div class="dashboard-toolbar-right">
-                    <button class="btn btn-outline btn-small" id="toggleDashboardLayout">
-                        <i class="fas fa-sliders-h"></i> Modify Layout
+                    <div class="notifications dashboard-home-notifications">
+                        <button class="notification-btn" id="notificationBtn" aria-haspopup="true" aria-expanded="false">
+                            <i class="fas fa-bell"></i>
+                            <span class="notification-count" id="notificationCount">0</span>
+                        </button>
+                        <div class="notification-dropdown" id="notificationDropdown" aria-hidden="true">
+                            <div class="notification-dropdown-header">
+                                <span>Notifications</span>
+                                <div class="notification-dropdown-actions">
+                                    <button class="notification-action" type="button" id="notificationMarkAllRead">Mark all read</button>
+                                    <button class="notification-action" type="button" id="notificationViewAll">View All</button>
+                                </div>
+                            </div>
+                            <div class="notification-dropdown-body" id="notificationDropdownBody">
+                                <p class="empty-state">No alerts at this time</p>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn btn-outline btn-small btn-icon-only" id="resetDashboardLayout" aria-label="Reset layout" title="Reset layout">
+                        <i class="fas fa-rotate"></i>
+                    </button>
+                    <button class="btn btn-outline btn-small btn-icon-only" id="toggleDashboardLayout" aria-label="Modify layout">
+                        <i class="fas fa-sliders-h"></i>
+                    </button>
+                    <button class="dashboard-account-btn" id="toolbarAccountBtn" type="button" aria-label="Current account" title="Current account">
+                        <span class="dashboard-account-avatar" id="toolbarAccountAvatar">U</span>
+                        <i class="fas fa-chevron-down" aria-hidden="true"></i>
                     </button>
                 </div>
             </div>
 
-            <div class="dashboard-layout" id="dashboardLayout">
-                <div class="dashboard-card" data-layout-id="recent-activity">
+            <div class="dashboard-layout executive-layout" id="dashboardLayout">
+                <div class="dashboard-card full-width" data-layout-id="quick-stats">
                     <div class="card-header">
                         <div class="card-title">
-                            <h2>Recent Activity</h2>
+                            <h2>Overview</h2>
                             <span class="card-drag-handle" aria-hidden="true">
                                 <i class="fas fa-grip-vertical"></i>
                             </span>
                         </div>
-                        <button class="btn-icon">
-                            <i class="fas fa-ellipsis-v"></i>
-                        </button>
                     </div>
-                    <div class="activity-list" id="activityList">
-                        <!-- Activity items will be populated by JS -->
+                    <div class="card-content">
+                        <div class="mini-stats-grid">
+                            <div class="mini-stat-card mini-stat-card-executive mini-stat-card-active clickable" role="button" tabindex="0" data-target-section="devices-management">
+                                <div class="mini-stat-icon mini-stat-icon-devices">
+                                    <i class="far fa-clone"></i>
+                                </div>
+                                <div class="mini-stat-content">
+                                    <p class="kpi-label">Devices</p>
+                                    <h3 id="totalDevices">0</h3>
+                                    <p class="kpi-subtext" id="devicesKpiSubtext">Active</p>
+                                </div>
+                            </div>
+                            <div class="mini-stat-card mini-stat-card-executive clickable" role="button" tabindex="0" data-target-section="devices">
+                                <div class="mini-stat-icon mini-stat-icon-shipments">
+                                    <i class="fas fa-truck"></i>
+                                </div>
+                                <div class="mini-stat-content">
+                                    <p class="kpi-label">Shipments</p>
+                                    <h3 id="activeShipments">0</h3>
+                                    <p class="kpi-subtext" id="shipmentsKpiSubtext">In Transit</p>
+                                </div>
+                            </div>
+                            <div class="mini-stat-card mini-stat-card-executive clickable" role="button" tabindex="0" data-target-section="config-deliveries">
+                                <div class="mini-stat-icon mini-stat-icon-planned">
+                                    <i class="fas fa-calendar-check"></i>
+                                </div>
+                                <div class="mini-stat-content">
+                                    <p class="kpi-label">Planned</p>
+                                    <h3 id="plannedDeliveriesStat">0</h3>
+                                    <p class="kpi-subtext" id="plannedKpiSubtext">Upcoming</p>
+                                </div>
+                            </div>
+                            <div class="mini-stat-card mini-stat-card-executive mini-stat-card-alerts clickable" role="button" tabindex="0" data-target-section="alerts">
+                                <div class="mini-stat-icon mini-stat-icon-alerts">
+                                    <i class="fas fa-triangle-exclamation"></i>
+                                </div>
+                                <div class="mini-stat-content">
+                                    <p class="kpi-label">Alerts</p>
+                                    <h3 id="activeAlerts">0</h3>
+                                    <p class="kpi-subtext" id="alertsKpiSubtext">Unread</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-card full-width" data-layout-id="delay-report">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <h2>Delay Report</h2>
+                            <span class="card-drag-handle" aria-hidden="true">
+                                <i class="fas fa-grip-vertical"></i>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-content">
+                        <div class="delay-report-shell">
+                            <h3 class="delay-report-subtitle">Top Delays</h3>
+                            <div class="delay-report-list" id="delayTopDelaysList">
+                                <div class="delay-report-item is-empty">
+                                    <div class="delay-report-item-content">
+                                        <p class="delay-report-item-title">No delay data yet.</p>
+                                        <p class="delay-report-item-meta">Add deliveries to generate insights.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <button class="btn btn-outline delay-report-btn" id="viewDelayReportBtn" type="button">View Report</button>
+                        </div>
+                        <div class="delay-report-metrics" aria-hidden="true">
+                            <span id="delayTodayStat">0m</span>
+                            <span id="delayWeekStat">0m</span>
+                            <span id="delayMonthStat">0m</span>
+                            <span id="delayActiveCount">0</span>
+                        </div>
                     </div>
                 </div>
                 
-                <div class="dashboard-card" data-layout-id="temperature-monitoring">
+                <div class="dashboard-card dashboard-card-monitor" data-layout-id="temperature-monitoring">
                     <div class="card-header">
                         <div class="card-title">
-                            <h2>Temperature Monitoring</h2>
+                            <h2>Shipment Volume (Last 30 Days)</h2>
                             <span class="card-drag-handle" aria-hidden="true">
                                 <i class="fas fa-grip-vertical"></i>
                             </span>
                         </div>
-                        <button class="btn-icon">
+                        <button class="btn-icon card-menu-btn" type="button" data-card-menu="temperature">
                             <i class="fas fa-ellipsis-v"></i>
                         </button>
                     </div>
@@ -354,15 +423,15 @@
                     </div>
                 </div>
 
-                <div class="dashboard-card" data-layout-id="humidity-monitoring">
+                <div class="dashboard-card dashboard-card-monitor" data-layout-id="humidity-monitoring">
                     <div class="card-header">
                         <div class="card-title">
-                            <h2>Humidity Monitoring</h2>
+                            <h2>On-Time Delivery Rate</h2>
                             <span class="card-drag-handle" aria-hidden="true">
                                 <i class="fas fa-grip-vertical"></i>
                             </span>
                         </div>
-                        <button class="btn-icon">
+                        <button class="btn-icon card-menu-btn" type="button" data-card-menu="humidity">
                             <i class="fas fa-ellipsis-v"></i>
                         </button>
                     </div>
@@ -371,7 +440,74 @@
                     </div>
                 </div>
 
-                <div class="dashboard-card full-width" data-layout-id="device-status">
+                <div class="dashboard-card dashboard-card-monitor" data-layout-id="battery-monitoring">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <h2>Battery Level Trend</h2>
+                            <span class="card-drag-handle" aria-hidden="true">
+                                <i class="fas fa-grip-vertical"></i>
+                            </span>
+                        </div>
+                        <button class="btn-icon card-menu-btn" type="button" data-card-menu="battery">
+                            <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="batteryChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="dashboard-card full-width dashboard-card-map" data-layout-id="dashboard-map">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <span class="card-drag-handle" aria-hidden="true">
+                                <i class="fas fa-grip-vertical"></i>
+                            </span>
+                        </div>
+                        <div class="card-actions">
+                            <span class="badge" id="mapDeviceCount">0</span>
+                            <button class="btn btn-outline btn-small" id="refreshGlobalMapBtn">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+                    <div class="history-controls">
+                        <div class="history-field">
+                            <label for="historyDeviceSelect">Device</label>
+                            <select id="historyDeviceSelect"></select>
+                        </div>
+                        <div class="history-field">
+                            <label for="historyRangeSelect">Range</label>
+                            <select id="historyRangeSelect">
+                                <option value="24h">Last 24h</option>
+                                <option value="7d">Last 7 days</option>
+                                <option value="30d">Last 30 days</option>
+                                <option value="90d">Last 90 days</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
+                        <div class="history-field history-custom" id="historyCustomStart">
+                            <label for="historyStart">From</label>
+                            <input type="datetime-local" id="historyStart">
+                        </div>
+                        <div class="history-field history-custom" id="historyCustomEnd">
+                            <label for="historyEnd">To</label>
+                            <input type="datetime-local" id="historyEnd">
+                        </div>
+                        <div class="history-actions">
+                            <button class="btn btn-outline btn-small" type="button" id="historyApplyBtn">
+                                <i class="fas fa-route"></i> Show Route
+                            </button>
+                            <button class="btn btn-outline btn-small" type="button" id="historyClearBtn">
+                                <i class="fas fa-times"></i> Clear
+                            </button>
+                        </div>
+                    </div>
+                    <div class="history-status" id="historyStatus"></div>
+                    <div id="globalMap" class="dashboard-map-container"></div>
+                </div>
+
+                <div class="dashboard-card full-width dashboard-card-ops" data-layout-id="device-status">
                     <div class="card-header">
                         <div class="card-title">
                             <h2>Device Status Overview</h2>
@@ -380,10 +516,10 @@
                             </span>
                         </div>
                         <div class="card-actions">
-                            <button class="btn btn-outline btn-small">
+                            <button class="btn btn-outline btn-small" type="button" id="deviceStatusFilterBtn">
                                 <i class="fas fa-filter"></i> Filter
                             </button>
-                            <button class="btn btn-outline btn-small">
+                            <button class="btn btn-outline btn-small" type="button" id="deviceStatusExportBtn">
                                 <i class="fas fa-download"></i> Export
                             </button>
                         </div>
@@ -394,8 +530,9 @@
                                 <tr>
                                     <th>Device ID</th>
                                     <th>Status</th>
-                                    <th>Location</th>
+                                    <th>Battery</th>
                                     <th>Temperature</th>
+                                    <th>Speed</th>
                                     <th>Last Update</th>
                                     <th>Actions</th>
                                 </tr>
@@ -411,29 +548,49 @@
 
         <!-- Live Tracking Section -->
         <section id="devices" class="content-section">
-            <div class="dashboard-card full-width">
-                <div class="card-header">
-                    <h2>Live Tracking Map</h2>
-                    <div class="card-actions">
-                        <button class="btn btn-outline btn-small" id="refreshMapBtn">
-                            <i class="fas fa-sync-alt"></i> Refresh
-                        </button>
-                    </div>
-                </div>
+            <div class="dashboard-card full-width" id="devicesMapCard">
                 <div id="map" class="map-container"></div>
             </div>
             
-            <div class="dashboard-grid">
-                <div class="dashboard-card">
-                    <div class="card-header">
-                        <h2>Device List</h2>
+            <div class="map-workspace-grid">
+                <div class="dashboard-card map-device-list-card">
+                    <div class="map-device-controls" role="group" aria-label="Map device filters">
+                        <label class="map-filter-field map-filter-field-search" for="mapDeviceSearch">
+                            <span class="map-filter-label">Search</span>
+                            <input
+                                type="search"
+                                id="mapDeviceSearch"
+                                class="map-filter-input"
+                                placeholder="Search in map list..."
+                                aria-label="Search devices in map list"
+                            >
+                        </label>
+                        <label class="map-filter-field" for="mapDeviceStatusFilter">
+                            <span class="map-filter-label">Status</span>
+                            <select id="mapDeviceStatusFilter" class="map-filter-select" aria-label="Filter map devices by status">
+                                <option value="all">All statuses</option>
+                                <option value="connected">Connected</option>
+                                <option value="stale">Stale</option>
+                                <option value="not-connected">Not connected</option>
+                                <option value="warning">Warnings</option>
+                            </select>
+                        </label>
+                        <label class="map-filter-field" for="mapDeviceSort">
+                            <span class="map-filter-label">Sort</span>
+                            <select id="mapDeviceSort" class="map-filter-select" aria-label="Sort map devices">
+                                <option value="lastSeenDesc">Last seen (newest)</option>
+                                <option value="nameAsc">Name (A-Z)</option>
+                                <option value="batteryDesc">Battery (high-low)</option>
+                                <option value="tempDesc">Temperature (high-low)</option>
+                            </select>
+                        </label>
                     </div>
                     <div class="device-list" id="deviceList">
                         <!-- Device items will be populated by JS -->
                     </div>
                 </div>
                 
-                <div class="dashboard-card">
+                <div class="dashboard-card map-device-details-card">
                     <div class="card-header">
                         <h2>Selected Device Details</h2>
                         <button class="btn btn-outline btn-small" id="viewFullDetailsBtn" style="display: none;" onclick="viewFullDeviceDetails()">
@@ -453,6 +610,27 @@
                 <div class="card-header">
                     <h2>Alerts & Notifications</h2>
                     <div class="card-actions">
+                        <select id="alertsSeverityFilter" class="select-input" aria-label="Filter alerts by severity">
+                            <option value="all">All severities</option>
+                            <option value="critical">Critical</option>
+                            <option value="warning">Warning</option>
+                            <option value="info">Info</option>
+                        </select>
+                        <select id="alertsStatusFilter" class="select-input" aria-label="Filter alerts by status">
+                            <option value="all">All statuses</option>
+                            <option value="unread">Unread</option>
+                            <option value="read">Read</option>
+                        </select>
+                        <input
+                            type="search"
+                            id="alertsSearchFilter"
+                            class="select-input"
+                            placeholder="Search alerts..."
+                            aria-label="Search alerts"
+                        >
+                        <button class="btn btn-outline btn-small" id="clearAlertsFilterBtn" type="button">
+                            <i class="fas fa-eraser"></i> Clear Filters
+                        </button>
                         <button class="btn btn-primary btn-small" id="markAllReadBtn">
                             <i class="fas fa-check-double"></i> Mark All Read
                         </button>
@@ -470,6 +648,21 @@
                 <div class="dashboard-card">
                     <div class="card-header">
                         <h2>Shipment Trends</h2>
+                        <div class="card-actions">
+                            <select id="analyticsGroupFilter" class="select-input">
+                                <option value="all">All groups</option>
+                            </select>
+                            <select id="analyticsRangeSelect" class="select-input">
+                                <option value="yesterday">Yesterday</option>
+                                <option value="today" selected>Today</option>
+                                <option value="7d">7 days</option>
+                                <option value="30d">30 days</option>
+                                <option value="90d">90 days</option>
+                                <option value="6m">6 months</option>
+                                <option value="12m">12 months</option>
+                                <option value="24m">24 months</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="chart-container">
                         <canvas id="shipmentTrendsChart"></canvas>
@@ -492,24 +685,76 @@
                 </div>
                 <div class="metrics-grid">
                     <div class="metric-item">
-                        <h3>Average Delivery Time</h3>
-                        <p class="metric-value">-</p>
-                        <span class="metric-change">No data yet</span>
+                            <h3>Active Devices</h3>
+                            <p class="metric-value" id="analyticsActiveDevices">-</p>
+                            <span class="metric-change" id="analyticsActiveDevicesNote">No data yet</span>
                     </div>
                     <div class="metric-item">
-                        <h3>On-Time Delivery Rate</h3>
-                        <p class="metric-value">-</p>
-                        <span class="metric-change">No data yet</span>
+                            <h3>In Transit</h3>
+                            <p class="metric-value" id="analyticsInTransit">-</p>
+                            <span class="metric-change" id="analyticsInTransitNote">No data yet</span>
                     </div>
                     <div class="metric-item">
-                        <h3>Temperature Compliance</h3>
-                        <p class="metric-value">-</p>
-                        <span class="metric-change">No data yet</span>
+                            <h3>Delivered Shipments</h3>
+                            <p class="metric-value" id="analyticsDelivered">-</p>
+                            <span class="metric-change" id="analyticsDeliveredNote">No data yet</span>
                     </div>
                     <div class="metric-item">
-                        <h3>Alert Response Time</h3>
-                        <p class="metric-value">-</p>
-                        <span class="metric-change">No data yet</span>
+                            <h3>Delayed Shipments</h3>
+                            <p class="metric-value" id="analyticsDelayed">-</p>
+                            <span class="metric-change" id="analyticsDelayedNote">No data yet</span>
+                    </div>
+                    <div class="metric-item">
+                            <h3>Average Battery</h3>
+                            <p class="metric-value" id="analyticsAvgBattery">-</p>
+                            <span class="metric-change" id="analyticsAvgBatteryNote">No data yet</span>
+                    </div>
+                    <div class="metric-item">
+                            <h3>Average Temperature</h3>
+                            <p class="metric-value" id="analyticsAvgTemp">-</p>
+                            <span class="metric-change" id="analyticsAvgTempNote">No data yet</span>
+                    </div>
+                    <div class="metric-item">
+                            <h3>Alerts (24h)</h3>
+                            <p class="metric-value" id="analyticsAlert24h">-</p>
+                            <span class="metric-change" id="analyticsAlert24hNote">No data yet</span>
+                    </div>
+                </div>
+            </div>
+            <div class="dashboard-card full-width">
+                <div class="card-header">
+                    <h2>Condition Monitoring</h2>
+                </div>
+                <div class="metrics-grid">
+                    <div class="metric-item">
+                            <h3>Monitored Devices</h3>
+                            <p class="metric-value" id="analyticsMonitoredDevices">-</p>
+                            <span class="metric-change" id="analyticsMonitoredDevicesNote">No data yet</span>
+                    </div>
+                    <div class="metric-item">
+                            <h3>Temp Out of Range</h3>
+                            <p class="metric-value" id="analyticsTempViolations">-</p>
+                            <span class="metric-change" id="analyticsTempViolationsNote">No data yet</span>
+                    </div>
+                    <div class="metric-item">
+                            <h3>Humidity Out of Range</h3>
+                            <p class="metric-value" id="analyticsHumidityViolations">-</p>
+                            <span class="metric-change" id="analyticsHumidityViolationsNote">No data yet</span>
+                    </div>
+                    <div class="metric-item">
+                            <h3>Excessive Tilt</h3>
+                            <p class="metric-value" id="analyticsTiltViolations">-</p>
+                            <span class="metric-change" id="analyticsTiltViolationsNote">No data yet</span>
+                    </div>
+                    <div class="metric-item">
+                            <h3>Collision Risk</h3>
+                            <p class="metric-value" id="analyticsCollisionViolations">-</p>
+                            <span class="metric-change" id="analyticsCollisionViolationsNote">No data yet</span>
+                    </div>
+                    <div class="metric-item">
+                            <h3>Delivery Delays</h3>
+                            <p class="metric-value" id="analyticsDeliveryDelays">-</p>
+                            <span class="metric-change" id="analyticsDeliveryDelaysNote">No data yet</span>
                     </div>
                 </div>
             </div>
@@ -520,9 +765,11 @@
             <div class="dashboard-card full-width">
                 <div class="card-header">
                     <h2>Devices</h2>
-                    <button class="btn btn-primary btn-small" id="addDeviceBtn">
-                        <i class="fas fa-plus"></i> Add Device
-                    </button>
+                    <div class="card-actions">
+                        <button class="btn btn-primary btn-small" id="addDeviceBtn" type="button">
+                            <i class="fas fa-plus"></i> Add Device
+                        </button>
+                    </div>
                 </div>
                 <div class="table-container">
                     <table class="data-table">
@@ -531,11 +778,10 @@
                                 <th>Device ID</th>
                                 <th>Name</th>
                                 <th>Type</th>
-                                <th>Status</th>
-                                <th>Network</th>
+                                <th>Connection</th>
                                 <th>Sensors</th>
-                                <th>Package</th>
-                                <th>Registered</th>
+                                <th>Battery</th>
+                                <th>Seen</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -578,8 +824,9 @@
                                     <div class="form-row">
                                         <div class="form-group">
                                             <label for="deviceGroup">Group *</label>
-                                            <input type="text" id="deviceGroup" name="deviceGroup" required placeholder="Enter device group">
-                                            <small>e.g., Warehouse A, Fleet 1, Cold Chain</small>
+                                            <input type="text" id="deviceGroup" name="deviceGroup" list="deviceGroupOptions" required placeholder="Select or enter group">
+                                            <datalist id="deviceGroupOptions"></datalist>
+                                            <small>Pick an existing group or type a new one.</small>
                                         </div>
                                         <div class="form-group">
                                             <label for="deviceType">Device Type *</label>
@@ -589,6 +836,14 @@
                                                 <option value="Sensor">Sensor</option>
                                                 <option value="Gateway">Gateway</option>
                                             </select>
+                                        </div>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="deviceModel">Device Model</label>
+                                            <input type="text" id="deviceModel" name="deviceModel" list="deviceModelOptions" placeholder="Select or enter device model">
+                                            <datalist id="deviceModelOptions"></datalist>
+                                            <small>Choose a model to auto-fill common settings</small>
                                         </div>
                                     </div>
                                     <div class="form-row">
@@ -623,10 +878,111 @@
                                         </div>
                                         <div class="form-group">
                                             <label for="deviceAsset">Asset</label>
-                                            <input type="text" id="deviceAsset" name="deviceAsset" placeholder="Enter asset (optional)">
-                                            <small>Optional: Associated asset or equipment</small>
+                                            <input type="text" id="deviceAsset" name="deviceAsset" placeholder="Enter asset (optional)" list="deviceAssetList">
+                                            <datalist id="deviceAssetList"></datalist>
+                                            <small>Optional: Associated asset or equipment (existing assets appear as suggestions)</small>
                                         </div>
                                     </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="logisticsStartAreaId">Start Area</label>
+                                        <select id="logisticsStartAreaId" name="logisticsStartAreaId">
+                                            <option value="">Select start area</option>
+                                        </select>
+                                        <small>Where shipment starts before departure.</small>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="logisticsDestinationAreaId">Planned Destination Area</label>
+                                        <select id="logisticsDestinationAreaId" name="logisticsDestinationAreaId">
+                                            <option value="">Select destination area</option>
+                                        </select>
+                                        <small>Uses saved Areas for route destination tracking.</small>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="logisticsCurrentArea">Current Area (auto)</label>
+                                        <input type="text" id="logisticsCurrentArea" readonly placeholder="Detected from live GPS">
+                                        <small>Automatically detects where the shipment is now.</small>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="deviceLocation">Route / Destination Note</label>
+                                        <input type="text" id="deviceLocation" name="deviceLocation" placeholder="Optional route note">
+                                        <small>Optional free-text note for reporting.</small>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="expectedDeliveryAt">Expected Delivery Time</label>
+                                        <input type="datetime-local" id="expectedDeliveryAt" name="expectedDeliveryAt">
+                                        <small>Trigger delivery delay alerts if ETA is exceeded.</small>
+                                    </div>
+                                    <div class="form-group"></div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="deliveryGraceMinutes">Delivery Grace (minutes)</label>
+                                        <input type="number" id="deliveryGraceMinutes" name="deliveryGraceMinutes" min="0" max="1440" step="5" value="30">
+                                        <small>Delay tolerance for this device.</small>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="logisticsAlertCooldownMinutes">Alert Cooldown (minutes)</label>
+                                        <input type="number" id="logisticsAlertCooldownMinutes" name="logisticsAlertCooldownMinutes" min="1" max="720" step="1" value="15">
+                                        <small>Minimum time between repeated alerts for same condition.</small>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group checkbox-group">
+                                        <label class="checkbox-label">
+                                            <input type="checkbox" id="logisticsMonitoringEnabled" name="logisticsMonitoringEnabled" checked>
+                                            <span>Enable logistics monitoring for this device</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="logisticsTempMin">Temperature Min (degC)</label>
+                                        <input type="number" id="logisticsTempMin" name="logisticsTempMin" step="0.1" value="-10">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="logisticsTempMax">Temperature Max (degC)</label>
+                                        <input type="number" id="logisticsTempMax" name="logisticsTempMax" step="0.1" value="30">
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="logisticsHumidityMin">Humidity Min (%)</label>
+                                        <input type="number" id="logisticsHumidityMin" name="logisticsHumidityMin" step="0.1" value="20">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="logisticsHumidityMax">Humidity Max (%)</label>
+                                        <input type="number" id="logisticsHumidityMax" name="logisticsHumidityMax" step="0.1" value="80">
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="logisticsTiltMax">Max Tilt (deg)</label>
+                                        <input type="number" id="logisticsTiltMax" name="logisticsTiltMax" step="0.1" value="30">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="logisticsCollisionMaxG">Max Collision (g)</label>
+                                        <input type="number" id="logisticsCollisionMaxG" name="logisticsCollisionMaxG" step="0.1" value="2.5">
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="logisticsCopySource">Copy Rules From Another Device</label>
+                                        <select id="logisticsCopySource">
+                                            <option value="">Select a source device</option>
+                                        </select>
+                                        <small>Copies monitoring toggle, thresholds, area route fields, grace, and cooldown.</small>
+                                    </div>
+                                    <div class="form-group" style="display: flex; align-items: end;">
+                                        <button type="button" class="btn btn-outline" onclick="applyCopiedLogisticsRules()">
+                                            <i class="fas fa-clone"></i> Copy Rules
+                                        </button>
+                                    </div>
+                                </div>
                                 </div>
                             
                             <!-- Network Connectivity -->
@@ -785,57 +1141,727 @@
             </div>
         </section>
 
-        <!-- Privacy & Data Section -->
-        <section id="privacy" class="content-section">
-            <div class="dashboard-grid">
+        <!-- Configuration: Deliveries -->
+        <section id="config-deliveries" class="content-section">
+            <div class="section-header">
+                <h2>Deliveries</h2>
+                <button class="btn btn-primary btn-small" id="addDeliveryBtn">
+                    <i class="fas fa-plus"></i> Add Delivery
+                </button>
+            </div>
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-calendar-check"></i>
+                        <span>Plan Delivery</span>
+                    </div>
+                </div>
+                <div class="card-content">
+                    <form id="deliveryForm" class="config-form">
+                        <input type="hidden" id="deliveryIdInput" name="deliveryIdInput">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="deliveryReference">Reference *</label>
+                                <input type="text" id="deliveryReference" name="deliveryReference" required placeholder="e.g. ORD-10245">
+                            </div>
+                            <div class="form-group">
+                                <label for="deliveryDeviceId">Device *</label>
+                                <select id="deliveryDeviceId" name="deliveryDeviceId" required>
+                                    <option value="">Select device</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="deliveryPickupAreaId">Planned pickup area</label>
+                                <select id="deliveryPickupAreaId" name="deliveryPickupAreaId">
+                                    <option value="">Select pickup area</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="deliveryDropoffAreaId">Planned destination area</label>
+                                <select id="deliveryDropoffAreaId" name="deliveryDropoffAreaId">
+                                    <option value="">Select destination area</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="deliveryDepartureAt">Planned departure</label>
+                                <input type="datetime-local" id="deliveryDepartureAt" name="deliveryDepartureAt">
+                            </div>
+                            <div class="form-group">
+                                <label for="deliveryArrivalAt">Planned arrival</label>
+                                <input type="datetime-local" id="deliveryArrivalAt" name="deliveryArrivalAt">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="deliveryStatus">Status</label>
+                                <select id="deliveryStatus" name="deliveryStatus">
+                                    <option value="planned">Planned</option>
+                                    <option value="in_transit">In transit</option>
+                                    <option value="arrived">Delivered</option>
+                                    <option value="delayed">Delayed</option>
+                                    <option value="missed">Missed</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="deliveryPriority">Priority</label>
+                                <select id="deliveryPriority" name="deliveryPriority">
+                                    <option value="normal">Normal</option>
+                                    <option value="high">High</option>
+                                    <option value="critical">Critical</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="deliveryTransportPlate">Transport plate number</label>
+                                <input type="text" id="deliveryTransportPlate" name="deliveryTransportPlate" placeholder="e.g. ABC-1234">
+                            </div>
+                            <div class="form-group"></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group full-width">
+                                <label for="deliveryNotes">Notes</label>
+                                <input type="text" id="deliveryNotes" name="deliveryNotes" placeholder="Optional notes">
+                            </div>
+                        </div>
+                        <div class="step-actions">
+                            <button type="submit" class="btn btn-primary btn-small">
+                                <i class="fas fa-save"></i> Save Delivery
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div class="dashboard-card full-width">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-truck"></i>
+                        <span>Planned Deliveries</span>
+                    </div>
+                </div>
+                <div class="card-content">
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Reference</th>
+                                    <th>Device</th>
+                                    <th>Route</th>
+                                    <th>Window</th>
+                                    <th>Status</th>
+                                    <th>Delay</th>
+                                    <th>Priority</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="deliveriesTableBody">
+                                <!-- Deliveries rendered by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="dashboard-card full-width">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-check-circle"></i>
+                        <span>Delivered</span>
+                    </div>
+                </div>
+                <div class="card-content">
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Reference</th>
+                                    <th>Device</th>
+                                    <th>Route</th>
+                                    <th>Window</th>
+                                    <th>Status</th>
+                                    <th>Delay</th>
+                                    <th>Priority</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="deliveredTableBody">
+                                <!-- Delivered items rendered by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Configuration: Areas -->
+        <section id="config-areas" class="content-section">
+            <div class="section-header">
+                <h2>Areas</h2>
+                <button class="btn btn-primary btn-small" id="addAreaBtn">
+                    <i class="fas fa-plus"></i> Add Area
+                </button>
+            </div>
+            <form id="areaForm" class="config-form">
                 <div class="dashboard-card">
                     <div class="card-header">
-                        <h2><i class="fas fa-download"></i> Export My Data</h2>
+                        <div class="card-title">
+                            <i class="fas fa-draw-polygon"></i>
+                            <span>Create Area</span>
+                        </div>
                     </div>
                     <div class="card-content">
-                        <p>Request a copy of all your personal data stored in our system (GDPR Right to Access).</p>
-                        <button class="btn btn-primary" onclick="exportMyData()">
-                            <i class="fas fa-download"></i> Export My Data
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="areaName">Area Name *</label>
+                                <input type="text" id="areaName" name="areaName" required placeholder="Enter area name">
+                            </div>
+                            <div class="form-group">
+                                <label for="areaType">Type</label>
+                                <select id="areaType" name="areaType">
+                                    <option value="Warehouse">Warehouse</option>
+                                    <option value="Geofence">Geofence</option>
+                                    <option value="Custom">Custom</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="areaShape">Shape *</label>
+                                <select id="areaShape" name="areaShape">
+                                    <option value="circle" selected>Circle</option>
+                                    <option value="polygon">Polygon</option>
+                                </select>
+                            </div>
+                            <div class="form-group" id="areaRadiusGroup">
+                                <label for="areaRadius">Radius (meters) *</label>
+                                <input type="number" id="areaRadius" name="areaRadius" required min="25" max="50000" step="5" placeholder="e.g. 250">
+                                <small>Set a radius after clicking on the map.</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="dashboard-card full-width">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-map-marked-alt"></i>
+                        <span>Area Map</span>
+                    </div>
+                    <div class="card-actions">
+                        <span class="badge" id="areasMapHint">Click to set center</span>
+                    </div>
+                </div>
+                    <div class="card-content">
+                        <div class="areas-map-toolbar">
+                            <div class="form-group">
+                                <label>Center</label>
+                                <input type="text" id="areaCenterDisplay" readonly placeholder="Click on the map to set center">
+                            </div>
+                            <div class="form-group" id="areaPolygonControls" style="display: none;">
+                                <label>Polygon Controls</label>
+                                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                    <button type="button" class="btn btn-outline btn-small" id="polygonStartBtn">
+                                        <i class="fas fa-draw-polygon"></i> Start
+                                    </button>
+                                    <button type="button" class="btn btn-outline btn-small" id="polygonUndoBtn">
+                                        <i class="fas fa-undo"></i> Undo
+                                    </button>
+                                    <button type="button" class="btn btn-outline btn-small" id="polygonFinishBtn">
+                                        <i class="fas fa-check"></i> Finish
+                                    </button>
+                                    <button type="button" class="btn btn-outline btn-small" id="polygonClearBtn">
+                                        <i class="fas fa-eraser"></i> Clear
+                                    </button>
+                                </div>
+                                <small>Click on map to add points, drag markers to adjust, then Finish.</small>
+                            </div>
+                            <div class="step-actions">
+                                <button type="submit" class="btn btn-primary btn-small">
+                                    <i class="fas fa-save"></i> Save Area
+                                </button>
+                            </div>
+                        </div>
+                        <div id="areasMap" class="map-container"></div>
+                    </div>
+                </div>
+            </form>
+            <div class="dashboard-card full-width">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-draw-polygon"></i>
+                        <span>Managed Areas</span>
+                    </div>
+                </div>
+                <div class="card-content">
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Area</th>
+                                    <th>Type</th>
+                                    <th>Shape</th>
+                                    <th>Radius</th>
+                                    <th>Center</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="areasTableBody">
+                                <!-- Areas will be populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Configuration: Assets -->
+        <section id="config-assets" class="content-section">
+            <div class="section-header">
+                <h2>Assets</h2>
+                <button class="btn btn-primary btn-small" id="addAssetBtn">
+                    <i class="fas fa-plus"></i> Add Asset
+                </button>
+            </div>
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-boxes"></i>
+                        <span>Create Asset</span>
+                    </div>
+                </div>
+                <div class="card-content">
+                    <form id="assetForm" class="config-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="assetName">Asset Name *</label>
+                                <input type="text" id="assetName" name="assetName" required placeholder="Enter asset name">
+                            </div>
+                            <div class="form-group">
+                                <label for="assetCategory">Category</label>
+                                <input type="text" id="assetCategory" name="assetCategory" placeholder="Optional category" list="assetCategoryList">
+                                <datalist id="assetCategoryList"></datalist>
+                            </div>
+                        </div>
+                        <div class="step-actions">
+                            <button type="submit" class="btn btn-primary btn-small">
+                                <i class="fas fa-save"></i> Save Asset
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div class="dashboard-card full-width">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-boxes"></i>
+                        <span>Managed Assets</span>
+                    </div>
+                    <div class="card-actions">
+                        <select id="assetCategoryFilter" class="asset-filter-select" aria-label="Filter assets by category">
+                            <option value="all">All categories</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="card-content">
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Asset</th>
+                                    <th>Category</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="assetsTableBody">
+                                <!-- Assets will be populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Configuration: Groups -->
+        <section id="config-groups" class="content-section">
+            <div class="section-header">
+                <h2>Groups</h2>
+                <button class="btn btn-primary btn-small" id="addGroupBtn">
+                    <i class="fas fa-plus"></i> Add Group
+                </button>
+            </div>
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-layer-group"></i>
+                        <span>Create Group</span>
+                    </div>
+                </div>
+                <div class="card-content">
+                    <form id="groupForm" class="config-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="groupName">Group Name *</label>
+                                <input type="text" id="groupName" name="groupName" required placeholder="Enter group name">
+                            </div>
+                            <div class="form-group">
+                                <label for="groupDescription">Description</label>
+                                <input type="text" id="groupDescription" name="groupDescription" placeholder="Optional description">
+                            </div>
+                        </div>
+                        <div class="step-actions">
+                            <button type="submit" class="btn btn-primary btn-small">
+                                <i class="fas fa-save"></i> Save Group
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div class="dashboard-card full-width">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-layer-group"></i>
+                        <span>Managed Groups</span>
+                    </div>
+                </div>
+                <div class="card-content">
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Group</th>
+                                    <th>Description</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="groupsTableBody">
+                                <!-- Groups will be populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Configuration: Users -->
+        <section id="config-users" class="content-section">
+            <div class="section-header">
+                <h2>Users</h2>
+                <button class="btn btn-primary btn-small" id="addUserBtn">
+                    <i class="fas fa-user-plus"></i> Add User
+                </button>
+            </div>
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-user-plus"></i>
+                        <span>Create User</span>
+                    </div>
+                </div>
+                <div class="card-content">
+                    <form id="userForm" class="config-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="userName">Full Name *</label>
+                                <input type="text" id="userNameInput" name="userName" required placeholder="Enter full name">
+                            </div>
+                            <div class="form-group">
+                                <label for="userEmailInput">Email *</label>
+                                <input type="text" id="userEmailInput" name="userEmail" required placeholder="name@email.com">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="userRole">Role</label>
+                                <select id="userRole" name="userRole">
+                                    <option value="Admin">Admin</option>
+                                    <option value="Manager">Manager</option>
+                                    <option value="Viewer">Viewer</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="userGroupSelect">Group</label>
+                                <select id="userGroupSelect" name="userGroup">
+                                    <option value="">Unassigned</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="step-actions">
+                            <button type="submit" class="btn btn-primary btn-small">
+                                <i class="fas fa-save"></i> Save User
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div class="dashboard-card full-width">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-users"></i>
+                        <span>Managed Users</span>
+                    </div>
+                </div>
+                <div class="card-content">
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Role</th>
+                                    <th>Group</th>
+                                    <th>Added</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTableBody">
+                                <!-- Users will be populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════ -->
+        <!-- INTELLIGENCE: Risk Overview                            -->
+        <!-- ═══════════════════════════════════════════════════════ -->
+        <section id="risk-overview" class="content-section">
+            <div class="section-header">
+                <h1><i class="fas fa-shield-halved"></i> AI Risk Overview</h1>
+                <p class="section-subtitle">Fleet-wide risk analysis powered by telemetry data and AI scoring.</p>
+            </div>
+
+            <!-- Fleet Score + Trend Row -->
+            <div class="intel-top-row">
+                <div class="dashboard-card intel-gauge-card">
+                    <div class="card-header"><h2>Fleet Risk Score</h2></div>
+                    <div class="card-body" style="display:flex;align-items:center;justify-content:center;flex-direction:column;padding:2rem;">
+                        <canvas id="riskGaugeChart" width="220" height="220"></canvas>
+                        <div id="riskGaugeLabel" class="risk-gauge-label">--</div>
+                        <div id="riskGaugeLevel" class="risk-level-badge risk-low">Analysing...</div>
+                    </div>
+                </div>
+                <div class="dashboard-card intel-trend-card">
+                    <div class="card-header"><h2>Risk Trend (30 days)</h2></div>
+                    <div class="card-body" style="position:relative;height:260px;">
+                        <canvas id="riskTrendChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI Summary Panel -->
+            <div class="dashboard-card full-width" id="aiSummaryPanel" style="display:none;">
+                <div class="card-header"><h2><i class="fas fa-robot"></i> AI Risk Narrative</h2></div>
+                <div class="card-body">
+                    <div id="aiSummaryContent" class="ai-summary-content"></div>
+                </div>
+            </div>
+
+            <!-- Per-device risk table -->
+            <div class="dashboard-card full-width">
+                <div class="card-header">
+                    <h2>Device Risk Scores</h2>
+                    <div class="card-actions">
+                        <button class="btn btn-outline btn-small" onclick="refreshRiskData(true)">
+                            <i class="fas fa-sync"></i> Refresh
                         </button>
                     </div>
                 </div>
-                
-                <div class="dashboard-card">
-                    <div class="card-header">
-                        <h2><i class="fas fa-trash"></i> Delete My Account</h2>
+                <div class="card-body">
+                    <div class="table-container">
+                        <table class="data-table" id="riskDeviceTable">
+                            <thead>
+                                <tr>
+                                    <th>Device</th>
+                                    <th>Score</th>
+                                    <th>Level</th>
+                                    <th>Delay</th>
+                                    <th>Temp</th>
+                                    <th>Speed</th>
+                                    <th>Battery</th>
+                                    <th>Geofence</th>
+                                    <th>Signal</th>
+                                    <th>Summary</th>
+                                </tr>
+                            </thead>
+                            <tbody id="riskDeviceTableBody">
+                                <tr><td colspan="10" class="text-center">Loading risk data...</td></tr>
+                            </tbody>
+                        </table>
                     </div>
-                    <div class="card-content">
-                        <p>Permanently delete your account and all associated data (GDPR Right to be Forgotten).</p>
-                        <button class="btn btn-outline" style="border-color: #ef4444; color: #ef4444;" onclick="deleteMyAccount()">
-                            <i class="fas fa-trash"></i> Delete Account
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════ -->
+        <!-- INTELLIGENCE: Compliance Reports                       -->
+        <!-- ═══════════════════════════════════════════════════════ -->
+        <section id="compliance-reports" class="content-section">
+            <div class="section-header">
+                <h1><i class="fas fa-file-circle-check"></i> Automated Compliance Reports</h1>
+                <p class="section-subtitle">Generate regulatory reports, temperature logs, SLA audits, and chain-of-custody records.</p>
+            </div>
+
+            <!-- Report Controls -->
+            <div class="dashboard-card full-width">
+                <div class="card-header"><h2>Generate Report</h2></div>
+                <div class="card-body">
+                    <div class="compliance-controls">
+                        <div class="form-group">
+                            <label for="complianceReportType">Report Type</label>
+                            <select id="complianceReportType" class="form-control">
+                                <option value="temperature">Temperature Compliance</option>
+                                <option value="chain-of-custody">Chain of Custody</option>
+                                <option value="delivery-sla">Delivery SLA</option>
+                                <option value="route-adherence">Route Adherence</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="complianceFrom">From</label>
+                            <input type="date" id="complianceFrom" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="complianceTo">To</label>
+                            <input type="date" id="complianceTo" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="complianceDevice">Device (optional)</label>
+                            <input type="text" id="complianceDevice" class="form-control" placeholder="All devices">
+                        </div>
+                        <button class="btn btn-primary" id="generateComplianceBtn" onclick="generateComplianceReport()">
+                            <i class="fas fa-file-export"></i> Generate
                         </button>
                     </div>
                 </div>
             </div>
-            
-            <div class="dashboard-card full-width">
+
+            <!-- Compliance Summary -->
+            <div class="dashboard-card full-width" id="complianceSummaryCard" style="display:none;">
                 <div class="card-header">
-                    <h2><i class="fas fa-shield-alt"></i> Privacy Information</h2>
+                    <h2 id="complianceSummaryTitle">Report Summary</h2>
+                    <div class="card-actions">
+                        <button class="btn btn-outline btn-small" onclick="exportComplianceCsv()">
+                            <i class="fas fa-download"></i> Export CSV
+                        </button>
+                    </div>
                 </div>
-                <div class="card-content">
-                    <h3>Data Protection</h3>
-                    <ul>
-                        <li>Your data is encrypted in transit (TLS 1.3)</li>
-                        <li>Data at rest is encrypted</li>
-                        <li>We comply with GDPR regulations</li>
-                        <li>You have the right to access, export, and delete your data</li>
-                    </ul>
-                    <h3 style="margin-top: 1.5rem;">Your Rights</h3>
-                    <ul>
-                        <li><strong>Right to Access:</strong> Request a copy of your data</li>
-                        <li><strong>Right to Rectification:</strong> Correct inaccurate data</li>
-                        <li><strong>Right to Erasure:</strong> Delete your account and data</li>
-                        <li><strong>Right to Data Portability:</strong> Export your data</li>
-                    </ul>
-                    <p style="margin-top: 1.5rem;">
-                        <a href="privacy-policy.html" target="_blank">Read full Privacy Policy</a>
-                    </p>
+                <div class="card-body">
+                    <div id="complianceSummaryStats" class="intel-stats-row"></div>
                 </div>
+            </div>
+
+            <!-- Compliance Results Table -->
+            <div class="dashboard-card full-width" id="complianceResultsCard" style="display:none;">
+                <div class="card-header"><h2>Report Data</h2></div>
+                <div class="card-body">
+                    <div class="table-container">
+                        <table class="data-table" id="complianceTable">
+                            <thead id="complianceTableHead"><tr></tr></thead>
+                            <tbody id="complianceTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════ -->
+        <!-- INTELLIGENCE: Insurance Pricing                        -->
+        <!-- ═══════════════════════════════════════════════════════ -->
+        <section id="insurance-pricing" class="content-section">
+            <div class="section-header">
+                <h1><i class="fas fa-hand-holding-dollar"></i> Smart Insurance Pricing</h1>
+                <p class="section-subtitle">Leverage real-time fleet data to optimise cargo insurance premiums.</p>
+            </div>
+
+            <!-- Premium Comparison Row -->
+            <div class="intel-top-row">
+                <div class="dashboard-card intel-gauge-card">
+                    <div class="card-header"><h2>Your Fleet Risk</h2></div>
+                    <div class="card-body" style="display:flex;align-items:center;justify-content:center;flex-direction:column;padding:2rem;">
+                        <div id="insuranceRiskScore" class="insurance-big-score">--</div>
+                        <div id="insuranceRiskLevel" class="risk-level-badge risk-low">--</div>
+                        <div class="insurance-fleet-size" id="insuranceFleetSize">0 assets</div>
+                    </div>
+                </div>
+                <div class="dashboard-card intel-trend-card">
+                    <div class="card-header"><h2>Premium Comparison</h2></div>
+                    <div class="card-body" style="position:relative;height:260px;">
+                        <canvas id="insuranceComparisonChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Savings Highlight -->
+            <div class="intel-top-row">
+                <div class="dashboard-card insurance-savings-card">
+                    <div class="card-body" style="text-align:center;padding:2rem;">
+                        <div class="insurance-savings-label">Estimated Annual Savings</div>
+                        <div class="insurance-savings-amount" id="insuranceSavingsAmount">&euro;0</div>
+                        <div class="insurance-savings-detail" id="insuranceSavingsDetail">vs. industry average premium</div>
+                    </div>
+                </div>
+                <div class="dashboard-card insurance-premium-card">
+                    <div class="card-body" style="padding:2rem;">
+                        <h3 style="margin-bottom:1rem;">Premium Breakdown</h3>
+                        <div class="insurance-premium-row">
+                            <span>Industry average (annual)</span>
+                            <strong id="insuranceIndustryPremium">&euro;0</strong>
+                        </div>
+                        <div class="insurance-premium-row">
+                            <span>Your estimated premium (annual)</span>
+                            <strong id="insuranceYourPremium" class="text-primary">&euro;0</strong>
+                        </div>
+                        <div class="insurance-premium-row">
+                            <span>Monthly estimate</span>
+                            <strong id="insuranceMonthly">&euro;0</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recommendations -->
+            <div class="dashboard-card full-width">
+                <div class="card-header"><h2><i class="fas fa-lightbulb"></i> Risk Reduction Recommendations</h2></div>
+                <div class="card-body">
+                    <div id="insuranceRecommendations" class="insurance-recs-grid">
+                        <p>Loading recommendations...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tier Table -->
+            <div class="dashboard-card full-width">
+                <div class="card-header"><h2>Insurance Tier Structure</h2></div>
+                <div class="card-body">
+                    <div class="table-container">
+                        <table class="data-table" id="insuranceTierTable">
+                            <thead>
+                                <tr>
+                                    <th>Risk Level</th>
+                                    <th>Score Range</th>
+                                    <th>Multiplier</th>
+                                    <th>Premium / Asset / Year</th>
+                                    <th>vs. Average</th>
+                                </tr>
+                            </thead>
+                            <tbody id="insuranceTierTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CTA -->
+            <div class="dashboard-card full-width" style="text-align:center;padding:2rem;">
+                <h3 style="margin-bottom:0.5rem;">Ready to lock in your premium?</h3>
+                <p style="color:var(--text-light);margin-bottom:1.5rem;">Contact our insurance partners with your verified fleet risk profile.</p>
+                <a href="mailto:info@aurion.io" class="btn btn-primary">
+                    <i class="fas fa-envelope"></i> Request Insurance Quote
+                </a>
             </div>
         </section>
 
@@ -961,8 +1987,12 @@
                                     <span>Push Notifications</span>
                                 </label>
                             </div>
+                            <div class="form-group">
+                                <label for="mobilePhone">Mobile Phone for SMS Alerts</label>
+                                <input type="tel" id="mobilePhone" placeholder="+1 555 123 4567">
+                            </div>
                         </div>
-                        
+
                         <div class="form-section" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
                             <h4 style="margin-bottom: 1rem; color: var(--text-dark);">System Notifications</h4>
                             <div class="form-group checkbox-group">
@@ -993,7 +2023,7 @@
             </div>
             
             <!-- API Keys for Integrations -->
-            <div class="dashboard-card full-width">
+            <div class="dashboard-card full-width" id="apiKeysCard">
                 <div class="card-header">
                     <h2><i class="fas fa-key"></i> API Keys for Integrations</h2>
                     <button class="btn btn-outline btn-small" id="generateApiKeyBtn">
@@ -1002,7 +2032,7 @@
                 </div>
                 <div class="api-keys-container">
                     <p style="margin-bottom: 1rem; color: var(--text-light);">
-                        Generate API keys to connect your CargoTrack Pro account with external systems, ERPs, or custom integrations.
+                        Generate API keys to connect your Aurion account with external systems, ERPs, or custom integrations.
                     </p>
                     <div id="userApiKeysList" class="api-keys-list">
                         <!-- API keys will be populated here -->
@@ -1106,15 +2136,84 @@
                     <button type="submit" class="btn btn-primary">Change Password</button>
                 </form>
             </div>
+
+            <div class="dashboard-grid">
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-download"></i> Export My Data</h2>
+                    </div>
+                    <div class="card-content">
+                        <p>Request a copy of all your personal data stored in our system (GDPR Right to Access).</p>
+                        <button class="btn btn-primary" onclick="exportMyData()">
+                            <i class="fas fa-download"></i> Export My Data
+                        </button>
+                    </div>
+                </div>
+
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-trash"></i> Delete My Account</h2>
+                    </div>
+                    <div class="card-content">
+                        <p>Permanently delete your account and all associated data (GDPR Right to be Forgotten).</p>
+                        <button class="btn btn-outline" style="border-color: #ef4444; color: #ef4444;" onclick="deleteMyAccount()">
+                            <i class="fas fa-trash"></i> Delete Account
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-card full-width">
+                <div class="card-header">
+                    <h2><i class="fas fa-shield-alt"></i> Privacy Information</h2>
+                </div>
+                <div class="card-content">
+                    <h3>Data Protection</h3>
+                    <ul>
+                        <li>Your data is encrypted in transit (TLS 1.3)</li>
+                        <li>Data at rest is encrypted</li>
+                        <li>We comply with GDPR regulations</li>
+                        <li>You have the right to access, export, and delete your data</li>
+                    </ul>
+                    <h3 style="margin-top: 1.5rem;">Your Rights</h3>
+                    <ul>
+                        <li><strong>Right to Access:</strong> Request a copy of your data</li>
+                        <li><strong>Right to Rectification:</strong> Correct inaccurate data</li>
+                        <li><strong>Right to Erasure:</strong> Delete your account and data</li>
+                        <li><strong>Right to Data Portability:</strong> Export your data</li>
+                    </ul>
+                    <p style="margin-top: 1.5rem;">
+                        <a href="privacy-policy.html" target="_blank">Read full Privacy Policy</a>
+                    </p>
+                </div>
+            </div>
         </section>
     </main>
 
     <script src="data-protection.js"></script>
     <script src="invoice.js"></script>
     <script src="email-notifications.js"></script>
-    <script src="dashboard.js"></script>
+    <script src="dashboard.js?v=20260215p"></script>
     <link rel="stylesheet" href="support-bot.css">
     <script src="support-bot.js"></script>
+    <div id="maintenanceOverlay" style="display:none;position:fixed;inset:0;z-index:99999;background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:2rem;">
+            <i class="fas fa-tools" style="font-size:4rem;margin-bottom:1.5rem;color:#fbbf24;"></i>
+            <h1 style="font-size:2.5rem;margin-bottom:1rem;">Under Maintenance</h1>
+            <p id="maintenanceMsg" style="font-size:1.15rem;max-width:500px;opacity:0.85;line-height:1.6;">The system is currently under maintenance. Please try again later.</p>
+        </div>
+    </div>
+    <script>
+        fetch('/api/maintenance').then(r=>r.json()).then(d=>{
+            if(d.enabled){
+                var o=document.getElementById('maintenanceOverlay');
+                var m=document.getElementById('maintenanceMsg');
+                if(d.message) m.textContent=d.message;
+                o.style.display='block';
+                document.body.style.overflow='hidden';
+            }
+        }).catch(function(){});
+    </script>
 </body>
 </html>
 

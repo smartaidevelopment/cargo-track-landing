@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Admin Login - CargoTrack Pro">
+    <meta name="description" content="Admin Login - Aurion">
     <meta name="robots" content="noindex, nofollow">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
     <link rel="shortcut icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
-    <title>Admin Login - CargoTrack Pro</title>
+    <title>Admin Login - Aurion</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="dashboard.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -18,7 +18,7 @@
             <div class="login-header">
                 <div class="login-brand">
                     <i class="fas fa-shield-alt"></i>
-                    <h1>CargoTrack Pro</h1>
+                    <h1>Aurion</h1>
                 </div>
                 <p>Admin Access Portal</p>
             </div>
@@ -28,7 +28,7 @@
                     <label for="adminEmail">
                         <i class="fas fa-user-shield"></i> Admin Email
                     </label>
-                    <input type="email" id="adminEmail" name="email" required placeholder="admin@cargotrackpro.com">
+                    <input type="email" id="adminEmail" name="email" required placeholder="your@email.com">
                 </div>
                 
                 <div class="form-group">
@@ -36,12 +36,6 @@
                         <i class="fas fa-lock"></i> Password
                     </label>
                     <input type="password" id="adminPassword" name="password" required placeholder="Enter admin password">
-                </div>
-                
-                <div class="form-group">
-                    <label for="admin2FA">Two-Factor Authentication Code</label>
-                    <input type="text" id="admin2FA" name="twoFA" placeholder="Enter 2FA code (optional for demo)">
-                    <small>Required in production</small>
                 </div>
                 
                 <div class="form-group checkbox-group">
@@ -57,11 +51,6 @@
                 
                 <div class="login-footer">
                     <p><a href="index.html">← Back to Website</a></p>
-                    <p style="margin-top: 1rem; font-size: 0.875rem; color: #666; text-align: center;">
-                        <strong>Demo Credentials:</strong><br>
-                        Email: admin@cargotrackpro.com<br>
-                        Password: admin123
-                    </p>
                 </div>
             </form>
             
@@ -77,9 +66,10 @@
             }
         }, true);
     </script>
-    <script src="auth.js"></script>
-    <script src="admin-auth.js"></script>
-    <script src="admin-login.js"></script>
+    <script src="storage-sync.js?v=20260218a"></script>
+    <script src="auth.js?v=20260218a"></script>
+    <script src="admin-auth.js?v=20260218a"></script>
+    <script src="admin-login.js?v=20260218a"></script>
     <script>
         // Fallback if scripts fail to load
         if (typeof authenticateAdmin === 'undefined') {

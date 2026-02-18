@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Login to CargoTrack Pro Dashboard">
+    <meta name="description" content="Login to Aurion Dashboard">
     <meta name="robots" content="noindex, nofollow">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
     <link rel="shortcut icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
-    <title>Login - CargoTrack Pro Dashboard</title>
+    <title>Login - Aurion Dashboard</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="dashboard.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -45,12 +45,31 @@
     </style>
 </head>
 <body>
+    <div id="maintenanceOverlay" style="display:none;position:fixed;inset:0;z-index:99999;background:#0f172a;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;align-items:center;justify-content:center;text-align:center;">
+        <div style="max-width:480px;padding:2rem;">
+            <i class="fas fa-tools" style="font-size:3.5rem;color:#f59e0b;margin-bottom:1.5rem;display:block;"></i>
+            <h1 style="font-size:2rem;margin-bottom:1rem;">Under Maintenance</h1>
+            <p id="maintenanceMessage" style="font-size:1.1rem;color:#94a3b8;line-height:1.6;">The system is currently under maintenance. Please try again later.</p>
+        </div>
+    </div>
+    <script>
+        (function(){
+            fetch('/api/maintenance').then(function(r){return r.json()}).then(function(d){
+                if(d.enabled){
+                    var o=document.getElementById('maintenanceOverlay');
+                    if(o){o.style.display='flex';}
+                    var m=document.getElementById('maintenanceMessage');
+                    if(m&&d.message){m.textContent=d.message;}
+                }
+            }).catch(function(){});
+        })();
+    </script>
     <div class="login-container">
         <div class="login-card">
             <div class="login-header">
                 <div class="login-brand">
                     <i class="fas fa-satellite-dish"></i>
-                    <h1>CargoTrack Pro</h1>
+                    <h1>Aurion</h1>
                 </div>
                 <p>Access your monitoring dashboard</p>
             </div>
@@ -75,7 +94,7 @@
                         <input type="checkbox" id="rememberMe">
                         <span>Remember me</span>
                     </label>
-                    <a href="#" class="forgot-password">Forgot password?</a>
+                    <span class="forgot-password" style="color:#9ca3af; cursor:default; font-size:0.85rem;" title="Contact your administrator to reset your password">Forgot password?</span>
                 </div>
                 
                 <button type="submit" class="btn btn-primary btn-large">
@@ -88,109 +107,30 @@
             </form>
             
             <div id="loginError" class="error-message" style="display: none;"></div>
-            
-            <!-- Test Credentials Helper -->
-            <div style="margin-top: 1.5rem; padding: 1rem; background: #f3f4f6; border-radius: 0.5rem; border-left: 4px solid #3b82f6;">
-                <p style="margin: 0 0 0.5rem 0; font-size: 0.875rem; font-weight: 600; color: #1f2937;">
-                    <i class="fas fa-info-circle"></i> Test Credentials:
-                </p>
-                <p style="margin: 0; font-size: 0.875rem; color: #4b5563;">
-                    <strong>Email:</strong> test@cargotrackpro.com<br>
-                    <strong>Password:</strong> test123456
-                </p>
-                <button onclick="createTestUserNow()" style="margin-top: 0.5rem; padding: 0.5rem 1rem; background: #3b82f6; color: white; border: none; border-radius: 0.25rem; cursor: pointer; font-size: 0.875rem;">
-                    <i class="fas fa-user-plus"></i> Create Test User
-                </button>
-            </div>
         </div>
     </div>
     
-    <script src="auth.js"></script>
+    <div id="maintenanceOverlay" style="display:none;position:fixed;inset:0;z-index:99999;background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:2rem;">
+            <i class="fas fa-tools" style="font-size:4rem;margin-bottom:1.5rem;color:#fbbf24;"></i>
+            <h1 style="font-size:2.5rem;margin-bottom:1rem;">Under Maintenance</h1>
+            <p id="maintenanceMsg" style="font-size:1.15rem;max-width:500px;opacity:0.85;line-height:1.6;">The system is currently under maintenance. Please try again later.</p>
+        </div>
+    </div>
     <script>
-        // Function to create test user (can be called manually)
-        window.createTestUserNow = function() {
-            try {
-                if (typeof createUser === 'undefined' || typeof getUsers === 'undefined') {
-                    alert('Auth functions not loaded. Please refresh the page.');
-                    return;
-                }
-                
-                const users = getUsers();
-                const testUser = users.find(u => u.email === 'test@cargotrackpro.com');
-                
-                if (testUser) {
-                    alert('Test user already exists!\n\nEmail: test@cargotrackpro.com\nPassword: test123456');
-                    return;
-                }
-                
-                const result = createUser({
-                    email: 'test@cargotrackpro.com',
-                    password: 'test123456',
-                    company: 'Test Company',
-                    phone: '+1 (555) 123-4567',
-                    package: 'professional',
-                    devices: 5
-                });
-                
-                if (result.success) {
-                    alert('✅ Test user created successfully!\n\nEmail: test@cargotrackpro.com\nPassword: test123456\n\nYou can now login with these credentials.');
-                    // Auto-fill the form
-                    document.getElementById('loginEmail').value = 'test@cargotrackpro.com';
-                    document.getElementById('loginPassword').value = 'test123456';
-                } else {
-                    alert('Failed to create test user: ' + result.message);
-                }
-            } catch (error) {
-                console.error('Error creating test user:', error);
-                alert('Error: ' + error.message);
+        fetch('/api/maintenance').then(r=>r.json()).then(d=>{
+            if(d.enabled){
+                var o=document.getElementById('maintenanceOverlay');
+                var m=document.getElementById('maintenanceMsg');
+                if(d.message) m.textContent=d.message;
+                o.style.display='block';
+                document.body.style.overflow='hidden';
             }
-        };
-        
-        // Ensure test user exists automatically
-        (function() {
-            function ensureTestUser() {
-                try {
-                    if (typeof createUser === 'undefined' || typeof getUsers === 'undefined') {
-                        setTimeout(ensureTestUser, 200);
-                        return;
-                    }
-                    
-                    const users = getUsers();
-                    const testUser = users.find(u => u.email === 'test@cargotrackpro.com');
-                    
-                    if (!testUser) {
-                        console.log('Auto-creating test user...');
-                        const result = createUser({
-                            email: 'test@cargotrackpro.com',
-                            password: 'test123456',
-                            company: 'Test Company',
-                            phone: '+1 (555) 123-4567',
-                            package: 'professional',
-                            devices: 5
-                        });
-                        
-                        if (result.success) {
-                            console.log('✅ Test user auto-created!');
-                            console.log('Email: test@cargotrackpro.com');
-                            console.log('Password: test123456');
-                        } else {
-                            console.log('Test user creation result:', result);
-                        }
-                    } else {
-                        console.log('✅ Test user already exists');
-                    }
-                } catch (error) {
-                    console.error('Error ensuring test user:', error);
-                }
-            }
-            
-            // Try multiple times to ensure it works
-            ensureTestUser();
-            setTimeout(ensureTestUser, 500);
-            setTimeout(ensureTestUser, 1000);
-        })();
+        }).catch(function(){});
     </script>
-    <script src="login.js"></script>
+    <script src="storage-sync.js?v=20260218a"></script>
+    <script src="auth.js?v=20260218a"></script>
+    <script src="login.js?v=20260213e"></script>
 </body>
 </html>
 
