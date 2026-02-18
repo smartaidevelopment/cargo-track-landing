@@ -71,6 +71,8 @@ document.addEventListener('DOMContentLoaded', function() {
     initAdminDeviceManagement();
     initAdminSettings();
     initTrackerLibrary();
+
+    fetchTenants().catch(() => {});
     
     // Initialize logout
     const adminLogoutBtn = document.getElementById('adminLogoutBtn');
