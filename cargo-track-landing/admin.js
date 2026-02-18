@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             const resellerNav = document.querySelector('.sidebar-nav .nav-item[data-section="admin-reseller"]');
             if (resellerNav) {
-                resellerNav.style.display = (currentAdmin.role === 'reseller' || currentAdmin.role === 'super_admin')
+                resellerNav.style.display = (currentAdmin.role === 'admin' || currentAdmin.role === 'reseller' || currentAdmin.role === 'super_admin')
                     ? ''
                     : 'none';
             }
