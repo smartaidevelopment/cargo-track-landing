@@ -72,7 +72,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initAdminSettings();
     initTrackerLibrary();
 
-    fetchTenants().catch(() => {});
+    fetchTenants().then(() => fetchUsers()).then(() => cleanOrphanedTenants()).catch(() => {});
     
     // Initialize logout
     const adminLogoutBtn = document.getElementById('adminLogoutBtn');
@@ -4032,9 +4032,34 @@ async function loadResellerData() {
     }
     await fetchTenants();
     await fetchUsers();
+    await cleanOrphanedTenants();
     renderResellerTenants();
     renderResellerUsers();
     populateTenantSelect();
+}
+
+async function cleanOrphanedTenants() {
+    if (!resellerTenantsCache.length) return;
+    const allUsers = [...resellerUsersCache, ...getUsers()];
+    const usedTenantIds = new Set(allUsers.map(u => u.tenantId).filter(Boolean));
+
+    const orphans = resellerTenantsCache.filter(t => !usedTenantIds.has(t.id));
+    if (!orphans.length) return;
+
+    for (const tenant of orphans) {
+        try {
+            const resp = await fetch(`/api/tenants?tenantId=${encodeURIComponent(tenant.id)}`, {
+                method: 'DELETE',
+                headers: getApiAuthHeaders()
+            });
+            if (resp.ok) {
+                console.log(`Cleaned orphaned tenant: ${tenant.name} (${tenant.id})`);
+            }
+        } catch (e) {
+            console.warn('Failed to clean orphaned tenant:', tenant.id, e);
+        }
+    }
+    await fetchTenants();
 }
 
 function renderResellerTenants() {
