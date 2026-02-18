@@ -1,0 +1,12 @@
+{
+  "name": "cargotrack-codec8-gateway",
+  "version": "1.0.0",
+  "description": "Teltonika Codec8/Codec8E TCP gateway for CargoTrack",
+  "main": "codec8-gateway.js",
+  "scripts": {
+    "start": "node codec8-gateway.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -188,7 +188,22 @@ function parseAvlRecords(data) {
 function scaleIoValue(field, value) {
     if (typeof value !== 'number') return value;
     if (field === 'temperature' || field === 'humidity') {
-        return value / 10;
+        if (value >= 850 && [850, 2000, 3000, 4000, 5000].includes(value)) return null;
+        const magnitude = Math.abs(value);
+        return magnitude > 1000 ? value / 1000 : value / 10;
+    }
+    if (field === 'battery') {
+        let normalized = Math.abs(value);
+        if (normalized > 1000) {
+            normalized = normalized / 100;
+        } else if (normalized > 100) {
+            normalized = normalized / 10;
+        }
+        if (normalized > 100) normalized = 100;
+        return Math.round(normalized * 10) / 10;
+    }
+    if (field === 'batteryVoltage' || field === 'externalVoltage') {
+        return Math.round(value) / 1000;
     }
     return value;
 }
@@ -277,7 +292,6 @@ const server = net.createServer(socket => {
             try {
                 const parsed = parseAvlRecords(frame.data);
                 recordCount = parsed.recordCount;
-                console.log(`AVL records received: ${recordCount}`);
                 for (const record of parsed.records) {
                     const ioMapped = mapIoToPayload(record.io);
                     if (LOG_IO && (!LOG_IO_ONCE || !loggedImeis.has(imei))) {
