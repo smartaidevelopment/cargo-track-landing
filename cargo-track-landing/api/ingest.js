@@ -320,12 +320,22 @@ module.exports = async (req, res) => {
             'angle',
             'orientation.tilt'
         ])),
+        batteryVoltage: toNumber(getFirstValue(payload, [
+            'batteryVoltage',
+            'battery_voltage',
+            'voltBattery'
+        ])),
         rssi: toNumber(getFirstValue(payload, [
             'rssi',
             'signal',
             'signalStrength',
             'signal_strength'
         ])),
+        gsmSignal: toNumber(getFirstValue(payload, [
+            'gsmSignal',
+            'gsm_signal'
+        ])),
+        movement: payload.movement !== undefined ? Number(payload.movement) : null,
         speed: toNumber(getFirstValue(payload, [
             'speed',
             'gps.speed',

@@ -188,7 +188,7 @@ function parseAvlRecords(data) {
 function scaleIoValue(field, value) {
     if (typeof value !== 'number') return value;
     if (field === 'temperature' || field === 'humidity') {
-        if (value >= 850 && [850, 2000, 3000, 4000, 5000].includes(value)) return null;
+        if (value === 32767 || (value >= 850 && [850, 2000, 3000, 4000, 5000].includes(value))) return null;
         const magnitude = Math.abs(value);
         return magnitude > 1000 ? value / 1000 : value / 10;
     }
@@ -272,6 +272,7 @@ const server = net.createServer(socket => {
     let imei = null;
 
     socket.on('data', async chunk => {
+        console.log(`[${imei || 'new'}] Bytes received: ${chunk.length}`);
         buffer = Buffer.concat([buffer, chunk]);
 
         if (!imei) {
@@ -280,22 +281,35 @@ const server = net.createServer(socket => {
             imei = parsed.imei;
             buffer = parsed.rest;
             socket.write(Buffer.from([0x01]));
+            console.log(`[${imei}] IMEI accepted, remaining buffer: ${buffer.length} bytes`);
         }
 
         while (true) {
+            if (buffer.length < 8) {
+                if (buffer.length > 0) console.log(`[${imei}] Waiting for AVL frame header: have ${buffer.length} bytes, need 8`);
+                break;
+            }
+            const dataLength = buffer.readUInt32BE(4);
+            const frameLength = 8 + dataLength + 4;
+            if (buffer.length < frameLength) {
+                console.log(`[${imei}] Waiting for full AVL frame: have ${buffer.length}, need ${frameLength} (dataLength=${dataLength})`);
+                break;
+            }
             const frame = decodeAvlFrame(buffer);
             if (!frame) break;
             buffer = frame.rest;
+            console.log(`[${imei}] AVL frame decoded: ${frame.data.length} bytes of data`);
 
             let recordCount = 0;
             let parseFailed = false;
             try {
                 const parsed = parseAvlRecords(frame.data);
                 recordCount = parsed.recordCount;
+                console.log(`[${imei}] Parsed ${recordCount} AVL records`);
                 for (const record of parsed.records) {
                     const ioMapped = mapIoToPayload(record.io);
                     if (LOG_IO && (!LOG_IO_ONCE || !loggedImeis.has(imei))) {
-                        console.log(`IO snapshot for ${imei}:`, record.io);
+                        console.log(`[${imei}] IO snapshot:`, JSON.stringify(record.io));
                         loggedImeis.add(imei);
                     }
                     const payload = {
@@ -310,10 +324,12 @@ const server = net.createServer(socket => {
                         accuracy: ioMapped.accuracy ?? null,
                         ...ioMapped
                     };
-                    await postToIngest(payload);
+                    console.log(`[${imei}] Sending to ingest: lat=${payload.lat} lng=${payload.lng} battery=${payload.battery} temp=${payload.temperature}`);
+                    const status = await postToIngest(payload);
+                    console.log(`[${imei}] Ingest response: ${status}`);
                 }
             } catch (error) {
-                console.error('Failed to process AVL data:', error);
+                console.error(`[${imei}] Failed to process AVL data:`, error.message || error);
                 parseFailed = true;
             }
 
@@ -325,11 +341,16 @@ const server = net.createServer(socket => {
             const ack = Buffer.alloc(4);
             ack.writeUInt32BE(recordCount, 0);
             socket.write(ack);
+            console.log(`[${imei}] ACK sent for ${recordCount} records`);
         }
     });
 
+    socket.on('close', () => {
+        console.log(`[${imei || 'unknown'}] Connection closed`);
+    });
+
     socket.on('error', error => {
-        console.warn('Socket error:', error.message);
+        console.warn(`[${imei || 'unknown'}] Socket error:`, error.message);
     });
 });
 
