@@ -3223,6 +3223,11 @@ function initAdminDeviceManagement() {
     const modal = document.getElementById('adminDeviceModal');
     if (modal) modal.addEventListener('click', (e) => { if (e.target === modal) closeAdminDeviceModal(); });
 
+    const closeTenantBtn = document.getElementById('closeTenantEditModal');
+    if (closeTenantBtn) closeTenantBtn.addEventListener('click', closeTenantEditModal);
+    const tenantModal = document.getElementById('tenantEditModal');
+    if (tenantModal) tenantModal.addEventListener('click', (e) => { if (e.target === tenantModal) closeTenantEditModal(); });
+
     const refreshBtn = document.getElementById('refreshDeviceListBtn');
     if (refreshBtn) refreshBtn.addEventListener('click', () => {
         refreshBtn.querySelector('i').classList.add('fa-spin');
@@ -3422,8 +3427,21 @@ function showAdminDeviceForm(deviceId) {
     function sel(a, b) { return a === b ? 'selected' : ''; }
     function v(val, fallback) { return val != null ? val : (fallback != null ? fallback : ''); }
 
+    const profileOptions = TRACKER_PROFILES.map(p =>
+        `<option value="${p.id}">${p.manufacturer} ${p.model} (${p.protocol})</option>`
+    ).join('');
+
     body.innerHTML = `
         <form id="adminDeviceForm" class="settings-form" onsubmit="return false;">
+
+            ${!isEdit ? `<div class="form-section" style="background:var(--bg-light);padding:1rem;border-radius:0.5rem;margin-bottom:1rem;">
+            <h4 style="margin-top:0;"><i class="fas fa-microchip"></i> Device Profile</h4>
+            <p style="font-size:0.85rem;color:var(--text-light);margin-bottom:0.75rem;">Select a pre-built profile to auto-fill model, data format, and sensors, or choose manual entry.</p>
+            <select id="adminDeviceProfile" style="width:100%;padding:0.5rem;border:1px solid var(--border-color);border-radius:0.25rem;">
+                <option value="">Custom / Manual Entry</option>
+                <optgroup label="Pre-built Profiles">${profileOptions}</optgroup>
+            </select>
+            </div>` : ''}
 
             <div class="form-section"><h4><i class="fas fa-info-circle"></i> Basic Information</h4>
             <div class="form-row">
@@ -3639,7 +3657,82 @@ function showAdminDeviceForm(deviceId) {
         }
     }
 
+    const profileSelect = document.getElementById('adminDeviceProfile');
+    if (profileSelect) {
+        profileSelect.addEventListener('change', function() {
+            const profileId = this.value;
+            if (!profileId) return;
+            const profile = TRACKER_PROFILES.find(p => p.id === profileId);
+            if (!profile) return;
+
+            const modelEl = document.getElementById('adminDeviceModel');
+            const typeEl = document.getElementById('adminDeviceType');
+            const dataFmtEl = document.getElementById('adminLteDataFormat');
+            const apnEl = document.getElementById('adminLteApn');
+
+            if (modelEl) modelEl.value = profile.manufacturer + ' ' + profile.model;
+
+            if (typeEl) {
+                const catMap = { 'Vehicle': 'Tracker', 'Asset': 'Tracker', 'Fleet': 'Tracker', 'Personal': 'Tracker', 'Sensor': 'Sensor', 'Gateway': 'Gateway' };
+                typeEl.value = catMap[profile.category] || 'Tracker';
+            }
+
+            if (dataFmtEl) {
+                const fmtMap = { 'HTTP': 'json', 'TCP': 'codec8', 'TCP/UDP': 'codec8', 'MQTT': 'json' };
+                dataFmtEl.value = fmtMap[profile.protocol] || 'json';
+            }
+
+            if (apnEl && profile.apn) {
+                apnEl.value = profile.apn.replace(/\s*\(.*\)/, '');
+            }
+
+            if (profile.sensors && profile.sensors.length) {
+                const sensorMap = {
+                    'GPS': null, 'Wi-Fi positioning': null,
+                    'Accelerometer': 'accelerometer', 'Gyroscope': 'gyroscope',
+                    'Temperature': 'temperature', 'Humidity': 'humidity',
+                    'Magnetometer': 'magnetometer', 'Pressure': 'pressure',
+                    'Light': 'light', 'Fuel': null, 'OBD-II': null
+                };
+                document.querySelectorAll('#adminDeviceForm input[name="adSensors"]').forEach(cb => cb.checked = false);
+                profile.sensors.forEach(s => {
+                    const mapped = sensorMap[s];
+                    if (mapped) {
+                        const cb = document.querySelector(`#adminDeviceForm input[name="adSensors"][value="${mapped}"]`);
+                        if (cb) cb.checked = true;
+                    }
+                });
+            }
+
+            showNotification(`Profile "${profile.manufacturer} ${profile.model}" applied. You can override any field.`, 'info');
+        });
+    }
+
+    const nsSelect = document.getElementById('adminDeviceNamespace');
+    if (nsSelect) {
+        nsSelect.addEventListener('change', function() {
+            applyTenantNetworkDefaults(this.value);
+        });
+    }
+
     modal.style.display = 'flex';
+}
+
+function applyTenantNetworkDefaults(namespaceValue) {
+    if (!namespaceValue || !namespaceValue.startsWith('tenant:')) return;
+    const tenantId = namespaceValue.replace('tenant:', '');
+    const tenant = resellerTenantsCache.find(t => t.id === tenantId);
+    if (!tenant) return;
+
+    const carrierEl = document.getElementById('adminLteCarrier');
+    const apnEl = document.getElementById('adminLteApn');
+
+    if (carrierEl && !carrierEl.value && tenant.defaultCarrier) {
+        carrierEl.value = tenant.defaultCarrier;
+    }
+    if (apnEl && !apnEl.value && tenant.defaultApn) {
+        apnEl.value = tenant.defaultApn;
+    }
 }
 
 function getAvailableNamespaceOptions(selectedValue) {
@@ -3904,33 +3997,66 @@ function renderResellerTenants() {
     const table = document.getElementById('resellerTenantsTable');
     if (!table) return;
     if (!resellerTenantsCache.length) {
-        table.innerHTML = '<tr><td colspan="5">No workspaces found.</td></tr>';
+        table.innerHTML = '<tr><td colspan="6">No workspaces found.</td></tr>';
         return;
     }
-    table.innerHTML = resellerTenantsCache.map((tenant) => `
-        <tr>
+    table.innerHTML = resellerTenantsCache.map((tenant) => {
+        const netParts = [tenant.defaultCarrier, tenant.defaultApn].filter(Boolean);
+        const netLabel = netParts.length ? netParts.join(' / ') : '<span style="color:var(--text-light);">Not set</span>';
+        return `<tr>
             <td>${tenant.name}</td>
             <td>${tenant.planTier || 'individual'}</td>
+            <td style="font-size:0.9rem;">${netLabel}</td>
             <td>${tenant.resellerId || 'Direct'}</td>
             <td>${tenant.createdAt ? new Date(tenant.createdAt).toLocaleDateString() : '-'}</td>
             <td>
                 <button class="btn btn-outline btn-small" onclick="editTenant('${tenant.id}')" title="Edit"><i class="fas fa-edit"></i></button>
                 <button class="btn btn-outline btn-small" onclick="deleteTenant('${tenant.id}')" title="Delete"><i class="fas fa-trash"></i></button>
             </td>
-        </tr>
-    `).join('');
+        </tr>`;
+    }).join('');
 }
 
-async function editTenant(tenantId) {
+function editTenant(tenantId) {
     const tenant = resellerTenantsCache.find(t => t.id === tenantId);
     if (!tenant) return;
-    const newName = prompt('Tenant name:', tenant.name);
-    if (!newName || newName === tenant.name) return;
+
+    document.getElementById('tenantEditId').value = tenant.id;
+    document.getElementById('tenantEditName').value = tenant.name || '';
+    document.getElementById('tenantEditPlan').value = tenant.planTier || 'individual';
+    document.getElementById('tenantEditCarrier').value = tenant.defaultCarrier || '';
+    document.getElementById('tenantEditApn').value = tenant.defaultApn || '';
+    document.getElementById('tenantEditSimProvider').value = tenant.simProvider || '';
+    document.getElementById('tenantEditNetworkNotes').value = tenant.networkNotes || '';
+
+    document.getElementById('tenantEditModalTitle').textContent = `Edit Tenant — ${tenant.name}`;
+    document.getElementById('tenantEditModal').style.display = 'flex';
+}
+
+function closeTenantEditModal() {
+    document.getElementById('tenantEditModal').style.display = 'none';
+}
+
+async function saveTenantEdit() {
+    const tenantId = document.getElementById('tenantEditId').value;
+    const name = document.getElementById('tenantEditName').value.trim();
+    if (!name) { showNotification('Tenant name is required.', 'error'); return; }
+
+    const payload = {
+        id: tenantId,
+        name,
+        planTier: document.getElementById('tenantEditPlan').value,
+        defaultCarrier: document.getElementById('tenantEditCarrier').value.trim(),
+        defaultApn: document.getElementById('tenantEditApn').value.trim(),
+        simProvider: document.getElementById('tenantEditSimProvider').value.trim(),
+        networkNotes: document.getElementById('tenantEditNetworkNotes').value.trim()
+    };
+
     try {
         const response = await fetch('/api/tenants', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', ...getApiAuthHeaders() },
-            body: JSON.stringify({ id: tenantId, name: newName })
+            body: JSON.stringify(payload)
         });
         if (!response.ok) {
             const r = await response.json();
@@ -3938,6 +4064,7 @@ async function editTenant(tenantId) {
             return;
         }
         showNotification('Tenant updated.', 'success');
+        closeTenantEditModal();
         await loadResellerData();
     } catch (error) {
         showNotification('Failed to update tenant.', 'error');
