@@ -3467,6 +3467,7 @@ function showAdminDeviceForm(deviceId) {
 
     body.innerHTML = `
         <form id="adminDeviceForm" class="settings-form" onsubmit="return false;">
+            <input type="hidden" id="adminDeviceOriginalNamespace" value="${isEdit ? (device.ownerNamespace || '') : ''}">
 
             ${!isEdit ? `<div class="form-section" style="background:var(--bg-light);padding:1rem;border-radius:0.5rem;margin-bottom:1rem;">
             <h4 style="margin-top:0;"><i class="fas fa-microchip"></i> Device Profile</h4>
@@ -3795,7 +3796,11 @@ function getAvailableNamespaceOptions(selectedValue) {
         options += '</optgroup>';
     }
 
-    if (users.length === 0 && tenants.length === 0) {
+    if (selectedValue && !options.includes(`value="${selectedValue}"`)) {
+        options += `<option value="${selectedValue}" selected>${selectedValue} (current)</option>`;
+    }
+
+    if (users.length === 0 && tenants.length === 0 && !selectedValue) {
         options = '<option value="">No users or tenants available</option>';
     }
 
@@ -3813,11 +3818,14 @@ async function saveAdminDevice(existingId) {
     const type = document.getElementById('adminDeviceType')?.value || 'Tracker';
     const model = (document.getElementById('adminDeviceModel')?.value || '').trim();
     const status = document.getElementById('adminDeviceStatus')?.value || 'active';
-    const namespace = document.getElementById('adminDeviceNamespace')?.value || '';
+    const selectedNamespace = document.getElementById('adminDeviceNamespace')?.value || '';
+    const originalNamespace = document.getElementById('adminDeviceOriginalNamespace')?.value || '';
     const group = (document.getElementById('adminDeviceGroup')?.value || '').trim();
     const asset = (document.getElementById('adminDeviceAsset')?.value || '').trim();
     const lat = document.getElementById('adminDeviceLat')?.value;
     const lng = document.getElementById('adminDeviceLng')?.value;
+
+    const namespace = selectedNamespace || originalNamespace;
 
     if (!id || !name) {
         showNotification('Device ID and Name are required.', 'error');
@@ -3827,6 +3835,8 @@ async function saveAdminDevice(existingId) {
         showNotification('Please select an owner for the device.', 'error');
         return;
     }
+
+    const namespaceMoved = existingId && originalNamespace && selectedNamespace && selectedNamespace !== originalNamespace;
 
     const selectedNetworks = [];
     document.querySelectorAll('#adminDeviceForm input[name="adNetworks"]:checked').forEach(cb => selectedNetworks.push(cb.value));
@@ -3921,10 +3931,19 @@ async function saveAdminDevice(existingId) {
     }
 
     try {
+        if (namespaceMoved) {
+            await fetch('/api/admin-devices', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json', ...getApiAuthHeaders() },
+                body: JSON.stringify({ namespace: originalNamespace, deviceId: id })
+            });
+        }
+
+        const saveNs = namespaceMoved ? selectedNamespace : (existingId ? (originalNamespace || namespace) : namespace);
         const response = await fetch('/api/admin-devices', {
-            method: existingId ? 'PUT' : 'POST',
+            method: existingId && !namespaceMoved ? 'PUT' : 'POST',
             headers: { 'Content-Type': 'application/json', ...getApiAuthHeaders() },
-            body: JSON.stringify({ namespace, device: payload })
+            body: JSON.stringify({ namespace: saveNs, device: payload })
         });
         const result = await response.json();
         if (!response.ok) {
