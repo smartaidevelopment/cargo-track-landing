@@ -3427,14 +3427,74 @@ function viewDeviceAdmin(deviceId) {
             <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.75rem;">${sensorHtml}</div>
         </div>
 
+        <div id="deviceDiagnosticsPanel" style="display:none;margin-top:1.25rem;"></div>
+
         <div class="form-actions" style="margin-top:1.5rem;">
             <button class="btn btn-outline" onclick="closeAdminDeviceModal()"><i class="fas fa-times"></i> Close</button>
             ${hasLoc ? `<button class="btn btn-outline" onclick="closeAdminDeviceModal();adminLocateDevice('${device.id}')"><i class="fas fa-crosshairs"></i> Locate on Map</button>` : ''}
+            <button class="btn btn-outline" onclick="runDeviceDiagnostics('${device.id}')"><i class="fas fa-stethoscope"></i> Diagnostics</button>
             <button class="btn btn-outline" onclick="editDeviceAdmin('${device.id}')"><i class="fas fa-edit"></i> Edit</button>
             <button class="btn btn-outline danger" onclick="deleteDeviceAdmin('${device.id}')"><i class="fas fa-trash"></i> Delete</button>
         </div>
     `;
     modal.style.display = 'flex';
+}
+
+async function runDeviceDiagnostics(deviceId) {
+    const panel = document.getElementById('deviceDiagnosticsPanel');
+    if (!panel) return;
+    panel.style.display = 'block';
+    panel.innerHTML = `<div class="form-section"><h4><i class="fas fa-stethoscope"></i> Connection Diagnostics</h4><p style="color:var(--text-light);"><i class="fas fa-spinner fa-spin"></i> Running checks...</p></div>`;
+
+    try {
+        const resp = await fetch(`/api/ingest-status?deviceId=${encodeURIComponent(deviceId)}`, {
+            headers: getApiAuthHeaders()
+        });
+        if (!resp.ok) {
+            panel.innerHTML = `<div class="form-section"><h4><i class="fas fa-stethoscope"></i> Connection Diagnostics</h4><p style="color:#ef4444;">Diagnostics failed: ${resp.status}</p></div>`;
+            return;
+        }
+        const d = await resp.json();
+
+        const statusColors = { connected: '#22c55e', stale: '#f59e0b', awaiting_data: '#3b82f6', not_registered: '#ef4444', misconfigured: '#ef4444', inactive: '#6b7280', unknown: '#6b7280' };
+        const statusLabels = { connected: 'Connected — receiving live data', stale: 'Stale — last data over 5 minutes ago', awaiting_data: 'Ready — waiting for first data from tracker', not_registered: 'Not registered — device needs tenant mapping', misconfigured: 'Misconfigured — ingest token not set', inactive: 'Inactive — no recent data', unknown: 'Unknown' };
+        const color = statusColors[d.pipelineStatus] || '#6b7280';
+        const label = statusLabels[d.pipelineStatus] || d.pipelineStatus;
+
+        const check = (ok, text) => `<div style="display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0;"><i class="fas ${ok ? 'fa-check-circle' : 'fa-times-circle'}" style="color:${ok ? '#22c55e' : '#ef4444'};"></i> <span>${text}</span></div>`;
+
+        let dataSection = '';
+        if (d.latestData) {
+            const fields = [];
+            if (d.latestData.timestamp) fields.push(`<strong>Timestamp:</strong> ${new Date(d.latestData.timestamp).toLocaleString()}`);
+            if (d.latestData.latitude != null) fields.push(`<strong>Lat/Lng:</strong> ${d.latestData.latitude}, ${d.latestData.longitude}`);
+            if (d.latestData.battery != null) fields.push(`<strong>Battery:</strong> ${d.latestData.battery}%`);
+            if (d.latestData.temperature != null) fields.push(`<strong>Temp:</strong> ${d.latestData.temperature}°C`);
+            if (d.latestData.speed != null) fields.push(`<strong>Speed:</strong> ${d.latestData.speed} km/h`);
+            if (d.latestData.satellites != null) fields.push(`<strong>Satellites:</strong> ${d.latestData.satellites}`);
+            if (d.latestData.rssi != null) fields.push(`<strong>Signal:</strong> ${d.latestData.rssi} dBm`);
+            dataSection = `<div style="margin-top:0.75rem;padding:0.75rem;background:var(--bg-light);border-radius:0.5rem;border:1px solid var(--border-color);"><strong style="display:block;margin-bottom:0.5rem;">Last Received Data:</strong>${fields.join('<br>')}</div>`;
+        }
+
+        panel.innerHTML = `
+            <div class="form-section">
+                <h4><i class="fas fa-stethoscope"></i> Connection Diagnostics</h4>
+                <div style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.5rem 1rem;border-radius:1rem;background:${color}15;border:1px solid ${color}40;margin-bottom:0.75rem;">
+                    <span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;"></span>
+                    <strong style="color:${color};">${label}</strong>
+                </div>
+                <div style="margin-top:0.5rem;">
+                    ${check(d.ingestTokenConfigured, 'Ingest token configured')}
+                    ${check(d.tenantMapping, `Device registered to tenant${d.tenantId ? ': <code>' + d.tenantId + '</code>' : ''}`)}
+                    ${check(d.registryStatus === 'registered', `Device in tenant registry${d.registryStatus === 'registered' ? '' : ' (not found)'}`)}
+                    ${check(d.inDevicesSet, 'Device in live data index')}
+                    ${check(!!d.latestData, d.latestData ? `Last data: ${d.dataAgeLabel || 'unknown age'}` : 'No data received yet')}
+                </div>
+                ${dataSection}
+            </div>`;
+    } catch (e) {
+        panel.innerHTML = `<div class="form-section"><h4><i class="fas fa-stethoscope"></i> Connection Diagnostics</h4><p style="color:#ef4444;">Error: ${e.message}</p></div>`;
+    }
 }
 
 function showAdminDeviceForm(deviceId) {

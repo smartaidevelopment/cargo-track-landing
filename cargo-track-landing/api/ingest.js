@@ -1,13 +1,18 @@
-const { kv } = require('@vercel/kv');
 const { Redis } = require('@upstash/redis');
+const crypto = require('crypto');
 
 const redis = Redis.fromEnv();
-const buildDeviceTenantKey = (deviceId) => `device:tenant:${deviceId}`;
-const buildStorageKey = (namespace, key) => `storage:${namespace}:${key}`;
-const buildRegistrySetKey = (namespace) => `storage:set:${namespace}:${DEVICE_REGISTRY_KEY}`;
 const DEVICE_REGISTRY_KEY = 'cargotrack_device_registry';
 const INGEST_RETRY_ATTEMPTS = 3;
 const MAX_DEVICE_ID_LENGTH = 128;
+const buildDeviceTenantKey = (deviceId) => `device:tenant:${deviceId}`;
+const buildStorageKey = (namespace, key) => `storage:${namespace}:${key}`;
+const buildRegistrySetKey = (namespace) => `storage:set:${namespace}:${DEVICE_REGISTRY_KEY}`;
+
+const toFixedHash = (v) => crypto.createHash('sha256').update(String(v ?? '')).digest();
+const safeTokenEqual = (a, b) => {
+    try { return crypto.timingSafeEqual(toFixedHash(a), toFixedHash(b)); } catch (_) { return false; }
+};
 
 function parseJsonBody(body) {
     if (!body) return null;
@@ -99,6 +104,31 @@ function normalizeBattery(value) {
     return Math.round(magnitude * 10) / 10;
 }
 
+function normalizeTimestamp(value, fallbackIso) {
+    if (value === null || value === undefined || value === '') return fallbackIso;
+    if (typeof value === 'number') {
+        if (!Number.isFinite(value)) return fallbackIso;
+        const ms = value < 1e12 ? value * 1000 : value;
+        return new Date(ms).toISOString();
+    }
+
+    const raw = String(value).trim();
+    if (!raw) return fallbackIso;
+
+    if (/^\d+(\.\d+)?$/.test(raw)) {
+        const numeric = Number(raw);
+        if (!Number.isFinite(numeric)) return fallbackIso;
+        const ms = numeric < 1e12 ? numeric * 1000 : numeric;
+        return new Date(ms).toISOString();
+    }
+
+    const parsed = Date.parse(raw);
+    if (Number.isFinite(parsed)) {
+        return new Date(parsed).toISOString();
+    }
+    return fallbackIso;
+}
+
 module.exports = async (req, res) => {
     if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method not allowed' });
@@ -120,10 +150,18 @@ module.exports = async (req, res) => {
         return;
     }
 
-    if (bearerToken !== token && headerToken !== token) {
+    if (!safeTokenEqual(bearerToken, token) && !safeTokenEqual(headerToken, token)) {
         console.log('[ingest] unauthorized');
         res.status(401).json({ error: 'Unauthorized' });
         return;
+    }
+
+    const callerIp = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown').split(',')[0].trim();
+    const rlKey = `rl:ingest:${callerIp}`;
+    const rlCount = await redis.incr(rlKey);
+    if (rlCount === 1) await redis.expire(rlKey, 60);
+    if (rlCount > 120) {
+        return res.status(429).json({ error: 'Rate limit exceeded' });
     }
 
     const payload = parseJsonBody(req.body);
@@ -173,26 +211,32 @@ module.exports = async (req, res) => {
         'position.longitude'
     ]));
 
-    if (!deviceId || deviceId.length > MAX_DEVICE_ID_LENGTH || latitude === null || longitude === null) {
+    if (!deviceId || deviceId.length > MAX_DEVICE_ID_LENGTH) {
         console.log('[ingest] missing required fields', {
             deviceId,
             latitude,
             longitude
         });
-        res.status(400).json({ error: 'Valid deviceId, latitude, and longitude are required' });
+        res.status(400).json({ error: 'Valid deviceId is required' });
         return;
     }
-    if (!isValidLatitude(latitude) || !isValidLongitude(longitude)) {
+    const hasCoordinates = latitude !== null && longitude !== null;
+    if (hasCoordinates && (!isValidLatitude(latitude) || !isValidLongitude(longitude))) {
         res.status(400).json({ error: 'Invalid coordinates' });
         return;
     }
 
     const now = new Date().toISOString();
+    const imeiValue = payload.imei ? payload.imei.toString().trim() : '';
+    const persistedIds = Array.from(new Set([deviceId, imeiValue].filter(Boolean)));
     const tenantFromPayload = getFirstValue(payload, ['tenantId', 'tenant_id']);
     const payloadTenantId = tenantFromPayload ? tenantFromPayload.toString().trim() : '';
     let tenantId = '';
     try {
-        const mapped = await redis.get(buildDeviceTenantKey(deviceId));
+        let mapped = await redis.get(buildDeviceTenantKey(deviceId));
+        if (!mapped && imeiValue) {
+            mapped = await redis.get(buildDeviceTenantKey(imeiValue));
+        }
         tenantId = mapped ? mapped.toString() : '';
     } catch (error) {
         tenantId = '';
@@ -206,16 +250,11 @@ module.exports = async (req, res) => {
         return;
     }
     try {
-        await withRetry(() => redis.set(buildDeviceTenantKey(deviceId), tenantId));
+        await Promise.all(persistedIds.map((id) => withRetry(() => redis.set(buildDeviceTenantKey(id), tenantId))));
         const namespace = `tenant:${tenantId}`;
         const registryKey = buildStorageKey(namespace, DEVICE_REGISTRY_KEY);
         const registrySetKey = buildRegistrySetKey(namespace);
-        const idsToAdd = [deviceId];
-        if (payload.imei) {
-            const imeiValue = payload.imei.toString().trim();
-            if (imeiValue) idsToAdd.push(imeiValue);
-        }
-        await withRetry(() => redis.sadd(registrySetKey, ...idsToAdd));
+        await withRetry(() => redis.sadd(registrySetKey, ...persistedIds));
         const registryMembers = await withRetry(() => redis.smembers(registrySetKey));
         const registry = Array.from(new Set((Array.isArray(registryMembers) ? registryMembers : [])
             .map((id) => String(id || '').trim())
@@ -228,18 +267,18 @@ module.exports = async (req, res) => {
     }
     const record = {
         deviceId,
-        imei: payload.imei ? payload.imei.toString().trim() : null,
+        imei: imeiValue || null,
         tenantId: tenantId || null,
-        latitude,
-        longitude,
-        timestamp: getFirstValue(payload, [
+        latitude: hasCoordinates ? latitude : null,
+        longitude: hasCoordinates ? longitude : null,
+        timestamp: normalizeTimestamp(getFirstValue(payload, [
             'timestamp',
             'time',
             'ts',
             'gps_time',
             'gpsTime',
             'reportedAt'
-        ]) || now,
+        ]), now),
         battery: normalizeBattery(getFirstValue(payload, [
             'battery',
             'batteryLevel',
@@ -311,32 +350,47 @@ module.exports = async (req, res) => {
     };
 
     try {
-        await withRetry(() => kv.set(`device:latest:${deviceId}`, record));
-        await withRetry(() => kv.sadd('devices:latest', deviceId));
+        await Promise.all(
+            persistedIds.map((id) =>
+                withRetry(() =>
+                    redis.set(`device:latest:${id}`, {
+                        ...record,
+                        // Preserve canonical tracker ID from payload so alias
+                        // records (e.g. IMEI keys) can still resolve back to
+                        // the true telemetry history key.
+                        deviceId,
+                        id
+                    })
+                )
+            )
+        );
+        await withRetry(() => redis.sadd('devices:latest', ...persistedIds));
         const retentionDays = Number.parseInt(process.env.HISTORY_RETENTION_DAYS || '90', 10);
         const retentionMs = Number.isFinite(retentionDays) && retentionDays > 0
             ? retentionDays * 24 * 60 * 60 * 1000
             : 90 * 24 * 60 * 60 * 1000;
         const ts = Date.parse(record.timestamp) || Date.now();
-        const historyKey = `device:history:${deviceId}`;
-        const historyPoint = {
-            id: `${deviceId}-${ts}`,
-            deviceId,
-            latitude,
-            longitude,
-            timestamp: new Date(ts).toISOString(),
-            temperature: record.temperature,
-            humidity: record.humidity,
-            collision: record.collision,
-            tilt: record.tilt,
-            battery: record.battery,
-            speed: record.speed,
-            heading: record.heading,
-            accuracy: record.accuracy,
-            satellites: record.satellites
-        };
-        await withRetry(() => kv.zadd(historyKey, [{ score: ts, member: JSON.stringify(historyPoint) }]));
-        await withRetry(() => kv.zremrangebyscore(historyKey, 0, ts - retentionMs));
+        if (hasCoordinates) {
+            const historyKey = `device:history:${deviceId}`;
+            const historyPoint = {
+                id: `${deviceId}-${ts}`,
+                deviceId,
+                latitude: record.latitude,
+                longitude: record.longitude,
+                timestamp: new Date(ts).toISOString(),
+                temperature: record.temperature,
+                humidity: record.humidity,
+                collision: record.collision,
+                tilt: record.tilt,
+                battery: record.battery,
+                speed: record.speed,
+                heading: record.heading,
+                accuracy: record.accuracy,
+                satellites: record.satellites
+            };
+            await withRetry(() => redis.zadd(historyKey, { score: ts, member: JSON.stringify(historyPoint) }));
+            await withRetry(() => redis.zremrangebyscore(historyKey, 0, ts - retentionMs));
+        }
         console.log('[ingest] persisted', {
             deviceId,
             tenantId: tenantId || null

@@ -189,6 +189,29 @@ async function handleSave(req, res, session) {
 
         await redis.set(key, JSON.stringify(existing));
         await redis.sadd(NAMESPACES_SET, namespace);
+
+        let tenantId = null;
+        if (namespace.startsWith('tenant:')) {
+            tenantId = namespace.replace('tenant:', '');
+        } else if (device.tenantId) {
+            tenantId = device.tenantId;
+        }
+        if (tenantId) {
+            const deviceIds = [device.id];
+            const imei = device.lte?.imei;
+            if (imei) deviceIds.push(imei);
+            const REGISTRY_KEY = 'cargotrack_device_registry';
+            const registrySetKey = `storage:set:tenant:${tenantId}:${REGISTRY_KEY}`;
+            await Promise.all([
+                ...deviceIds.map((id) => redis.set(`device:tenant:${id}`, tenantId)),
+                redis.sadd(registrySetKey, ...deviceIds),
+                redis.set(buildStorageKey(`tenant:${tenantId}`, REGISTRY_KEY),
+                    JSON.stringify(Array.from(new Set(
+                        [...(await redis.smembers(registrySetKey) || []).map(String), ...deviceIds]
+                    ))))
+            ]);
+        }
+
         return res.status(200).json({ ok: true, device: existing[idx >= 0 ? idx : existing.length - 1] });
     } catch (error) {
         console.error('Admin device save failed:', error);
