@@ -1,7 +1,64 @@
 /* Admin Panel Specific Styles */
 
-.admin-avatar {
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+.admin-section-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.55rem 0.75rem;
+    background: #ffffff;
+    border-radius: 0.68rem;
+    border: 1px solid #dbe4ee;
+    margin-bottom: 1.25rem;
+}
+
+.admin-section-toolbar-left,
+.admin-section-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.admin-section-title {
+    font-size: 0.88rem;
+    font-weight: 700;
+    margin: 0;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.admin-section-title i {
+    font-size: 0.82rem;
+    color: #5b6b82;
+}
+
+.admin-section-toolbar .notification-btn {
+    width: 34px;
+    height: 34px;
+    border: 1px solid #d1dbe7;
+    border-radius: 0.45rem;
+    background: #f8fbff;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+    color: #5b6b82;
+    font-size: 0.85rem;
+    transition: background 0.15s;
+}
+
+.admin-section-toolbar .notification-btn:hover {
+    background: #eef5fc;
+}
+
+.admin-section-toolbar .notification-count {
+    position: absolute;
+    top: -5px;
+    right: -5px;
 }
 
 .admin-filters {
