@@ -670,32 +670,9 @@ function setActiveSection(targetSection, options = {}) {
         'compliance-reports': 'Compliance',
         'insurance-pricing': 'Insurance'
             };
-    const titleIcons = {
-        'dashboard': 'fa-home',
-        'devices': 'fa-map-marked-alt',
-        'alerts': 'fa-bell',
-        'analytics': 'fa-chart-line',
-        'devices-management': 'fa-microchip',
-        'config-deliveries': 'fa-calendar-check',
-        'config-areas': 'fa-draw-polygon',
-        'config-assets': 'fa-boxes',
-        'config-groups': 'fa-layer-group',
-        'config-users': 'fa-users',
-        'billing': 'fa-file-invoice-dollar',
-        'settings': 'fa-user-cog',
-        'risk-overview': 'fa-shield-halved',
-        'compliance-reports': 'fa-file-circle-check',
-        'insurance-pricing': 'fa-hand-holding-dollar'
-    };
     const pageTitle = document.getElementById('pageTitle');
     if (pageTitle) {
         pageTitle.textContent = titles[sectionId] || 'Dashboard';
-    }
-    const globalTitle = document.getElementById('globalToolbarTitle');
-    if (globalTitle) {
-        const icon = titleIcons[sectionId] || 'fa-home';
-        const label = titles[sectionId] || 'Dashboard';
-        globalTitle.innerHTML = '<i class="fas ' + icon + '"></i> ' + label;
     }
     const dashActions = document.querySelector('.global-toolbar-dashboard-actions');
     if (dashActions) {
