@@ -680,11 +680,15 @@ function setActiveSection(targetSection, options = {}) {
     }
             
     if (sectionId === 'dashboard' && globalMap) {
-        setTimeout(() => globalMap.invalidateSize(), 50);
+        globalMap._userInteracted = false;
+        setTimeout(() => { globalMap.invalidateSize(); updateGlobalMap(); }, 50);
     }
     if (sectionId === 'devices') {
         if (!map) {
             initMap();
+        } else {
+            mapUserInteracted = false;
+            updateMap();
         }
         if (map) {
             setTimeout(() => map.invalidateSize(), 50);
@@ -1762,6 +1766,8 @@ function initMap() {
         defaultView: { center: [40.7128, -74.0060], zoom: 2 },
         getFitLayers: () => [...deviceMarkers, ...(mapAreasLayerGroup ? mapAreasLayerGroup.getLayers() : [])]
     });
+    map.on('zoomstart', (e) => { if (e.originalEvent) mapUserInteracted = true; });
+    map.on('dragstart', () => { mapUserInteracted = true; });
     
     updateMap();
 }
@@ -1792,6 +1798,8 @@ function initGlobalMap() {
             return [...globalDeviceMarkers, ...areaLayers, ...routeLayers];
         }
     });
+    globalMap.on('zoomstart', (e) => { if (e.originalEvent) globalMap._userInteracted = true; });
+    globalMap.on('dragstart', () => { globalMap._userInteracted = true; });
     
     // Refresh button
     const refreshBtn = document.getElementById('refreshGlobalMapBtn');
@@ -1927,15 +1935,15 @@ function updateGlobalMap() {
         deviceCountEl.textContent = deviceCount;
     }
     
-    // Fit map to show device markers and area overlays
     const globalAreaLayers = globalAreasLayerGroup ? globalAreasLayerGroup.getLayers() : [];
     const globalFitLayers = [...globalDeviceMarkers, ...globalAreaLayers];
-    if (globalFitLayers.length > 0) {
-        const group = L.featureGroup(globalFitLayers);
-        globalMap.fitBounds(group.getBounds().pad(0.1));
-    } else {
-        // Default view if no devices
-        globalMap.setView([20, 0], 2);
+    if (!globalMap._userInteracted) {
+        if (globalFitLayers.length > 0) {
+            const group = L.featureGroup(globalFitLayers);
+            globalMap.fitBounds(group.getBounds().pad(0.1));
+        } else {
+            globalMap.setView([20, 0], 2);
+        }
     }
 }
 
@@ -2260,6 +2268,8 @@ function clearHistoryRoute() {
     historyRouteMapInstance = null;
 }
 
+let mapUserInteracted = false;
+
 function updateMap() {
     if (!map) return;
     
@@ -2293,12 +2303,13 @@ function updateMap() {
         }
     });
     
-    // Fit map to show markers and area overlays
-    const liveAreaLayers = mapAreasLayerGroup ? mapAreasLayerGroup.getLayers() : [];
-    const liveFitLayers = [...deviceMarkers, ...liveAreaLayers];
-    if (liveFitLayers.length > 0) {
-        const group = L.featureGroup(liveFitLayers);
-        map.fitBounds(group.getBounds().pad(0.1));
+    if (!mapUserInteracted) {
+        const liveAreaLayers = mapAreasLayerGroup ? mapAreasLayerGroup.getLayers() : [];
+        const liveFitLayers = [...deviceMarkers, ...liveAreaLayers];
+        if (liveFitLayers.length > 0) {
+            const group = L.featureGroup(liveFitLayers);
+            map.fitBounds(group.getBounds().pad(0.1));
+        }
     }
 }
 
