@@ -259,11 +259,6 @@
             </a>
         </nav>
         
-        <div class="sidebar-footer">
-            <button class="btn btn-outline btn-small sidebar-logout-btn" id="logoutBtn">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </button>
-        </div>
     </aside>
 
     <!-- Main Content -->
@@ -278,47 +273,69 @@
         </div>
         <input type="text" id="deviceSearchInput" class="dashboard-search-proxy" aria-hidden="true" tabindex="-1">
 
-        <!-- Dashboard Section -->
-        <section id="dashboard" class="content-section active dashboard-home">
-            <div class="dashboard-toolbar executive-toolbar">
-                <div class="dashboard-toolbar-left">
-                    <div class="dashboard-home-search">
-                        <i class="fas fa-search"></i>
-                        <input type="text" id="dashboardHomeSearch" placeholder="Search shipments, routes, devices...">
-                    </div>
-                </div>
-                <div class="dashboard-toolbar-right">
-                    <div class="notifications dashboard-home-notifications">
-                        <button class="notification-btn" id="notificationBtn" aria-haspopup="true" aria-expanded="false">
-                            <i class="fas fa-bell"></i>
-                            <span class="notification-count" id="notificationCount">0</span>
-                        </button>
-                        <div class="notification-dropdown" id="notificationDropdown" aria-hidden="true">
-                            <div class="notification-dropdown-header">
-                                <span>Notifications</span>
-                                <div class="notification-dropdown-actions">
-                                    <button class="notification-action" type="button" id="notificationMarkAllRead">Mark all read</button>
-                                    <button class="notification-action" type="button" id="notificationViewAll">View All</button>
-                                </div>
-                            </div>
-                            <div class="notification-dropdown-body" id="notificationDropdownBody">
-                                <p class="empty-state">No alerts at this time</p>
+        <!-- Global Toolbar -->
+        <div class="dashboard-toolbar executive-toolbar global-toolbar" id="globalToolbar">
+            <div class="dashboard-toolbar-left">
+                <h1 class="global-toolbar-title" id="globalToolbarTitle"><i class="fas fa-home"></i> Dashboard</h1>
+            </div>
+            <div class="dashboard-toolbar-right">
+                <div class="notifications dashboard-home-notifications">
+                    <button class="notification-btn" id="notificationBtn" aria-haspopup="true" aria-expanded="false">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-count" id="notificationCount">0</span>
+                    </button>
+                    <div class="notification-dropdown" id="notificationDropdown" aria-hidden="true">
+                        <div class="notification-dropdown-header">
+                            <span>Notifications</span>
+                            <div class="notification-dropdown-actions">
+                                <button class="notification-action" type="button" id="notificationMarkAllRead">Mark all read</button>
+                                <button class="notification-action" type="button" id="notificationViewAll">View All</button>
                             </div>
                         </div>
+                        <div class="notification-dropdown-body" id="notificationDropdownBody">
+                            <p class="empty-state">No alerts at this time</p>
+                        </div>
                     </div>
+                </div>
+                <span class="global-toolbar-dashboard-actions">
                     <button class="btn btn-outline btn-small btn-icon-only" id="resetDashboardLayout" aria-label="Reset layout" title="Reset layout">
                         <i class="fas fa-rotate"></i>
                     </button>
                     <button class="btn btn-outline btn-small btn-icon-only" id="toggleDashboardLayout" aria-label="Modify layout">
                         <i class="fas fa-sliders-h"></i>
                     </button>
-                    <button class="dashboard-account-btn" id="toolbarAccountBtn" type="button" aria-label="Current account" title="Current account">
+                </span>
+                <div class="account-dropdown-wrap" id="accountDropdownWrap">
+                    <button class="dashboard-account-btn" id="toolbarAccountBtn" type="button" aria-label="Current account" aria-haspopup="true" aria-expanded="false">
                         <span class="dashboard-account-avatar" id="toolbarAccountAvatar">U</span>
                         <i class="fas fa-chevron-down" aria-hidden="true"></i>
                     </button>
+                    <div class="account-dropdown" id="accountDropdown">
+                        <div class="account-dropdown-header">
+                            <span class="account-dropdown-avatar" id="accountDropdownAvatar">U</span>
+                            <div class="account-dropdown-info">
+                                <span class="account-dropdown-name" id="accountDropdownName">User</span>
+                                <span class="account-dropdown-email" id="accountDropdownEmail"></span>
+                            </div>
+                        </div>
+                        <div class="account-dropdown-divider"></div>
+                        <button class="account-dropdown-item" id="accountDropdownSettings" type="button">
+                            <i class="fas fa-user-cog"></i> Account Settings
+                        </button>
+                        <button class="account-dropdown-item" id="accountDropdownBilling" type="button">
+                            <i class="fas fa-file-invoice-dollar"></i> Billing
+                        </button>
+                        <div class="account-dropdown-divider"></div>
+                        <button class="account-dropdown-item account-dropdown-logout" id="logoutBtn" type="button">
+                            <i class="fas fa-sign-out-alt"></i> Logout
+                        </button>
+                    </div>
                 </div>
             </div>
+        </div>
 
+        <!-- Dashboard Section -->
+        <section id="dashboard" class="content-section active dashboard-home">
             <div class="dashboard-layout executive-layout" id="dashboardLayout">
                 <div class="dashboard-card full-width" data-layout-id="quick-stats">
                     <div class="card-header">
@@ -1940,6 +1957,25 @@
                         <h2>Account Settings</h2>
                     </div>
                     <form class="settings-form" id="accountSettingsForm">
+                        <div class="settings-avatar-section">
+                            <div class="settings-avatar-preview" id="settingsAvatarPreview">
+                                <span class="settings-avatar-initials" id="settingsAvatarInitials">U</span>
+                                <img class="settings-avatar-img" id="settingsAvatarImg" src="" alt="Avatar" style="display:none;">
+                            </div>
+                            <div class="settings-avatar-actions">
+                                <label class="btn btn-outline btn-small settings-avatar-upload-btn" for="settingsAvatarInput">
+                                    <i class="fas fa-camera"></i> Upload Photo
+                                </label>
+                                <input type="file" id="settingsAvatarInput" accept="image/*" hidden>
+                                <button type="button" class="btn btn-outline btn-small settings-avatar-remove-btn" id="settingsAvatarRemove" style="display:none;">
+                                    <i class="fas fa-trash"></i> Remove
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Nickname</label>
+                            <input type="text" id="settingsNickname" placeholder="Display name">
+                        </div>
                         <div class="form-group">
                             <label>Company Name</label>
                             <input type="text" id="settingsCompany" required>

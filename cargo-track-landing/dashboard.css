@@ -971,23 +971,49 @@ body.dashboard {
     display: flex;
     flex-direction: column;
     padding: var(--dashboard-home-container-gap) 1.1rem 1.4rem;
+    padding-top: 0.5rem;
 }
 
-.dashboard-home .executive-toolbar {
+.global-toolbar.executive-toolbar {
     border-radius: 0.68rem;
     border: 1px solid #dbe4ee;
     background: #ffffff;
     box-shadow: none;
-    padding: 0.55rem 0.65rem;
-    margin-bottom: 0;
+    padding: 0.55rem 0.75rem;
+    margin: var(--dashboard-home-container-gap, 0.7rem) 1.1rem 0;
+    position: sticky;
+    top: 0;
+    z-index: 50;
 }
 
-.dashboard-home .dashboard-toolbar-left {
-    width: 100%;
+.global-toolbar .dashboard-toolbar-left {
+    flex: 1;
 }
 
-.dashboard-home .dashboard-toolbar-right {
+.global-toolbar .dashboard-toolbar-right {
     gap: 0.45rem;
+}
+
+.global-toolbar-title {
+    font-size: 0.88rem;
+    font-weight: 700;
+    margin: 0;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+}
+
+.global-toolbar-title i {
+    font-size: 0.82rem;
+    color: #5b6b82;
+}
+
+.global-toolbar-dashboard-actions {
+    display: inline-flex;
+    gap: 0.35rem;
+    align-items: center;
 }
 
 .dashboard-home .executive-layout {
@@ -1368,7 +1394,7 @@ body.dashboard {
     display: none;
 }
 
-.dashboard-home .btn.btn-small.btn-icon-only {
+.global-toolbar .btn.btn-small.btn-icon-only {
     width: 34px;
     height: 34px;
     border-radius: 0.45rem;
@@ -1377,11 +1403,11 @@ body.dashboard {
     background: #f8fbff;
 }
 
-.dashboard-home .btn.btn-small.btn-icon-only i {
+.global-toolbar .btn.btn-small.btn-icon-only i {
     font-size: 0.8rem;
 }
 
-.dashboard-home .dashboard-toolbar-right .notification-btn {
+.global-toolbar .dashboard-toolbar-right .notification-btn {
     width: 34px;
     height: 34px;
     border: 1px solid #d1dbe7;
@@ -1395,16 +1421,16 @@ body.dashboard {
     font-size: 0.8rem;
 }
 
-.dashboard-home .dashboard-toolbar-right .notification-btn:hover {
+.global-toolbar .dashboard-toolbar-right .notification-btn:hover {
     background: #eef5fc;
 }
 
-.dashboard-home .dashboard-toolbar-right .notification-count {
+.global-toolbar .dashboard-toolbar-right .notification-count {
     top: -5px;
     right: -5px;
 }
 
-.dashboard-home .dashboard-account-btn {
+.global-toolbar .dashboard-account-btn {
     height: 34px;
     border: 1px solid #d1dbe7;
     border-radius: 0.45rem;
@@ -1417,11 +1443,11 @@ body.dashboard {
     color: #3a4a5d;
 }
 
-.dashboard-home .dashboard-account-btn:hover {
+.global-toolbar .dashboard-account-btn:hover {
     background: #eef5fc;
 }
 
-.dashboard-home .dashboard-account-avatar {
+.global-toolbar .dashboard-account-avatar {
     width: 24px;
     height: 24px;
     border-radius: 50%;
@@ -1435,8 +1461,130 @@ body.dashboard {
     text-transform: uppercase;
 }
 
-.dashboard-home .dashboard-account-btn .fa-chevron-down {
+.global-toolbar .dashboard-account-btn .fa-chevron-down {
     font-size: 0.62rem;
+    transition: transform 0.2s;
+}
+
+.account-dropdown-wrap.is-open .dashboard-account-btn .fa-chevron-down {
+    transform: rotate(180deg);
+}
+
+.account-dropdown-wrap {
+    position: relative;
+}
+
+.account-dropdown {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 240px;
+    background: #ffffff;
+    border: 1px solid #dbe4ee;
+    border-radius: 0.6rem;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    z-index: 200;
+    padding: 0.4rem 0;
+    animation: accountDropdownIn 0.15s ease;
+}
+
+@keyframes accountDropdownIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.account-dropdown-wrap.is-open .account-dropdown {
+    display: block;
+}
+
+.account-dropdown-header {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.7rem 0.85rem;
+}
+
+.account-dropdown-avatar {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    border-radius: 50%;
+    background: #2563eb;
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.account-dropdown-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.account-dropdown-name {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #1e293b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.account-dropdown-email {
+    font-size: 0.72rem;
+    color: #6b7b8f;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.account-dropdown-divider {
+    height: 1px;
+    background: #e8edf3;
+    margin: 0.3rem 0;
+}
+
+.account-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    width: 100%;
+    padding: 0.5rem 0.85rem;
+    border: none;
+    background: none;
+    font-size: 0.78rem;
+    color: #374151;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.12s;
+}
+
+.account-dropdown-item:hover {
+    background: #f1f5f9;
+}
+
+.account-dropdown-item i {
+    width: 16px;
+    text-align: center;
+    font-size: 0.78rem;
+    color: #6b7b8f;
+}
+
+.account-dropdown-logout {
+    color: #dc2626;
+}
+
+.account-dropdown-logout i {
+    color: #dc2626;
+}
+
+.account-dropdown-logout:hover {
+    background: #fef2f2;
 }
 
 body.dashboard .main-content {
@@ -2081,6 +2229,78 @@ body.map-fullscreen-active {
 }
 
 /* Settings Forms */
+.settings-avatar-section {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid #e8edf3;
+}
+
+.settings-avatar-preview {
+    width: 72px;
+    height: 72px;
+    min-width: 72px;
+    border-radius: 50%;
+    background: #2563eb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.settings-avatar-initials {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #ffffff;
+    text-transform: uppercase;
+}
+
+.settings-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    position: absolute;
+    inset: 0;
+}
+
+.settings-avatar-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.settings-avatar-upload-btn {
+    cursor: pointer;
+}
+
+.settings-avatar-remove-btn {
+    color: #dc2626 !important;
+    border-color: #fca5a5 !important;
+}
+
+.settings-avatar-remove-btn:hover {
+    background: #fef2f2 !important;
+}
+
+.global-toolbar .dashboard-account-avatar,
+.account-dropdown-avatar {
+    overflow: hidden;
+    position: relative;
+}
+
+.dashboard-account-avatar img,
+.account-dropdown-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+}
+
 .settings-form {
     margin-top: 1rem;
 }

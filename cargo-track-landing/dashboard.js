@@ -214,7 +214,7 @@ function safeGetCurrentUser() {
 
 function getUserInitials(currentUser) {
     if (!currentUser || typeof currentUser !== 'object') return 'U';
-    const source = String(currentUser.company || currentUser.name || currentUser.email || '').trim();
+    const source = String(currentUser.nickname || currentUser.company || currentUser.name || currentUser.email || '').trim();
     if (!source) return 'U';
     const parts = source.split(/\s+/).filter(Boolean);
     if (parts.length === 1) {
@@ -223,11 +223,31 @@ function getUserInitials(currentUser) {
     return `${parts[0][0] || ''}${parts[1][0] || ''}`.toUpperCase();
 }
 
+function setAvatarElement(el, currentUser) {
+    if (!el) return;
+    const avatarUrl = currentUser?.avatarUrl;
+    const initials = getUserInitials(currentUser);
+    let img = el.querySelector('img');
+    if (avatarUrl) {
+        if (!img) {
+            img = document.createElement('img');
+            img.alt = 'Avatar';
+            el.appendChild(img);
+        }
+        img.src = avatarUrl;
+        img.style.display = '';
+        el.childNodes.forEach(n => { if (n !== img && n.nodeType === Node.TEXT_NODE) n.textContent = ''; });
+    } else {
+        if (img) img.remove();
+        el.textContent = initials;
+    }
+}
+
 function updateCurrentUserUi(currentUser) {
     const userNameEl = document.getElementById('userName');
     const userEmailEl = document.getElementById('userEmail');
     if (userNameEl) {
-        userNameEl.textContent = currentUser?.company || 'User';
+        userNameEl.textContent = currentUser?.nickname || currentUser?.company || 'User';
     }
     if (userEmailEl) {
         userEmailEl.textContent = currentUser?.email || '';
@@ -235,14 +255,18 @@ function updateCurrentUserUi(currentUser) {
 
     const toolbarAccountAvatar = document.getElementById('toolbarAccountAvatar');
     const toolbarAccountBtn = document.getElementById('toolbarAccountBtn');
-    if (toolbarAccountAvatar) {
-        toolbarAccountAvatar.textContent = getUserInitials(currentUser);
-    }
+    setAvatarElement(toolbarAccountAvatar, currentUser);
     if (toolbarAccountBtn) {
-        const accountLabel = currentUser?.company || currentUser?.email || 'Current account';
+        const displayName = currentUser?.nickname || currentUser?.company || currentUser?.email || 'Current account';
         const emailSuffix = currentUser?.email ? ` (${currentUser.email})` : '';
-        toolbarAccountBtn.title = `${accountLabel}${emailSuffix}`;
+        toolbarAccountBtn.title = `${displayName}${emailSuffix}`;
     }
+    const ddAvatar = document.getElementById('accountDropdownAvatar');
+    const ddName = document.getElementById('accountDropdownName');
+    const ddEmail = document.getElementById('accountDropdownEmail');
+    setAvatarElement(ddAvatar, currentUser);
+    if (ddName) ddName.textContent = currentUser?.nickname || currentUser?.company || currentUser?.name || 'User';
+    if (ddEmail) ddEmail.textContent = currentUser?.email || '';
 }
 
 function isSessionTokenValid(token) {
@@ -420,9 +444,32 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     const toolbarAccountBtn = document.getElementById('toolbarAccountBtn');
-    if (toolbarAccountBtn) {
-        toolbarAccountBtn.addEventListener('click', () => {
+    const accountDropdownWrap = document.getElementById('accountDropdownWrap');
+    if (toolbarAccountBtn && accountDropdownWrap) {
+        toolbarAccountBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = accountDropdownWrap.classList.toggle('is-open');
+            toolbarAccountBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        });
+        document.addEventListener('click', (e) => {
+            if (!accountDropdownWrap.contains(e.target)) {
+                accountDropdownWrap.classList.remove('is-open');
+                toolbarAccountBtn.setAttribute('aria-expanded', 'false');
+            }
+        });
+    }
+    const acctSettings = document.getElementById('accountDropdownSettings');
+    if (acctSettings) {
+        acctSettings.addEventListener('click', () => {
+            accountDropdownWrap?.classList.remove('is-open');
             setActiveSection('settings', { updateHash: true });
+        });
+    }
+    const acctBilling = document.getElementById('accountDropdownBilling');
+    if (acctBilling) {
+        acctBilling.addEventListener('click', () => {
+            accountDropdownWrap?.classList.remove('is-open');
+            setActiveSection('billing', { updateHash: true });
         });
     }
     
@@ -618,11 +665,41 @@ function setActiveSection(targetSection, options = {}) {
         'config-groups': 'Groups',
         'config-users': 'Users',
                 'billing': 'Billing & Invoices',
-                'settings': 'Settings'
+                'settings': 'Settings',
+        'risk-overview': 'Risk Overview',
+        'compliance-reports': 'Compliance',
+        'insurance-pricing': 'Insurance'
             };
+    const titleIcons = {
+        'dashboard': 'fa-home',
+        'devices': 'fa-map-marked-alt',
+        'alerts': 'fa-bell',
+        'analytics': 'fa-chart-line',
+        'devices-management': 'fa-microchip',
+        'config-deliveries': 'fa-calendar-check',
+        'config-areas': 'fa-draw-polygon',
+        'config-assets': 'fa-boxes',
+        'config-groups': 'fa-layer-group',
+        'config-users': 'fa-users',
+        'billing': 'fa-file-invoice-dollar',
+        'settings': 'fa-user-cog',
+        'risk-overview': 'fa-shield-halved',
+        'compliance-reports': 'fa-file-circle-check',
+        'insurance-pricing': 'fa-hand-holding-dollar'
+    };
     const pageTitle = document.getElementById('pageTitle');
     if (pageTitle) {
         pageTitle.textContent = titles[sectionId] || 'Dashboard';
+    }
+    const globalTitle = document.getElementById('globalToolbarTitle');
+    if (globalTitle) {
+        const icon = titleIcons[sectionId] || 'fa-home';
+        const label = titles[sectionId] || 'Dashboard';
+        globalTitle.innerHTML = '<i class="fas ' + icon + '"></i> ' + label;
+    }
+    const dashActions = document.querySelector('.global-toolbar-dashboard-actions');
+    if (dashActions) {
+        dashActions.style.display = sectionId === 'dashboard' ? '' : 'none';
     }
             
     if (sectionId === 'dashboard' && globalMap) {
@@ -9404,10 +9481,69 @@ function loadAccountSettings() {
     const companyInput = document.getElementById('settingsCompany');
     const emailInput = document.getElementById('settingsEmail');
     const phoneInput = document.getElementById('settingsPhone');
+    const nicknameInput = document.getElementById('settingsNickname');
     
     if (companyInput) companyInput.value = currentUser.company || '';
     if (emailInput) emailInput.value = currentUser.email || '';
     if (phoneInput) phoneInput.value = currentUser.phone || '';
+    if (nicknameInput) nicknameInput.value = currentUser.nickname || '';
+
+    const previewInitials = document.getElementById('settingsAvatarInitials');
+    const previewImg = document.getElementById('settingsAvatarImg');
+    const removeBtn = document.getElementById('settingsAvatarRemove');
+    if (previewInitials) previewInitials.textContent = getUserInitials(currentUser);
+    if (currentUser.avatarUrl) {
+        if (previewImg) { previewImg.src = currentUser.avatarUrl; previewImg.style.display = ''; }
+        if (previewInitials) previewInitials.style.display = 'none';
+        if (removeBtn) removeBtn.style.display = '';
+    } else {
+        if (previewImg) previewImg.style.display = 'none';
+        if (previewInitials) previewInitials.style.display = '';
+        if (removeBtn) removeBtn.style.display = 'none';
+    }
+
+    const avatarInput = document.getElementById('settingsAvatarInput');
+    if (avatarInput && !avatarInput._bound) {
+        avatarInput._bound = true;
+        avatarInput.addEventListener('change', handleAvatarUpload);
+    }
+    if (removeBtn && !removeBtn._bound) {
+        removeBtn._bound = true;
+        removeBtn.addEventListener('click', handleAvatarRemove);
+    }
+}
+
+function handleAvatarUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 512 * 1024) {
+        showToast('Image must be under 512 KB.', 'warning');
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+        const dataUrl = ev.target.result;
+        const previewImg = document.getElementById('settingsAvatarImg');
+        const previewInitials = document.getElementById('settingsAvatarInitials');
+        const removeBtn = document.getElementById('settingsAvatarRemove');
+        if (previewImg) { previewImg.src = dataUrl; previewImg.style.display = ''; }
+        if (previewInitials) previewInitials.style.display = 'none';
+        if (removeBtn) removeBtn.style.display = '';
+        document.getElementById('settingsAvatarInput')._pendingUrl = dataUrl;
+    };
+    reader.readAsDataURL(file);
+}
+
+function handleAvatarRemove() {
+    const previewImg = document.getElementById('settingsAvatarImg');
+    const previewInitials = document.getElementById('settingsAvatarInitials');
+    const removeBtn = document.getElementById('settingsAvatarRemove');
+    const avatarInput = document.getElementById('settingsAvatarInput');
+    if (previewImg) { previewImg.src = ''; previewImg.style.display = 'none'; }
+    if (previewInitials) previewInitials.style.display = '';
+    if (removeBtn) removeBtn.style.display = 'none';
+    if (avatarInput) { avatarInput.value = ''; avatarInput._pendingUrl = null; }
+    document.getElementById('settingsAvatarInput')._pendingRemove = true;
 }
 
 function saveAccountSettings() {
@@ -9424,6 +9560,16 @@ function saveAccountSettings() {
         users[userIndex].company = document.getElementById('settingsCompany').value;
         users[userIndex].email = document.getElementById('settingsEmail').value;
         users[userIndex].phone = document.getElementById('settingsPhone').value;
+        users[userIndex].nickname = document.getElementById('settingsNickname')?.value || '';
+
+        const avatarInput = document.getElementById('settingsAvatarInput');
+        if (avatarInput?._pendingRemove) {
+            delete users[userIndex].avatarUrl;
+            avatarInput._pendingRemove = false;
+        } else if (avatarInput?._pendingUrl) {
+            users[userIndex].avatarUrl = avatarInput._pendingUrl;
+            avatarInput._pendingUrl = null;
+        }
         
         saveUsers(users);
         
@@ -9433,6 +9579,8 @@ function saveAccountSettings() {
             session.user = users[userIndex];
             safeSetItem('cargotrack_auth', JSON.stringify(session));
         }
+
+        updateCurrentUserUi(users[userIndex]);
         
         showToast('Account settings saved successfully!', 'success');
     }
