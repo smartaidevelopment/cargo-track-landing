@@ -1,99 +1,84 @@
 // Admin Authentication System
 
 const ADMIN_KEY = 'cargotrack_admin';
-const ADMIN_USERS_KEY = 'cargotrack_admin_users';
-const DEFAULT_ADMIN = {
-    email: 'admin@cargotrackpro.com',
-    password: 'admin123', // Change this in production!
-    role: 'super_admin',
-    createdAt: new Date().toISOString(),
-    lastLogin: null
-};
 
-// Initialize admin storage
-function initAdminStorage() {
+// Authenticate admin via server-side /api/session endpoint
+async function authenticateAdmin(email, password) {
     try {
-        if (!localStorage.getItem(ADMIN_USERS_KEY)) {
-            const admins = [DEFAULT_ADMIN];
-            localStorage.setItem(ADMIN_USERS_KEY, JSON.stringify(admins));
+        const response = await fetch('/api/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ role: 'admin', email, password })
+        });
+
+        if (response.status === 429) {
+            return { success: false, message: 'Too many login attempts. Try again later.' };
         }
-    } catch (e) {
-        console.error('Error initializing admin storage:', e);
-    }
-}
 
-// Auto-initialize on load
-if (typeof window !== 'undefined') {
-    initAdminStorage();
-}
+        const data = await response.json();
 
-// Get all admin users
-function getAdminUsers() {
-    initAdminStorage();
-    return JSON.parse(localStorage.getItem(ADMIN_USERS_KEY)) || [];
-}
-
-// Save admin users
-function saveAdminUsers(admins) {
-    localStorage.setItem(ADMIN_USERS_KEY, JSON.stringify(admins));
-}
-
-// Authenticate admin
-function authenticateAdmin(email, password, twoFA = null) {
-    const admins = getAdminUsers();
-    const admin = admins.find(a => a.email === email && a.password === password);
-    
-    if (admin) {
-        // In production, verify 2FA here
-        if (twoFA && admin.twoFAEnabled) {
-            // Verify 2FA code
-            // For demo, we'll skip 2FA validation
+        if (!response.ok || !data.token) {
+            return { success: false, message: data.error || 'Invalid admin credentials' };
         }
-        
-        // Set admin session
+
+        // Store session token
+        try { localStorage.setItem('cargotrack_session_token', data.token); } catch (_) {}
+        try { localStorage.setItem('cargotrack_session_role', 'admin'); } catch (_) {}
+
+        // Store admin session for client-side checks
         const session = {
-            adminId: admin.email,
-            email: admin.email,
-            role: admin.role,
-            loginTime: new Date().toISOString(),
-            ipAddress: '127.0.0.1' // In production, get real IP
+            adminId: email,
+            email: email,
+            role: 'admin',
+            loginTime: new Date().toISOString()
         };
-        localStorage.setItem(ADMIN_KEY, JSON.stringify(session));
-        
-        // Update last login
-        admin.lastLogin = new Date().toISOString();
-        saveAdminUsers(admins);
-        
-        // Log security event
-        logSecurityEvent('admin_login', admin.email, 'success');
-        
-        return { success: true, admin };
+        try { localStorage.setItem(ADMIN_KEY, JSON.stringify(session)); } catch (_) {}
+
+        logSecurityEvent('admin_login', email, 'success');
+
+        if (window.AurionStorageSync && typeof window.AurionStorageSync.refresh === 'function') {
+            window.AurionStorageSync.refresh();
+        }
+
+        return { success: true, admin: session };
+    } catch (error) {
+        console.error('Admin auth request failed:', error);
+        return { success: false, message: 'Network error. Please try again.' };
     }
-    
-    // Log failed attempt
-    logSecurityEvent('admin_login', email, 'failed');
-    
-    return { success: false, message: 'Invalid admin credentials' };
 }
 
 // Get current admin session
 function getCurrentAdmin() {
     const adminData = localStorage.getItem(ADMIN_KEY);
     if (!adminData) return null;
-    
     try {
-        const session = JSON.parse(adminData);
-        const admins = getAdminUsers();
-        const admin = admins.find(a => a.email === session.email);
-        return admin ? { ...admin, ...session } : null;
+        return JSON.parse(adminData);
     } catch (e) {
         return null;
     }
 }
 
-// Check if admin is authenticated
+// Check if admin is authenticated (validates both local session and token)
 function isAdminAuthenticated() {
-    return getCurrentAdmin() !== null;
+    if (!getCurrentAdmin()) return false;
+    const token = localStorage.getItem('cargotrack_session_token');
+    if (!token) return false;
+    try {
+        const parts = token.split('.');
+        if (parts.length !== 2) return false;
+        const body = parts[0].replace(/-/g, '+').replace(/_/g, '/');
+        const pad = body.length % 4 ? '='.repeat(4 - body.length % 4) : '';
+        const payload = JSON.parse(atob(body + pad));
+        if (payload.exp && Date.now() > payload.exp) {
+            localStorage.removeItem('cargotrack_session_token');
+            localStorage.removeItem('cargotrack_session_role');
+            localStorage.removeItem(ADMIN_KEY);
+            return false;
+        }
+        return payload.role === 'admin' || payload.role === 'reseller';
+    } catch (_) {
+        return false;
+    }
 }
 
 // Admin logout
@@ -103,6 +88,8 @@ function adminLogout() {
         logSecurityEvent('admin_logout', admin.email, 'success');
     }
     localStorage.removeItem(ADMIN_KEY);
+    localStorage.removeItem('cargotrack_session_token');
+    localStorage.removeItem('cargotrack_session_role');
     window.location.href = 'admin-login.html';
 }
 
@@ -118,64 +105,40 @@ function requireAdminAuth() {
 // Security event logging
 function logSecurityEvent(event, user, status, details = {}) {
     const auditLogKey = 'cargotrack_security_audit';
-    let auditLog = JSON.parse(localStorage.getItem(auditLogKey)) || [];
-    
+    let auditLog = [];
+    try { auditLog = JSON.parse(localStorage.getItem(auditLogKey)) || []; } catch (_) {}
+
     const logEntry = {
         id: Date.now().toString(),
         timestamp: new Date().toISOString(),
         event: event,
         user: user,
         status: status,
-        ipAddress: details.ipAddress || '127.0.0.1',
         userAgent: navigator.userAgent,
         details: details
     };
-    
+
     auditLog.unshift(logEntry);
-    
-    // Keep only last 1000 entries
     if (auditLog.length > 1000) {
         auditLog = auditLog.slice(0, 1000);
     }
-    
-    localStorage.setItem(auditLogKey, JSON.stringify(auditLog));
+
+    try { localStorage.setItem(auditLogKey, JSON.stringify(auditLog)); } catch (_) {}
 }
 
 // Get security audit log
 function getSecurityAuditLog(limit = 100) {
     const auditLogKey = 'cargotrack_security_audit';
-    const auditLog = JSON.parse(localStorage.getItem(auditLogKey)) || [];
-    return auditLog.slice(0, limit);
-}
-
-// Update admin password
-function updateAdminPassword(adminEmail, currentPassword, newPassword) {
-    const admins = getAdminUsers();
-    const adminIndex = admins.findIndex(a => a.email === adminEmail);
-    
-    if (adminIndex === -1) {
-        return { success: false, message: 'Admin not found' };
+    try {
+        const auditLog = JSON.parse(localStorage.getItem(auditLogKey)) || [];
+        return auditLog.slice(0, limit);
+    } catch (_) {
+        return [];
     }
-    
-    if (admins[adminIndex].password !== currentPassword) {
-        logSecurityEvent('password_change', adminEmail, 'failed');
-        return { success: false, message: 'Current password is incorrect' };
-    }
-    
-    admins[adminIndex].password = newPassword; // In production, hash this
-    admins[adminIndex].passwordChangedAt = new Date().toISOString();
-    saveAdminUsers(admins);
-    
-    logSecurityEvent('password_change', adminEmail, 'success');
-    
-    return { success: true };
 }
 
 // Make functions globally available
 if (typeof window !== 'undefined') {
-    window.initAdminStorage = initAdminStorage;
-    window.getAdminUsers = getAdminUsers;
-    window.saveAdminUsers = saveAdminUsers;
     window.authenticateAdmin = authenticateAdmin;
     window.getCurrentAdmin = getCurrentAdmin;
     window.isAdminAuthenticated = isAdminAuthenticated;
@@ -183,6 +146,4 @@ if (typeof window !== 'undefined') {
     window.requireAdminAuth = requireAdminAuth;
     window.logSecurityEvent = logSecurityEvent;
     window.getSecurityAuditLog = getSecurityAuditLog;
-    window.updateAdminPassword = updateAdminPassword;
 }
-

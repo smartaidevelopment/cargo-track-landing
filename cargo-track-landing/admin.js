@@ -14,6 +14,13 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!requireAdminAuthFn || !requireAdminAuthFn()) {
         return;
     }
+    if (!validateAdminToken()) {
+        console.warn('Admin token invalid or expired, redirecting to login');
+        localStorage.removeItem('cargotrack_session_token');
+        localStorage.removeItem('cargotrack_session_role');
+        window.location.href = 'admin-login.html';
+        return;
+    }
     
     const getCurrentAdminFn = window.getCurrentAdmin || (typeof getCurrentAdmin !== 'undefined' ? getCurrentAdmin : null);
     if (getCurrentAdminFn) {
@@ -225,7 +232,24 @@ function getApiAuthHeaders() {
         return window.getSessionAuthHeaders();
     }
     const token = localStorage.getItem('cargotrack_session_token');
-    return token ? { Authorization: `Bearer ${token}` } : {};
+    return token ? { Authorization: `Bearer ${token}`, 'x-session-token': token } : {};
+}
+
+function validateAdminToken() {
+    const token = localStorage.getItem('cargotrack_session_token');
+    if (!token) return false;
+    try {
+        const parts = token.split('.');
+        if (parts.length !== 2) return false;
+        const body = parts[0].replace(/-/g, '+').replace(/_/g, '/');
+        const pad = body.length % 4 ? '='.repeat(4 - body.length % 4) : '';
+        const payload = JSON.parse(atob(body + pad));
+        if (payload.exp && Date.now() > payload.exp) return false;
+        if (payload.role !== 'admin' && payload.role !== 'reseller') return false;
+        return true;
+    } catch (_) {
+        return false;
+    }
 }
 
 async function fetchAdminDevices() {
@@ -234,6 +258,13 @@ async function fetchAdminDevices() {
             cache: 'no-store',
             headers: getApiAuthHeaders()
         });
+        if (response.status === 401) {
+            console.warn('Admin session expired, redirecting to login');
+            localStorage.removeItem('cargotrack_session_token');
+            localStorage.removeItem('cargotrack_session_role');
+            window.location.href = 'admin-login.html';
+            return [];
+        }
         if (!response.ok) {
             console.warn('Admin devices fetch failed:', response.status);
             return adminDevicesCache;
