@@ -19,14 +19,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (getCurrentAdminFn) {
         const currentAdmin = getCurrentAdminFn();
         if (currentAdmin) {
-            const adminUserNameEl = document.getElementById('adminUserName');
-            const adminUserEmailEl = document.getElementById('adminUserEmail');
-            if (adminUserNameEl) {
-                adminUserNameEl.textContent = 'Admin';
-            }
-            if (adminUserEmailEl) {
-                adminUserEmailEl.textContent = currentAdmin.email;
-            }
             const adminAccountEmailEl = document.getElementById('adminAccountEmail');
             if (adminAccountEmailEl) {
                 adminAccountEmailEl.value = currentAdmin.email;
@@ -37,6 +29,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     ? ''
                     : 'none';
             }
+            const initials = (currentAdmin.email || 'A').charAt(0).toUpperCase();
+            const ddName = document.getElementById('adminDropdownName');
+            const ddEmail = document.getElementById('adminDropdownEmail');
+            const ddAvatar = document.getElementById('adminDropdownAvatar');
+            const tbAvatar = document.getElementById('adminAccountAvatar');
+            if (ddName) ddName.textContent = currentAdmin.name || 'Admin';
+            if (ddEmail) ddEmail.textContent = currentAdmin.email || '';
+            if (ddAvatar) ddAvatar.textContent = initials;
+            if (tbAvatar) tbAvatar.textContent = initials;
         }
     }
     
@@ -74,6 +75,30 @@ document.addEventListener('DOMContentLoaded', function() {
 
     fetchTenants().then(() => fetchUsers()).then(() => cleanOrphanedTenants()).catch(() => {});
     
+    // Avatar dropdown toggle
+    const adminAccountBtn = document.getElementById('adminAccountBtn');
+    const adminAccountWrap = document.getElementById('adminAccountDropdownWrap');
+    if (adminAccountBtn && adminAccountWrap) {
+        adminAccountBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = adminAccountWrap.classList.toggle('is-open');
+            adminAccountBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        });
+        document.addEventListener('click', (e) => {
+            if (!adminAccountWrap.contains(e.target)) {
+                adminAccountWrap.classList.remove('is-open');
+                adminAccountBtn.setAttribute('aria-expanded', 'false');
+            }
+        });
+    }
+    const adminDdSettings = document.getElementById('adminDropdownSettings');
+    if (adminDdSettings) {
+        adminDdSettings.addEventListener('click', () => {
+            adminAccountWrap?.classList.remove('is-open');
+            setActiveAdminSection('admin-settings', { updateHash: true });
+        });
+    }
+
     // Initialize logout
     const adminLogoutBtn = document.getElementById('adminLogoutBtn');
     if (adminLogoutBtn) {
