@@ -105,6 +105,36 @@ function parseIoElementWithMode(buffer, offset, isExtended) {
         return { eventIoId, totalIo, io, offset: buffer.length };
     }
 
+    if (isExtended && cursor + countSize <= buffer.length) {
+        const nByteCount = buffer.readUInt16BE(cursor);
+        cursor += 2;
+        for (let i = 0; i < nByteCount; i += 1) {
+            if (cursor + 4 > buffer.length) { cursor = buffer.length; break; }
+            try {
+                const id = buffer.readUInt16BE(cursor);
+                cursor += 2;
+                const len = buffer.readUInt16BE(cursor);
+                cursor += 2;
+                if (cursor + len > buffer.length) { cursor = buffer.length; break; }
+                if (len === 1) {
+                    io[id] = buffer.readInt8(cursor);
+                } else if (len === 2) {
+                    io[id] = buffer.readInt16BE(cursor);
+                } else if (len === 4) {
+                    io[id] = buffer.readInt32BE(cursor);
+                } else if (len === 8) {
+                    io[id] = Number(buffer.readBigInt64BE(cursor));
+                } else {
+                    io[id] = buffer.slice(cursor, cursor + len).toString('hex');
+                }
+                cursor += len;
+            } catch (error) {
+                cursor = buffer.length;
+                break;
+            }
+        }
+    }
+
     return { eventIoId, totalIo, io, offset: cursor };
 }
 
@@ -194,10 +224,10 @@ function scaleIoValue(field, value) {
     }
     if (field === 'battery') {
         let normalized = Math.abs(value);
-        if (normalized > 1000) {
+        if (normalized > 100 && normalized <= 4000) {
+            normalized = (normalized / 3800) * 100;
+        } else if (normalized > 4000) {
             normalized = normalized / 100;
-        } else if (normalized > 100) {
-            normalized = normalized / 10;
         }
         if (normalized > 100) normalized = 100;
         return Math.round(normalized * 10) / 10;
