@@ -3,6 +3,19 @@ const { getSessionFromRequest } = require('./_auth');
 
 const redis = Redis.fromEnv();
 
+async function findImeiForDevice(deviceId) {
+    try {
+        const namespaces = await redis.smembers('storage:namespaces');
+        for (const ns of namespaces) {
+            const raw = await redis.get(`storage:${ns}:cargotrack_devices`);
+            const devices = Array.isArray(parseJsonValue(raw)) ? parseJsonValue(raw) : [];
+            const match = devices.find((d) => d.id === deviceId);
+            if (match && match.lte?.imei) return match.lte.imei;
+        }
+    } catch (_) {}
+    return null;
+}
+
 const NAMESPACES_SET = 'storage:namespaces';
 const DEVICES_KEY = 'cargotrack_devices';
 const buildStorageKey = (namespace, key) => `storage:${namespace}:${key}`;
@@ -60,7 +73,15 @@ module.exports = async (req, res) => {
             checks.registryStatus = 'no_tenant';
         }
 
-        const latest = await redis.get(`device:latest:${deviceId}`);
+        let latest = await redis.get(`device:latest:${deviceId}`);
+        if (!latest || typeof latest !== 'object') {
+            const deviceImei = await findImeiForDevice(deviceId);
+            if (deviceImei) {
+                latest = await redis.get(`device:latest:${deviceImei}`);
+                checks.resolvedVia = 'imei';
+                checks.imei = deviceImei;
+            }
+        }
         if (latest && typeof latest === 'object') {
             checks.latestData = {
                 timestamp: latest.timestamp || latest.updatedAt || null,
@@ -83,7 +104,10 @@ module.exports = async (req, res) => {
             }
         }
 
-        const devicesSet = await redis.sismember('devices:latest', deviceId);
+        let devicesSet = await redis.sismember('devices:latest', deviceId);
+        if (!devicesSet && checks.imei) {
+            devicesSet = await redis.sismember('devices:latest', checks.imei);
+        }
         checks.inDevicesSet = !!devicesSet;
 
         if (!checks.ingestTokenConfigured) {

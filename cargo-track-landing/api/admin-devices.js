@@ -133,17 +133,20 @@ async function handleGet(req, res, session) {
         }
 
         const ids = devices.map((device) => device.id).filter(Boolean);
-        const kvKeys = ids.map((id) => `device:latest:${id}`);
+        const imeis = devices.map((device) => device.lte?.imei).filter(Boolean);
+        const allLookupIds = [...new Set([...ids, ...imeis])];
+        const kvKeys = allLookupIds.map((id) => `device:latest:${id}`);
         const kvRecords = kvKeys.length ? await redis.mget(...kvKeys) : [];
         const kvMap = new Map();
         kvRecords.forEach((record) => {
             if (record && record.deviceId) {
                 kvMap.set(record.deviceId, record);
+                if (record.imei) kvMap.set(record.imei, record);
             }
         });
 
         const merged = devices.map((device) => {
-            const live = kvMap.get(device.id);
+            const live = kvMap.get(device.id) || (device.lte?.imei ? kvMap.get(device.lte.imei) : null);
             const owner = device.ownerId ? userMap.get(device.ownerId) : null;
             return {
                 ...device,
