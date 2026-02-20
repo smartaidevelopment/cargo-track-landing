@@ -295,16 +295,17 @@ function initAdminGlobalMap() {
     }
     
     // Initialize admin global map
-    adminGlobalMap = L.map('adminGlobalMap').setView([20, 0], 2);
+    adminGlobalMap = L.map('adminGlobalMap', { attributionControl: false }).setView([20, 0], 2);
     const baseLayers = {
-        'Basic': L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            attribution: '© OpenStreetMap contributors © CARTO'
+        'Basic': L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            subdomains: 'abcd',
+            maxZoom: 19
         }),
         'Streets': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors'
+            maxZoom: 19
         }),
         'Topography': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors © OpenTopoMap'
+            maxZoom: 17
         })
     };
     baseLayers.Basic.addTo(adminGlobalMap);

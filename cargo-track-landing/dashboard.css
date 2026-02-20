@@ -1691,7 +1691,7 @@ body.dashboard .search-box input {
 
 /* Prevent occasional white tile seams caused by subpixel rendering on some browsers/GPUs */
 .leaflet-container {
-    background: #e2e8f0;
+    background: #2d3748;
     transform: translateZ(0);
 }
 
@@ -1705,6 +1705,15 @@ body.dashboard .search-box input {
 
 .leaflet-tile {
     outline: 1px solid transparent;
+    image-rendering: auto;
+}
+
+.leaflet-tile-pane {
+    will-change: transform;
+}
+
+.leaflet-fade-anim .leaflet-tile {
+    will-change: opacity;
 }
 
 .leaflet-bar.aurion-map-controls {
