@@ -297,7 +297,7 @@ function initAdminGlobalMap() {
     // Initialize admin global map
     adminGlobalMap = L.map('adminGlobalMap', { attributionControl: false }).setView([20, 0], 2);
     const baseLayers = {
-        'Basic': L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        'Basic': L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
             subdomains: 'abcd',
             maxZoom: 19
         }),

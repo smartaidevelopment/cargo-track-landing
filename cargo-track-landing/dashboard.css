@@ -1691,29 +1691,17 @@ body.dashboard .search-box input {
 
 /* Prevent occasional white tile seams caused by subpixel rendering on some browsers/GPUs */
 .leaflet-container {
-    background: #2d3748;
+    background: #e2e8f0;
     transform: translateZ(0);
 }
 
-.leaflet-pane,
-.leaflet-tile,
-.leaflet-marker-icon,
-.leaflet-marker-shadow {
-    backface-visibility: hidden;
-    -webkit-backface-visibility: hidden;
-}
-
-.leaflet-tile {
-    outline: 1px solid transparent;
-    image-rendering: auto;
-}
-
-.leaflet-tile-pane {
+.leaflet-tile-container {
     will-change: transform;
 }
 
-.leaflet-fade-anim .leaflet-tile {
-    will-change: opacity;
+.leaflet-tile {
+    width: 256.5px !important;
+    height: 256.5px !important;
 }
 
 .leaflet-bar.aurion-map-controls {
