@@ -971,10 +971,11 @@ function initDashboardActions() {
     }
 
     const dashboardHomeSearch = document.getElementById('dashboardHomeSearch');
-    if (dashboardHomeSearch && searchInput) {
+    if (dashboardHomeSearch) {
+        let _searchDebounce = null;
         dashboardHomeSearch.addEventListener('input', () => {
-            searchInput.value = dashboardHomeSearch.value;
-            searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+            clearTimeout(_searchDebounce);
+            _searchDebounce = setTimeout(() => handleGlobalSearch(dashboardHomeSearch.value), 250);
         });
     }
 
@@ -7112,6 +7113,48 @@ window.deleteUser = deleteUser;
 
 let deviceStatusFilter = 'all';
 let deviceSearchTerm = '';
+
+function handleGlobalSearch(value) {
+    const term = (value || '').trim().toLowerCase();
+    const activeSection = document.querySelector('.content-section.active');
+    const activeId = activeSection ? activeSection.id : '';
+
+    if (activeId === 'devices' || activeId === 'devices-management') {
+        const el = document.getElementById('deviceSearchInput');
+        if (el) {
+            el.value = term;
+            deviceSearchTerm = term;
+            loadDevices();
+            updateDevicesTable(getDevices());
+        }
+        return;
+    }
+
+    if (activeId === 'config-deliveries' || activeId === 'config-areas' || activeId === 'config-assets' || activeId === 'config-groups') {
+        const rows = activeSection.querySelectorAll('table tbody tr, .list-item');
+        rows.forEach(row => {
+            row.style.display = !term || row.textContent.toLowerCase().includes(term) ? '' : 'none';
+        });
+        return;
+    }
+
+    if (!term) return;
+
+    const devices = getDevices();
+    const matched = devices.filter(d => matchesDeviceSearch(d, term));
+    if (matched.length > 0) {
+        setActiveSection('devices', { updateHash: true });
+        const el = document.getElementById('deviceSearchInput');
+        if (el) {
+            el.value = term;
+            deviceSearchTerm = term;
+            loadDevices();
+            updateDevicesTable(getDevices());
+        }
+        const gs = document.getElementById('dashboardHomeSearch');
+        if (gs) gs.value = value;
+    }
+}
 
 function getDeviceSearchTerm() {
     const input = document.getElementById('deviceSearchInput');

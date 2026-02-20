@@ -4861,12 +4861,66 @@ function testLorawanConnection() {
 
 // Search functionality
 function handleAdminSearch(e) {
-    const searchTerm = e.target.value.toLowerCase();
-    // Implement global search across users, devices, etc.
-    // For now, just filter users table
-    if (document.getElementById('admin-users').classList.contains('active')) {
-        document.getElementById('userSearchInput').value = searchTerm;
-        filterUsers();
+    const searchTerm = (e.target.value || '').toLowerCase().trim();
+    const activeSection = document.querySelector('.content-section.active');
+    const activeId = activeSection ? activeSection.id : '';
+
+    if (activeId === 'admin-users') {
+        const el = document.getElementById('userSearchInput');
+        if (el) { el.value = searchTerm; filterUsers(); }
+    } else if (activeId === 'admin-devices') {
+        const el = document.getElementById('adminDeviceSearch');
+        if (el) { el.value = searchTerm; loadAllDevices(); }
+    } else if (activeId === 'admin-payments') {
+        filterAdminPayments(searchTerm);
+    } else if (activeId === 'admin-invoices') {
+        filterAdminInvoices(searchTerm);
+    } else if (activeId === 'admin-dashboard') {
+        filterAdminDashboard(searchTerm);
+    }
+}
+
+function filterAdminPayments(term) {
+    const rows = document.querySelectorAll('#paymentsTableBody tr, #admin-payments table tbody tr');
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = !term || text.includes(term) ? '' : 'none';
+    });
+}
+
+function filterAdminInvoices(term) {
+    const rows = document.querySelectorAll('#admin-invoices table tbody tr, #admin-invoices .invoice-row');
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = !term || text.includes(term) ? '' : 'none';
+    });
+}
+
+function filterAdminDashboard(term) {
+    if (!term) return;
+    const users = getUsers();
+    const devices = getAllDevices();
+    const matchUsers = users.filter(u =>
+        (u.email || '').toLowerCase().includes(term) ||
+        (u.company || '').toLowerCase().includes(term)
+    );
+    const matchDevices = devices.filter(d =>
+        (d.id || '').toLowerCase().includes(term) ||
+        (d.name || '').toLowerCase().includes(term) ||
+        (d.ownerEmail || '').toLowerCase().includes(term)
+    );
+    if (matchDevices.length && !matchUsers.length) {
+        setActiveAdminSection('admin-devices', { updateHash: true });
+        const el = document.getElementById('adminDeviceSearch');
+        if (el) { el.value = term; loadAllDevices(); }
+        const gs = document.getElementById('adminSearch');
+        if (gs) gs.value = term;
+    } else if (matchUsers.length) {
+        setActiveAdminSection('admin-users', { updateHash: true });
+        const el = document.getElementById('userSearchInput');
+        if (el) { el.value = term; filterUsers(); }
+        const gs = document.getElementById('adminSearch');
+        if (gs) gs.value = term;
     }
 }
 
