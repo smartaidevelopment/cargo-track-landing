@@ -435,7 +435,7 @@ function initRoiCalculator() {
 
     const calculate = () => {
         const assets = parseInt(slider.value, 10) || 1;
-        const defaultPrice = getTierPricing('monitor').price;
+        const defaultPrice = getTierPricing('track').price;
         const pricePerAsset = tierSelect ? parseFloat(tierSelect.value) || defaultPrice : defaultPrice;
         const platformCost = assets * pricePerAsset;
         const timeSavings = assets * 48;
