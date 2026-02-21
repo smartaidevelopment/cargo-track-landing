@@ -2,11 +2,29 @@
 // Polarsat — Multi-Industry 3-Tier Pricing
 // ══════════════════════════════════════════════════════════════
 
-const TIER_BASE = {
+const TIER_DEFAULTS = {
     track:   { lora: { price: 2.95, annual: 35.40 }, '4g': { price: 7.95, annual: 95.40 },  interval: '5 min',  data: '50 MB' },
     monitor: { lora: { price: 4.95, annual: 59.40 }, '4g': { price: 9.95, annual: 119.40 }, interval: '1 min',  data: '200 MB' },
     predict: { lora: { price: 7.95, annual: 95.40 }, '4g': { price: 14.95, annual: 179.40 }, interval: '10 sec', data: '500 MB' }
 };
+
+const TIER_BASE = (() => {
+    try {
+        const stored = JSON.parse(localStorage.getItem('cargotrack_packages') || '{}');
+        const merged = JSON.parse(JSON.stringify(TIER_DEFAULTS));
+        Object.keys(merged).forEach(key => {
+            const pkg = stored[key];
+            if (!pkg) return;
+            if (pkg.priceLora)       merged[key].lora.price  = pkg.priceLora;
+            if (pkg.annualPriceLora)  merged[key].lora.annual = pkg.annualPriceLora;
+            if (pkg.price4g)         merged[key]['4g'].price  = pkg.price4g;
+            if (pkg.annualPrice4g)   merged[key]['4g'].annual = pkg.annualPrice4g;
+            if (pkg.interval)        merged[key].interval     = pkg.interval;
+            if (pkg.data)            merged[key].data         = pkg.data;
+        });
+        return merged;
+    } catch (_) { return TIER_DEFAULTS; }
+})();
 
 const TIER_ALIASES = {
     locate: 'track', manage: 'monitor', protect: 'predict',
@@ -448,6 +466,8 @@ function initPricingCalculator() {
 
 function initLandingPage() {
     initConnectivityToggle();
+    updatePricingCards(selectedConnectivity);
+    updateTierSelectPrices(selectedConnectivity);
     initializePackageSelection();
     initPricingCalculator();
     initRoiCalculator();
