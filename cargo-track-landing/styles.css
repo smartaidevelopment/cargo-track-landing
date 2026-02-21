@@ -880,6 +880,10 @@ html {
 :root {
     --primary-color: #2563eb;
     --primary-dark: #1d4ed8;
+    --primary-darker: #1e3a8a;
+    --primary-light: #93c5fd;
+    --primary-lighter: #eff6ff;
+    --primary-bg: #dbeafe;
     --secondary-color: #0ea5e9;
     --accent-color: #14b8a6;
     --text-dark: #0f172a;
@@ -888,6 +892,7 @@ html {
     --bg-white: #ffffff;
     --border-color: #e2e8f0;
     --success-color: #16a34a;
+    --hero-mid: #1e3a5f;
 }
 
 body {
@@ -1225,7 +1230,7 @@ body {
 
 .case-image {
     height: 160px;
-    background: linear-gradient(135deg, #2563eb, #0ea5e9);
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
 }
 
 .comparison {
@@ -1246,8 +1251,8 @@ body {
 }
 
 .comparison-col.featured {
-    border-color: #93c5fd;
-    background: #eff6ff;
+    border-color: var(--primary-light);
+    background: var(--primary-lighter);
 }
 
 .comparison-col ul {
@@ -1284,11 +1289,11 @@ body {
     border: 2px solid var(--primary-color);
     border-radius: 1.2rem;
     overflow: hidden;
-    box-shadow: 0 8px 30px rgba(37, 99, 235, 0.12);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
 }
 
 .pricing-card-header {
-    background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+    background: linear-gradient(135deg, var(--primary-darker) 0%, var(--primary-color) 100%);
     color: #fff;
     padding: 2.5rem 2rem 2rem;
     text-align: center;
@@ -1598,7 +1603,7 @@ body {
 /* Industry hero variant */
 .industry-hero {
     padding: 6rem 0 4rem;
-    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #2563eb 100%);
+    background: linear-gradient(135deg, #0f172a 0%, var(--hero-mid) 60%, var(--primary-color) 100%);
     color: #fff;
     position: relative;
     overflow: hidden;
@@ -1653,6 +1658,68 @@ body {
     transition: color 0.2s;
 }
 .back-to-hub:hover { color: #fff; }
+
+/* ── Per-industry page colour themes ── */
+body[data-industry="logistics"] {
+    --primary-color: #2563eb;
+    --primary-dark: #1d4ed8;
+    --primary-darker: #1e3a8a;
+    --primary-light: #93c5fd;
+    --primary-lighter: #eff6ff;
+    --primary-bg: #dbeafe;
+    --secondary-color: #0ea5e9;
+    --hero-mid: #1e3a5f;
+}
+body[data-industry="energy"] {
+    --primary-color: #D97706;
+    --primary-dark: #B45309;
+    --primary-darker: #78350F;
+    --primary-light: #FCD34D;
+    --primary-lighter: #FFFBEB;
+    --primary-bg: #FEF3C7;
+    --secondary-color: #FBBF24;
+    --hero-mid: #5c3a10;
+}
+body[data-industry="pharma"] {
+    --primary-color: #059669;
+    --primary-dark: #047857;
+    --primary-darker: #064E3B;
+    --primary-light: #6EE7B7;
+    --primary-lighter: #ECFDF5;
+    --primary-bg: #D1FAE5;
+    --secondary-color: #34D399;
+    --hero-mid: #1a3a2e;
+}
+body[data-industry="insurance"] {
+    --primary-color: #6D28D9;
+    --primary-dark: #5B21B6;
+    --primary-darker: #3B0764;
+    --primary-light: #C4B5FD;
+    --primary-lighter: #F5F3FF;
+    --primary-bg: #EDE9FE;
+    --secondary-color: #A78BFA;
+    --hero-mid: #2e1a5e;
+}
+body[data-industry="leasing"] {
+    --primary-color: #F97316;
+    --primary-dark: #EA580C;
+    --primary-darker: #7C2D12;
+    --primary-light: #FDBA74;
+    --primary-lighter: #FFF7ED;
+    --primary-bg: #FFEDD5;
+    --secondary-color: #FB923C;
+    --hero-mid: #5c2e10;
+}
+body[data-industry="construction"] {
+    --primary-color: #DC2626;
+    --primary-dark: #B91C1C;
+    --primary-darker: #7F1D1D;
+    --primary-light: #FCA5A5;
+    --primary-lighter: #FEF2F2;
+    --primary-bg: #FECACA;
+    --secondary-color: #F87171;
+    --hero-mid: #5c1a1a;
+}
 
 /* Connectivity Toggle */
 .conn-toggle-wrap {
