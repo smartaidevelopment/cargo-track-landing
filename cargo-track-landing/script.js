@@ -15,12 +15,15 @@ function applyPackagesToTiers(stored) {
     Object.keys(TIER_BASE).forEach(key => {
         const pkg = stored[key];
         if (!pkg) return;
-        if (pkg.priceLora)       TIER_BASE[key].lora.price  = pkg.priceLora;
+        if (pkg.priceLora)        TIER_BASE[key].lora.price  = pkg.priceLora;
         if (pkg.annualPriceLora)  TIER_BASE[key].lora.annual = pkg.annualPriceLora;
-        if (pkg.price4g)         TIER_BASE[key]['4g'].price  = pkg.price4g;
-        if (pkg.annualPrice4g)   TIER_BASE[key]['4g'].annual = pkg.annualPrice4g;
-        if (pkg.interval)        TIER_BASE[key].interval     = pkg.interval;
-        if (pkg.data)            TIER_BASE[key].data         = pkg.data;
+        if (pkg.price4g)          TIER_BASE[key]['4g'].price  = pkg.price4g;
+        if (pkg.annualPrice4g)    TIER_BASE[key]['4g'].annual = pkg.annualPrice4g;
+        if (pkg.interval)         TIER_BASE[key].interval     = pkg.interval;
+        if (pkg.data)             TIER_BASE[key].data         = pkg.data;
+        if (pkg.name)             TIER_BASE[key].name         = pkg.name;
+        if (pkg.features)         TIER_BASE[key].features     = pkg.features;
+        if (pkg.description)      TIER_BASE[key].description  = pkg.description;
     });
 }
 
@@ -343,6 +346,17 @@ function updatePricingCards(conn) {
         const annualEl = card.querySelector('.tier-annual');
         if (amountEl) amountEl.textContent = p.price.toFixed(2);
         if (annualEl) annualEl.textContent = `Billed annually at \u20ac${p.annual.toFixed(2)}/asset/year`;
+        const specs = card.querySelectorAll('.tier-spec');
+        if (specs.length >= 1 && base.interval) specs[0].innerHTML = `<i class="fas fa-clock"></i> Every ${base.interval}`;
+        if (specs.length >= 2 && base.data) specs[1].innerHTML = `<i class="fas fa-database"></i> ${base.data}/mo`;
+        if (base.name) {
+            const nameEl = card.querySelector('.tier-name');
+            if (nameEl) nameEl.textContent = base.name;
+        }
+        if (base.features && Array.isArray(base.features)) {
+            const featList = card.querySelector('.tier-features');
+            if (featList) featList.innerHTML = base.features.map(f => `<li><i class="fas fa-check"></i> ${f}</li>`).join('');
+        }
     });
 }
 
