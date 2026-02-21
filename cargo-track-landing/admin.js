@@ -2274,7 +2274,24 @@ function initPackageManagement() {
     document.getElementById('addPackageBtn').addEventListener('click', showAddPackageForm);
     document.getElementById('packageForm').addEventListener('submit', savePackage);
     document.getElementById('closePackageModal').addEventListener('click', closePackageModal);
-    
+
+    const priceLora = document.getElementById('packagePriceLora');
+    const annualLora = document.getElementById('packageAnnualPriceLora');
+    const price4g = document.getElementById('packagePrice4g');
+    const annual4g = document.getElementById('packageAnnualPrice4g');
+    if (priceLora && annualLora) {
+        priceLora.addEventListener('input', () => {
+            const v = parseFloat(priceLora.value);
+            if (!isNaN(v)) annualLora.value = (v * 12).toFixed(2);
+        });
+    }
+    if (price4g && annual4g) {
+        price4g.addEventListener('input', () => {
+            const v = parseFloat(price4g.value);
+            if (!isNaN(v)) annual4g.value = (v * 12).toFixed(2);
+        });
+    }
+
     initDefaultPackages();
     populatePackageDropdowns();
 }
