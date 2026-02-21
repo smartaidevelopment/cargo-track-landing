@@ -101,16 +101,16 @@
             <p class="section-subtitle">Free hardware with every 24-month plan. Choose by tracking frequency, data, and features.</p>
             <div class="conn-toggle-wrap">
                 <div class="conn-toggle" id="connectivityToggle">
-                    <button type="button" class="conn-toggle-btn active" data-conn="4g"><i class="fas fa-signal"></i> 4G / LTE</button>
-                    <button type="button" class="conn-toggle-btn" data-conn="lora"><i class="fas fa-broadcast-tower"></i> LoRaWAN</button>
+                    <button type="button" class="conn-toggle-btn" data-conn="4g"><i class="fas fa-signal"></i> 4G / LTE</button>
+                    <button type="button" class="conn-toggle-btn active" data-conn="lora"><i class="fas fa-broadcast-tower"></i> LoRaWAN</button>
                 </div>
             </div>
             <div class="conn-toggle-label">Select device connectivity to see pricing</div>
             <div class="tiers-grid">
                 <div class="tier-card" data-tier-key="track">
                     <div class="tier-name">Locate</div>
-                    <div class="tier-price"><span class="tier-currency">&euro;</span><span class="tier-amount">7.95</span><span class="tier-period">/asset/mo</span></div>
-                    <div class="tier-annual">Billed annually at &euro;95.40/asset/year</div>
+                    <div class="tier-price"><span class="tier-currency">&euro;</span><span class="tier-amount">2.95</span><span class="tier-period">/asset/mo</span></div>
+                    <div class="tier-annual">Billed annually at &euro;35.40/asset/year</div>
                     <div class="tier-specs">
                         <span class="tier-spec"><i class="fas fa-clock"></i> Every 5 min</span>
                         <span class="tier-spec"><i class="fas fa-database"></i> 50 MB/mo</span>
@@ -127,8 +127,8 @@
                 </div>
                 <div class="tier-card featured" data-tier-key="monitor">
                     <div class="tier-name">Monitor</div>
-                    <div class="tier-price"><span class="tier-currency">&euro;</span><span class="tier-amount">9.95</span><span class="tier-period">/asset/mo</span></div>
-                    <div class="tier-annual">Billed annually at &euro;119.40/asset/year</div>
+                    <div class="tier-price"><span class="tier-currency">&euro;</span><span class="tier-amount">4.95</span><span class="tier-period">/asset/mo</span></div>
+                    <div class="tier-annual">Billed annually at &euro;59.40/asset/year</div>
                     <div class="tier-specs">
                         <span class="tier-spec"><i class="fas fa-clock"></i> Every 1 min</span>
                         <span class="tier-spec"><i class="fas fa-database"></i> 200 MB/mo</span>
@@ -146,8 +146,8 @@
                 </div>
                 <div class="tier-card" data-tier-key="predict">
                     <div class="tier-name">Command</div>
-                    <div class="tier-price"><span class="tier-currency">&euro;</span><span class="tier-amount">14.95</span><span class="tier-period">/asset/mo</span></div>
-                    <div class="tier-annual">Billed annually at &euro;179.40/asset/year</div>
+                    <div class="tier-price"><span class="tier-currency">&euro;</span><span class="tier-amount">7.95</span><span class="tier-period">/asset/mo</span></div>
+                    <div class="tier-annual">Billed annually at &euro;95.40/asset/year</div>
                     <div class="tier-specs">
                         <span class="tier-spec"><i class="fas fa-clock"></i> Every 10 sec</span>
                         <span class="tier-spec"><i class="fas fa-database"></i> 500 MB/mo</span>
@@ -168,33 +168,37 @@
     </section>
 
     <section id="roi" class="roi">
-        <div class="container roi-grid">
-            <div class="roi-copy">
-                <h2>Estimate your monthly ROI</h2>
-                <p>See how Polarsat impacts dispatch time, fuel waste, and dispute recovery for your fleet.</p>
-                <label for="roiVehicles">Number of tracked assets: <strong id="roiCount">20</strong></label>
-                <input type="range" id="roiVehicles" min="1" max="500" step="1" value="20">
-                <div class="form-group" style="margin-top:1rem;">
-                    <label for="roiConnectivity">Connectivity</label>
-                    <select id="roiConnectivity" class="form-control" style="max-width:200px;">
-                        <option value="4g" selected>4G / LTE</option>
-                        <option value="lora">LoRaWAN</option>
-                    </select>
+        <div class="container">
+            <h2 class="section-title">Estimate your monthly ROI</h2>
+            <p class="roi-subtitle">See how Polarsat impacts dispatch time, fuel waste, and dispute recovery for your fleet.</p>
+            <div class="roi-grid">
+                <div class="roi-controls">
+                    <div class="roi-slider-label"><span>Tracked assets</span><strong id="roiCount">20</strong></div>
+                    <input type="range" id="roiVehicles" min="1" max="500" step="1" value="20">
+                    <div class="roi-selects">
+                        <div class="form-group">
+                            <label for="roiConnectivity">Connectivity</label>
+                            <select id="roiConnectivity">
+                                <option value="lora" selected>LoRaWAN</option>
+                                <option value="4g">4G / LTE</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="roiTier">Plan</label>
+                            <select id="roiTier">
+                                <option value="2.95" data-tier-key="track" data-label="Locate">Locate (&euro;2.95)</option>
+                                <option value="4.95" selected data-tier-key="monitor" data-label="Monitor">Monitor (&euro;4.95)</option>
+                                <option value="7.95" data-tier-key="predict" data-label="Command">Command (&euro;7.95)</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
-                <div class="form-group" style="margin-top:0.75rem;">
-                    <label for="roiTier">Plan</label>
-                    <select id="roiTier" class="form-control" style="max-width:200px;">
-                        <option value="7.95" data-tier-key="track" data-label="Locate">Locate (&euro;7.95)</option>
-                        <option value="9.95" selected data-tier-key="monitor" data-label="Monitor">Monitor (&euro;9.95)</option>
-                        <option value="14.95" data-tier-key="predict" data-label="Command">Command (&euro;14.95)</option>
-                    </select>
+                <div class="roi-card">
+                    <div class="roi-row"><span>Platform Cost</span><strong id="roiCost">&euro;99.00/mo</strong></div>
+                    <div class="roi-row"><span>Estimated Time Savings</span><strong id="roiTime">&euro;960/mo</strong></div>
+                    <div class="roi-row"><span>Estimated Fuel Savings</span><strong id="roiFuel">&euro;700/mo</strong></div>
+                    <div class="roi-row total"><span>Estimated Net ROI</span><strong id="roiNet">+&euro;1,561/mo</strong></div>
                 </div>
-            </div>
-            <div class="roi-card">
-                <div class="roi-row"><span>Platform Cost</span><strong id="roiCost">&euro;299.00/mo</strong></div>
-                <div class="roi-row"><span>Estimated Time Savings</span><strong id="roiTime">&euro;960/mo</strong></div>
-                <div class="roi-row"><span>Estimated Fuel Savings</span><strong id="roiFuel">&euro;700/mo</strong></div>
-                <div class="roi-row total"><span>Estimated Net ROI</span><strong id="roiNet">+&euro;1,361/mo</strong></div>
             </div>
         </div>
     </section>
@@ -239,16 +243,16 @@
                         <div class="form-group">
                             <label for="connectivity">Device Connectivity</label>
                             <select id="connectivity" name="connectivity" required>
-                                <option value="4g" selected>4G / LTE</option>
-                                <option value="lora">LoRaWAN</option>
+                                <option value="4g">4G / LTE</option>
+                                <option value="lora" selected>LoRaWAN</option>
                             </select>
                         </div>
                         <div class="form-group">
                             <label for="tier">Plan</label>
                             <select id="tier" name="tier" required>
-                                <option value="locate">Locate (&euro;7.95/asset/mo)</option>
-                                <option value="monitor" selected>Monitor (&euro;9.95/asset/mo)</option>
-                                <option value="command">Command (&euro;14.95/asset/mo)</option>
+                                <option value="locate">Locate (&euro;2.95/asset/mo)</option>
+                                <option value="monitor" selected>Monitor (&euro;4.95/asset/mo)</option>
+                                <option value="command">Command (&euro;7.95/asset/mo)</option>
                             </select>
                         </div>
                         <div class="form-group">

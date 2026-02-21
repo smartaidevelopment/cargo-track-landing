@@ -54,7 +54,7 @@ const TIER_ALIASES = {
     secure: 'track', optimise: 'monitor', command: 'predict'
 };
 
-let selectedConnectivity = '4g';
+let selectedConnectivity = 'lora';
 
 function resolveTierKey(key) {
     const k = (key || 'monitor').toLowerCase();
