@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Admin Dashboard - Aurion">
+    <meta name="description" content="Admin Dashboard - Polarsat">
     <meta name="robots" content="noindex, nofollow">
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
-    <link rel="shortcut icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
-    <title>Admin Dashboard - Aurion</title>
-    <link rel="stylesheet" href="styles.css?v=20260219e">
-    <link rel="stylesheet" href="dashboard.css?v=20260219e">
-    <link rel="stylesheet" href="admin.css?v=20260219e">
+    <link rel="icon" type="image/svg+xml" href="assets/polarsat-logo.svg">
+    <link rel="shortcut icon" href="assets/polarsat-logo.svg">
+    <title>Admin Dashboard - Polarsat</title>
+    <link rel="stylesheet" href="styles.css?v=20260219f">
+    <link rel="stylesheet" href="dashboard.css?v=20260219f">
+    <link rel="stylesheet" href="admin.css?v=20260219f">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.js"></script>
@@ -486,7 +486,7 @@
                     </div>
                 </div>
                 
-                <p style="margin-bottom:1rem;color:var(--text-light);">Pricing per asset per month. Free hardware with every 24-month plan. Packages match the landing page tiers.</p>
+                <p style="margin-bottom:1rem;color:var(--text-light);">Pricing per asset per month by connectivity (LoRaWAN / 4G). Free hardware with every 24-month plan.</p>
                 <div class="table-container">
                     <table class="data-table">
                         <thead>
@@ -1400,11 +1400,11 @@
                     <form class="settings-form" id="appSettingsForm">
                         <div class="form-group">
                             <label>Application Name</label>
-                            <input type="text" id="appName" value="Aurion">
+                            <input type="text" id="appName" value="Polarsat">
                         </div>
                         <div class="form-group">
                             <label>Support Email</label>
-                            <input type="email" id="supportEmail" value="info@aurion.io">
+                            <input type="email" id="supportEmail" value="info@polarsat.com">
                         </div>
                         <div class="form-group">
                             <label>Support Phone</label>
@@ -1560,7 +1560,7 @@
                             <div class="form-group">
                                 <label for="lorawanWebhookUrl">Webhook Endpoint</label>
                                 <input type="url" id="lorawanWebhookUrl" placeholder="Auto-detected" autocomplete="off" readonly>
-                                <small>Auto-filled. This is the URL you set in your NS to forward data to Aurion.</small>
+                                <small>Auto-filled. This is the URL you set in your NS to forward data to Polarsat.</small>
                             </div>
                         </div>
                         <div class="form-group">
@@ -1634,15 +1634,28 @@
                         <label>Description</label>
                         <input type="text" id="packageDescription" name="packageDescription" placeholder="Short description of what's included">
                     </div>
+                    <p style="margin:0 0 0.25rem;font-weight:600;font-size:0.85rem;color:var(--text-light);"><i class="fas fa-broadcast-tower" style="margin-right:0.3rem;"></i> LoRaWAN Pricing</p>
                     <div class="form-row" style="display:flex;gap:1rem;">
                         <div class="form-group" style="flex:1;">
-                            <label>Price per Asset/Month (&euro;) *</label>
-                            <input type="number" id="packagePrice" name="packagePrice" required min="0" step="0.01" placeholder="14.95">
+                            <label>LoRa Price / Asset / Month (&euro;)</label>
+                            <input type="number" id="packagePriceLora" name="packagePriceLora" min="0" step="0.01" placeholder="2.95">
                         </div>
                         <div class="form-group" style="flex:1;">
-                            <label>Annual Price per Asset (&euro;)</label>
-                            <input type="number" id="packageAnnualPrice" name="packageAnnualPrice" min="0" step="0.01" placeholder="179.40">
-                            <small>Leave empty to calculate as price &times; 12</small>
+                            <label>LoRa Annual / Asset (&euro;)</label>
+                            <input type="number" id="packageAnnualPriceLora" name="packageAnnualPriceLora" min="0" step="0.01" placeholder="35.40">
+                            <small>Leave empty = price &times; 12</small>
+                        </div>
+                    </div>
+                    <p style="margin:0 0 0.25rem;font-weight:600;font-size:0.85rem;color:var(--text-light);"><i class="fas fa-signal" style="margin-right:0.3rem;"></i> 4G / LTE Pricing</p>
+                    <div class="form-row" style="display:flex;gap:1rem;">
+                        <div class="form-group" style="flex:1;">
+                            <label>4G Price / Asset / Month (&euro;) *</label>
+                            <input type="number" id="packagePrice4g" name="packagePrice4g" required min="0" step="0.01" placeholder="7.95">
+                        </div>
+                        <div class="form-group" style="flex:1;">
+                            <label>4G Annual / Asset (&euro;)</label>
+                            <input type="number" id="packageAnnualPrice4g" name="packageAnnualPrice4g" min="0" step="0.01" placeholder="95.40">
+                            <small>Leave empty = price &times; 12</small>
                         </div>
                     </div>
                     <div class="form-row" style="display:flex;gap:1rem;">
@@ -1853,7 +1866,7 @@
                     </div>
                     <div class="form-group">
                         <label>Subject</label>
-                        <input type="text" id="sendInvoiceSubject" placeholder="Invoice from Aurion">
+                        <input type="text" id="sendInvoiceSubject" placeholder="Invoice from Polarsat">
                     </div>
                     <div class="form-group">
                         <label>Message</label>
@@ -1874,12 +1887,12 @@
         </div>
     </div>
 
-    <script src="storage-sync.js?v=20260219e"></script>
-    <script src="auth.js?v=20260219e"></script>
-    <script src="admin-auth.js?v=20260219e"></script>
-    <script src="data-protection.js?v=20260219e"></script>
-    <script src="invoice.js?v=20260219e"></script>
-    <script src="admin.js?v=20260219e"></script>
+    <script src="storage-sync.js?v=20260219f"></script>
+    <script src="auth.js?v=20260219f"></script>
+    <script src="admin-auth.js?v=20260219f"></script>
+    <script src="data-protection.js?v=20260219f"></script>
+    <script src="invoice.js?v=20260219f"></script>
+    <script src="admin.js?v=20260219f"></script>
     <link rel="stylesheet" href="support-bot.css">
     <script src="support-bot.js"></script>
 </body>

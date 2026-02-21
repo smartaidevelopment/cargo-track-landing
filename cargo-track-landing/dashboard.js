@@ -513,7 +513,7 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     window.addEventListener('cargotrack:storage-sync-complete', refreshAfterStorageSync, { once: true });
-    if (window.AurionStorageSync?.hasCompletedInitialSync?.()) {
+    if (window.PolarsatStorageSync?.hasCompletedInitialSync?.()) {
         refreshAfterStorageSync();
     }
     
@@ -1687,11 +1687,11 @@ function setMapFullscreen(mapInstance, fullscreen, toggleButton = null) {
         if (activeFullscreenMap && activeFullscreenMap !== mapInstance) {
             setMapFullscreen(activeFullscreenMap, false);
         }
-        container.classList.add('aurion-map-fullscreen');
+        container.classList.add('polarsat-map-fullscreen');
         document.body.classList.add('map-fullscreen-active');
         activeFullscreenMap = mapInstance;
     } else {
-        container.classList.remove('aurion-map-fullscreen');
+        container.classList.remove('polarsat-map-fullscreen');
         if (activeFullscreenMap === mapInstance) {
             activeFullscreenMap = null;
         }
@@ -1714,15 +1714,15 @@ function attachMapControls(mapInstance, options = {}) {
 
     const control = L.control({ position: options.position || 'topleft' });
     control.onAdd = function () {
-        const container = L.DomUtil.create('div', 'leaflet-bar aurion-map-controls');
+        const container = L.DomUtil.create('div', 'leaflet-bar polarsat-map-controls');
 
-        const centerButton = L.DomUtil.create('a', 'aurion-map-control-btn', container);
+        const centerButton = L.DomUtil.create('a', 'polarsat-map-control-btn', container);
         centerButton.href = '#';
         centerButton.innerHTML = '<i class="fas fa-crosshairs"></i>';
         centerButton.setAttribute('aria-label', 'Center map');
         centerButton.title = 'Center map';
 
-        const fullscreenButton = L.DomUtil.create('a', 'aurion-map-control-btn', container);
+        const fullscreenButton = L.DomUtil.create('a', 'polarsat-map-control-btn', container);
         fullscreenButton.href = '#';
         fullscreenButton.innerHTML = '<i class="fas fa-expand"></i>';
         fullscreenButton.setAttribute('aria-label', 'Open full size map');
@@ -1738,7 +1738,7 @@ function attachMapControls(mapInstance, options = {}) {
 
         L.DomEvent.on(fullscreenButton, 'click', function (event) {
             L.DomEvent.preventDefault(event);
-            const open = !mapInstance.getContainer().classList.contains('aurion-map-fullscreen');
+            const open = !mapInstance.getContainer().classList.contains('polarsat-map-fullscreen');
             setMapFullscreen(mapInstance, open, fullscreenButton);
         });
 
@@ -7379,14 +7379,17 @@ function getPlanCapabilities() {
         allowApiKeys: false,
         allowAdvancedAnalytics: false
     };
-    if (tier.includes('enterprise')) {
+    if (tier.includes('enterprise') || tier === 'predict' || tier === 'certify' || tier === 'protect' || tier === 'command') {
         return { deviceLimit: 1000, allowApiKeys: true, allowAdvancedAnalytics: true };
     }
-    if (tier.includes('smb') || tier.includes('pro') || tier.includes('business')) {
+    if (tier.includes('smb') || tier.includes('pro') || tier.includes('business') || tier === 'monitor' || tier === 'manage' || tier === 'validate' || tier === 'underwrite' || tier === 'optimise') {
         return { deviceLimit: 25, allowApiKeys: false, allowAdvancedAnalytics: true };
     }
     if (tier.includes('reseller')) {
         return { deviceLimit: 10000, allowApiKeys: true, allowAdvancedAnalytics: true };
+    }
+    if (tier === 'track' || tier === 'locate' || tier === 'comply' || tier === 'assess' || tier === 'secure') {
+        return { deviceLimit: 10, allowApiKeys: false, allowAdvancedAnalytics: false };
     }
     return defaults;
 }
@@ -8405,7 +8408,7 @@ function dispatchAlertChannels(alertEntry) {
     if (settings.emailAlerts !== false && typeof sendEmail === 'function' && currentUser.email) {
         sendEmail(
             currentUser.email,
-            `[Aurion] ${alertEntry.title}`,
+            `[Polarsat] ${alertEntry.title}`,
             `${alertEntry.message}\n\nSeverity: ${alertEntry.severity}\nTime: ${new Date(alertEntry.timestamp).toLocaleString()}`,
             'logisticsAlert'
         );
@@ -8415,7 +8418,7 @@ function dispatchAlertChannels(alertEntry) {
         pushChannelNotification(SMS_NOTIFICATIONS_KEY, {
             id: `sms-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
             to: settings.mobilePhone || currentUser.phone || '',
-            message: `[Aurion] ${alertEntry.title}: ${alertEntry.message}`,
+            message: `[Polarsat] ${alertEntry.title}: ${alertEntry.message}`,
             severity: alertEntry.severity,
             timestamp: alertEntry.timestamp
         });
@@ -9290,9 +9293,38 @@ function deleteMyAccount() {
 }
 
 // Billing & Invoices Functions
+function updateCurrentPlanCard() {
+    const currentUser = safeGetCurrentUser();
+    if (!currentUser) return;
+    const planNameEl = document.getElementById('billingPlanName');
+    const planConnEl = document.getElementById('billingPlanConn');
+    const planPriceEl = document.getElementById('billingPlanPrice');
+    const planAssetsEl = document.getElementById('billingPlanAssets');
+    if (!planNameEl) return;
+    const pkg = currentUser.package || currentUser.planTier || 'monitor';
+    const conn = currentUser.connectivity || '4g';
+    const label = pkg.charAt(0).toUpperCase() + pkg.slice(1);
+    const connLabel = conn === 'lora' ? 'LoRaWAN' : '4G / LTE';
+    planNameEl.textContent = label;
+    planConnEl.textContent = connLabel;
+    const devices = currentUser.devices || 1;
+    planAssetsEl.textContent = devices;
+    const PLAN_PRICES = {
+        track: { lora: 2.95, '4g': 7.95 }, monitor: { lora: 4.95, '4g': 9.95 }, predict: { lora: 7.95, '4g': 14.95 },
+        locate: { lora: 2.95, '4g': 7.95 }, manage: { lora: 4.95, '4g': 9.95 }, protect: { lora: 7.95, '4g': 14.95 },
+        comply: { lora: 2.95, '4g': 7.95 }, validate: { lora: 4.95, '4g': 9.95 }, certify: { lora: 7.95, '4g': 14.95 },
+        assess: { lora: 2.95, '4g': 7.95 }, underwrite: { lora: 4.95, '4g': 9.95 },
+        secure: { lora: 2.95, '4g': 7.95 }, optimise: { lora: 4.95, '4g': 9.95 }, command: { lora: 7.95, '4g': 14.95 }
+    };
+    const tier = PLAN_PRICES[pkg.toLowerCase()] || PLAN_PRICES.monitor;
+    const price = tier[conn] || tier['4g'];
+    planPriceEl.textContent = '\u20ac' + (price * devices).toFixed(2) + '/mo';
+}
+
 function loadUserInvoices() {
     const currentUser = safeGetCurrentUser();
     if (!currentUser) return;
+    updateCurrentPlanCard();
     
     // Generate invoices for existing transactions
     if (typeof generateInvoicesForTransactions === 'function') {
@@ -9499,7 +9531,7 @@ function openSupportChat() {
 
 function openEmailSupport() {
     const currentUser = safeGetCurrentUser();
-    const email = 'info@aurion.io';
+    const email = 'info@polarsat.com';
     const subject = encodeURIComponent('Support Request from ' + (currentUser ? currentUser.email : 'Customer'));
     window.location.href = `mailto:${email}?subject=${subject}`;
 }
@@ -9654,8 +9686,8 @@ function submitSupportRequest(e) {
     if (typeof sendEmail === 'function') {
         sendEmail(
             currentUser.email,
-            'Support Request Received - Aurion',
-            `Dear ${currentUser.company || currentUser.email.split('@')[0]},\n\nWe have received your support request:\n\nSubject: ${subject}\nCategory: ${category}\n\nOur team will review your request and respond within 24 hours.\n\nThank you for contacting Aurion support.\n\nBest regards,\nAurion Support Team`,
+            'Support Request Received - Polarsat',
+            `Dear ${currentUser.company || currentUser.email.split('@')[0]},\n\nWe have received your support request:\n\nSubject: ${subject}\nCategory: ${category}\n\nOur team will review your request and respond within 24 hours.\n\nThank you for contacting Polarsat support.\n\nBest regards,\nPolarsat Support Team`,
             'supportRequest'
         );
     }

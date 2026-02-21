@@ -2103,8 +2103,8 @@ function sendAdminInvoice(invoiceId) {
 
     document.getElementById('sendInvoiceId').value = invoiceId;
     document.getElementById('sendInvoiceEmail').value = invoice.userEmail || '';
-    document.getElementById('sendInvoiceSubject').value = 'Invoice ' + invoice.invoiceNumber + ' from Aurion';
-    document.getElementById('sendInvoiceMessage').value = 'Dear Customer,\n\nPlease find attached invoice ' + invoice.invoiceNumber + ' for $' + invoice.total.toFixed(2) + '.\n\nDue date: ' + formatDate(invoice.dueDate) + '\n\nThank you for your business!\n\nAurion Team';
+    document.getElementById('sendInvoiceSubject').value = 'Invoice ' + invoice.invoiceNumber + ' from Polarsat';
+    document.getElementById('sendInvoiceMessage').value = 'Dear Customer,\n\nPlease find attached invoice ' + invoice.invoiceNumber + ' for $' + invoice.total.toFixed(2) + '.\n\nDue date: ' + formatDate(invoice.dueDate) + '\n\nThank you for your business!\n\nPolarsat Team';
     document.getElementById('sendInvoiceModal').classList.add('active');
 }
 
@@ -2284,7 +2284,10 @@ function initDefaultPackages() {
     const needsMigration = storedPackages && (() => {
         try {
             const p = JSON.parse(storedPackages);
-            return p.basic || p.professional || p.enterprise;
+            if (p.basic || p.professional || p.enterprise) return true;
+            const first = Object.values(p)[0];
+            if (first && first.price && !first.priceLora) return true;
+            return false;
         } catch (_) { return false; }
     })();
     if (!storedPackages || needsMigration) {
@@ -2292,8 +2295,12 @@ function initDefaultPackages() {
             track: {
                 id: 'track',
                 name: 'Track',
-                price: 9.95,
-                annualPrice: 119.40,
+                price: 7.95,
+                annualPrice: 95.40,
+                priceLora: 2.95,
+                annualPriceLora: 35.40,
+                price4g: 7.95,
+                annualPrice4g: 95.40,
                 interval: '5 min',
                 data: '50 MB',
                 maxDevices: 0,
@@ -2304,8 +2311,12 @@ function initDefaultPackages() {
             monitor: {
                 id: 'monitor',
                 name: 'Monitor',
-                price: 14.95,
-                annualPrice: 179.40,
+                price: 9.95,
+                annualPrice: 119.40,
+                priceLora: 4.95,
+                annualPriceLora: 59.40,
+                price4g: 9.95,
+                annualPrice4g: 119.40,
                 interval: '1 min',
                 data: '200 MB',
                 maxDevices: 0,
@@ -2317,8 +2328,12 @@ function initDefaultPackages() {
             predict: {
                 id: 'predict',
                 name: 'Predict',
-                price: 24.95,
-                annualPrice: 299.40,
+                price: 14.95,
+                annualPrice: 179.40,
+                priceLora: 7.95,
+                annualPriceLora: 95.40,
+                price4g: 14.95,
+                annualPrice4g: 179.40,
                 interval: '10 sec',
                 data: '500 MB',
                 maxDevices: 0,
@@ -2350,10 +2365,12 @@ function resolvePackageName(raw) {
     return names[id] || id.charAt(0).toUpperCase() + id.slice(1);
 }
 
-function resolvePackagePrice(raw) {
+function resolvePackagePrice(raw, connectivity) {
     const id = resolvePackageId(raw);
-    const prices = { track: 9.95, monitor: 14.95, predict: 24.95 };
-    return prices[id] || 14.95;
+    const conn = connectivity || '4g';
+    const prices4g = { track: 7.95, monitor: 9.95, predict: 14.95 };
+    const pricesLora = { track: 2.95, monitor: 4.95, predict: 7.95 };
+    return conn === 'lora' ? (pricesLora[id] || 4.95) : (prices4g[id] || 9.95);
 }
 
 function formatEurAdmin(value) {
@@ -2378,7 +2395,9 @@ function populatePackageDropdowns() {
         Object.values(packages).filter(p => p.active !== false).forEach(pkg => {
             const opt = document.createElement('option');
             opt.value = pkg.id;
-            opt.textContent = `${pkg.name} (\u20ac${Number(pkg.price).toFixed(2)}/asset/mo)`;
+            const loraPrice = Number(pkg.priceLora || pkg.price).toFixed(2);
+            const p4g = Number(pkg.price4g || pkg.price).toFixed(2);
+            opt.textContent = `${pkg.name} (LoRa \u20ac${loraPrice} / 4G \u20ac${p4g})`;
             if (pkg.featured && !isFilter) opt.selected = true;
             el.appendChild(opt);
         });
@@ -2439,8 +2458,10 @@ function loadPackages() {
                     </div>
                 </td>
                 <td>
-                    <strong>\u20ac${Number(pkg.price).toFixed(2)}</strong><span style="color:var(--text-light);font-size:0.8rem;">/asset/mo</span>
-                    <br><small style="color:var(--text-light);">\u20ac${Number(pkg.annualPrice || pkg.price * 12).toFixed(2)}/asset/yr</small>
+                    <div style="display:flex;flex-direction:column;gap:0.25rem;">
+                        <div><span style="font-size:0.7rem;padding:0.1rem 0.35rem;background:#dbeafe;color:#1d4ed8;border-radius:4px;">LoRa</span> <strong>\u20ac${Number(pkg.priceLora || pkg.price).toFixed(2)}</strong><span style="color:var(--text-light);font-size:0.75rem;">/mo</span></div>
+                        <div><span style="font-size:0.7rem;padding:0.1rem 0.35rem;background:#dcfce7;color:#166534;border-radius:4px;">4G</span> <strong>\u20ac${Number(pkg.price4g || pkg.price).toFixed(2)}</strong><span style="color:var(--text-light);font-size:0.75rem;">/mo</span></div>
+                    </div>
                 </td>
                 <td>
                     <span style="display:inline-flex;align-items:center;gap:0.3rem;"><i class="fas fa-clock" style="color:${color};font-size:0.75rem;"></i> ${pkg.interval || '-'}</span>
@@ -2486,8 +2507,10 @@ function editPackage(packageId) {
     document.getElementById('packageId').disabled = true;
     document.getElementById('packageName').value = pkg.name;
     document.getElementById('packageDescription').value = pkg.description || '';
-    document.getElementById('packagePrice').value = pkg.price;
-    document.getElementById('packageAnnualPrice').value = pkg.annualPrice || '';
+    document.getElementById('packagePriceLora').value = pkg.priceLora || '';
+    document.getElementById('packageAnnualPriceLora').value = pkg.annualPriceLora || '';
+    document.getElementById('packagePrice4g').value = pkg.price4g || pkg.price || '';
+    document.getElementById('packageAnnualPrice4g').value = pkg.annualPrice4g || pkg.annualPrice || '';
     document.getElementById('packageInterval').value = pkg.interval || '';
     document.getElementById('packageData').value = pkg.data || '';
     document.getElementById('packageMaxDevices').value = pkg.maxDevices || 0;
@@ -2505,8 +2528,12 @@ function savePackage(e) {
     const packageId = document.getElementById('packageId').value.trim().toLowerCase().replace(/\s+/g, '-');
     const packageName = document.getElementById('packageName').value.trim();
     const packageDescription = document.getElementById('packageDescription').value.trim();
-    const packagePrice = parseFloat(document.getElementById('packagePrice').value);
-    const packageAnnualPrice = parseFloat(document.getElementById('packageAnnualPrice').value) || (packagePrice * 12);
+    const priceLora = parseFloat(document.getElementById('packagePriceLora').value) || 0;
+    const annualPriceLora = parseFloat(document.getElementById('packageAnnualPriceLora').value) || (priceLora * 12);
+    const price4g = parseFloat(document.getElementById('packagePrice4g').value) || 0;
+    const annualPrice4g = parseFloat(document.getElementById('packageAnnualPrice4g').value) || (price4g * 12);
+    const packagePrice = price4g;
+    const packageAnnualPrice = annualPrice4g;
     const packageInterval = document.getElementById('packageInterval').value.trim();
     const packageData = document.getElementById('packageData').value.trim();
     const packageMaxDevices = parseInt(document.getElementById('packageMaxDevices').value) || 0;
@@ -2520,8 +2547,8 @@ function savePackage(e) {
         return;
     }
     
-    if (isNaN(packagePrice) || packagePrice < 0) {
-        alert('Please enter a valid price per asset');
+    if ((!priceLora && !price4g) || priceLora < 0 || price4g < 0) {
+        alert('Please enter at least one valid price');
         return;
     }
     
@@ -2536,9 +2563,13 @@ function savePackage(e) {
     packages[packageId] = {
         id: packageId,
         name: packageName,
-        description: packageDescription || `${packageName} — \u20ac${packagePrice.toFixed(2)}/asset/mo`,
+        description: packageDescription || `${packageName} — LoRa \u20ac${priceLora.toFixed(2)} / 4G \u20ac${price4g.toFixed(2)} per asset/mo`,
         price: packagePrice,
         annualPrice: packageAnnualPrice,
+        priceLora: priceLora,
+        annualPriceLora: annualPriceLora,
+        price4g: price4g,
+        annualPrice4g: annualPrice4g,
         interval: packageInterval,
         data: packageData,
         maxDevices: packageMaxDevices,
@@ -4998,7 +5029,7 @@ const TRACKER_PROFILES = [
         setupSteps: [
             'Log in to the Digital Matter OEM Server or your device management portal.',
             'Navigate to System Parameters > Server settings.',
-            'Set the server URL to your Aurion ingest endpoint.',
+            'Set the server URL to your Polarsat ingest endpoint.',
             'Set Upload Code to JSON and enable HTTP POST mode.',
             'Under Headers, add Authorization: Bearer <your_LTE_INGEST_TOKEN>.',
             'Set the tracking interval (e.g. 15 minutes for asset tracking).',
@@ -5040,7 +5071,7 @@ const TRACKER_PROFILES = [
         ],
         setupSteps: [
             'Access Yabby Edge settings via the Digital Matter OEM portal.',
-            'Set server URL to your Aurion /api/ingest endpoint.',
+            'Set server URL to your Polarsat /api/ingest endpoint.',
             'Enable JSON payload format under Upload settings.',
             'Add Authorization header: Bearer <your_LTE_INGEST_TOKEN>.',
             'Set tracking interval and movement thresholds.',
@@ -5240,7 +5271,7 @@ const TRACKER_PROFILES = [
             'Set tracking interval (e.g. on-moving: 30s, on-stop: 5 min).',
             'Save and verify that data reaches the gateway and is forwarded to /api/ingest.'
         ],
-        notes: 'Requires a TCP-to-HTTP gateway (e.g. Traccar, flespi, or custom) to convert Codec 8E binary data to JSON POST for the Aurion ingest API. Very cost-effective for large fleet rollouts.'
+        notes: 'Requires a TCP-to-HTTP gateway (e.g. Traccar, flespi, or custom) to convert Codec 8E binary data to JSON POST for the Polarsat ingest API. Very cost-effective for large fleet rollouts.'
     },
     {
         id: 'teltonika-fmb920',
@@ -5475,10 +5506,10 @@ const TRACKER_PROFILES = [
             'Configure reporting rules and PEG scripts for event types.',
             'Set APN for your carrier SIM.',
             'Create an MQTT bridge to forward messages as HTTP POST to /api/ingest.',
-            'Map CalAmp message fields to Aurion JSON fields.',
+            'Map CalAmp message fields to Polarsat JSON fields.',
             'Test and verify data flow to your dashboard.'
         ],
-        notes: 'Enterprise-grade tracker used in regulated industries. Supports CalAmp PEG (Programmable Event Generator) for custom logic. Requires an MQTT-to-HTTP bridge for Aurion integration.'
+        notes: 'Enterprise-grade tracker used in regulated industries. Supports CalAmp PEG (Programmable Event Generator) for custom logic. Requires an MQTT-to-HTTP bridge for Polarsat integration.'
     },
     {
         id: 'abeeway-micro',
@@ -5517,14 +5548,14 @@ const TRACKER_PROFILES = [
             'Register the Micro Tracker on the Actility ThingPark platform (or your LoRaWAN network server).',
             'Ensure the device is provisioned with the correct AppKey/AppEUI for OTAA join.',
             'In ThingPark, go to Application Settings and create an HTTP connector (webhook).',
-            'Set the destination URL to your Aurion /api/ingest endpoint.',
+            'Set the destination URL to your Polarsat /api/ingest endpoint.',
             'Add an HTTP header: Authorization: Bearer <your_LTE_INGEST_TOKEN>.',
             'Configure the payload decoder to output JSON with deviceId, latitude, longitude, temperature, battery fields.',
             'Use the Abeeway Device Manager to set the tracker profile (motion tracking, static, etc.).',
             'Set geolocation strategy: GPS for outdoor, Wi-Fi/BLE scan for indoor.',
             'Test by moving the device and verifying data appears on your dashboard.'
         ],
-        notes: 'Multi-mode geolocation (GPS + Wi-Fi + BLE) enables indoor/outdoor tracking without infrastructure changes. Data flows: Tracker -> LoRaWAN Gateway -> ThingPark -> HTTP webhook -> Aurion. Use the Abeeway Device Manager for advanced configuration (geofencing, motion profiles, SOS button).'
+        notes: 'Multi-mode geolocation (GPS + Wi-Fi + BLE) enables indoor/outdoor tracking without infrastructure changes. Data flows: Tracker -> LoRaWAN Gateway -> ThingPark -> HTTP webhook -> Polarsat. Use the Abeeway Device Manager for advanced configuration (geofencing, motion profiles, SOS button).'
     },
     {
         id: 'abeeway-industrial',
@@ -5568,7 +5599,7 @@ const TRACKER_PROFILES = [
             'Use the Abeeway Device Manager to set the operating mode (motion tracking, periodic, activity-based).',
             'Set GPS timeout and scan strategies for your environment.',
             'Mount the tracker on the asset (IP68 rated, use the mounting bracket).',
-            'Test and verify data flow to your Aurion dashboard.'
+            'Test and verify data flow to your Polarsat dashboard.'
         ],
         notes: 'IP68 ruggedized for harsh environments. Very long battery life due to LoRaWAN low-power design. Ideal for assets that move between outdoor yards and warehouses. Supports BLE beacon scanning for zone-level indoor positioning.'
     },
@@ -5791,7 +5822,7 @@ function showTrackerConfig(trackerId) {
         <div class="tracker-detail-section">
             <h4><i class="fas fa-exchange-alt"></i> Field Mapping</h4>
             <table class="tracker-specs-table">
-                <tr><th>Aurion Field</th><th>Tracker Field</th></tr>
+                <tr><th>Polarsat Field</th><th>Tracker Field</th></tr>
                 ${t.fieldMapping.map(([ctField, trackerField]) => `<tr><td><code>${ctField}</code></td><td>${trackerField}</td></tr>`).join('')}
             </table>
         </div>

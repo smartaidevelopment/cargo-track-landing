@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Aurion Dashboard - Monitor your cargo tracking devices in real-time">
+    <meta name="description" content="Polarsat Dashboard - Monitor your cargo tracking devices in real-time">
     <meta name="robots" content="noindex, nofollow">
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
-    <link rel="shortcut icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
-    <title>Dashboard - Aurion</title>
+    <link rel="icon" type="image/svg+xml" href="assets/polarsat-logo.svg">
+    <link rel="shortcut icon" href="assets/polarsat-logo.svg">
+    <title>Dashboard - Polarsat</title>
     <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="dashboard.css?v=20260219d">
+    <link rel="stylesheet" href="dashboard.css?v=20260219e">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="storage-sync.js?v=20260218a"></script>
@@ -1879,7 +1879,7 @@
             <div class="dashboard-card full-width" style="text-align:center;padding:2rem;">
                 <h3 style="margin-bottom:0.5rem;">Ready to lock in your premium?</h3>
                 <p style="color:var(--text-light);margin-bottom:1.5rem;">Contact our insurance partners with your verified fleet risk profile.</p>
-                <a href="mailto:info@aurion.io" class="btn btn-primary">
+                <a href="mailto:info@polarsat.com" class="btn btn-primary">
                     <i class="fas fa-envelope"></i> Request Insurance Quote
                 </a>
             </div>
@@ -1887,6 +1887,17 @@
 
         <!-- Billing & Invoices Section -->
         <section id="billing" class="content-section">
+            <div class="dashboard-card full-width" id="currentPlanCard" style="margin-bottom:1.5rem;">
+                <div class="card-header">
+                    <h2><i class="fas fa-cube"></i> Current Plan</h2>
+                </div>
+                <div style="display:flex;gap:2rem;flex-wrap:wrap;padding:0.5rem 0;">
+                    <div><span style="color:var(--text-light);font-size:0.85rem;">Plan</span><br><strong id="billingPlanName">—</strong></div>
+                    <div><span style="color:var(--text-light);font-size:0.85rem;">Connectivity</span><br><strong id="billingPlanConn">—</strong></div>
+                    <div><span style="color:var(--text-light);font-size:0.85rem;">Price</span><br><strong id="billingPlanPrice">—</strong></div>
+                    <div><span style="color:var(--text-light);font-size:0.85rem;">Assets</span><br><strong id="billingPlanAssets">—</strong></div>
+                </div>
+            </div>
             <div class="dashboard-card full-width">
                 <div class="card-header">
                     <h2><i class="fas fa-file-invoice-dollar"></i> Invoices & Receipts</h2>
@@ -2071,7 +2082,7 @@
                 </div>
                 <div class="api-keys-container">
                     <p style="margin-bottom: 1rem; color: var(--text-light);">
-                        Generate API keys to connect your Aurion account with external systems, ERPs, or custom integrations.
+                        Generate API keys to connect your Polarsat account with external systems, ERPs, or custom integrations.
                     </p>
                     <div id="userApiKeysList" class="api-keys-list">
                         <!-- API keys will be populated here -->
@@ -2232,7 +2243,7 @@
     <script src="data-protection.js"></script>
     <script src="invoice.js"></script>
     <script src="email-notifications.js"></script>
-    <script src="dashboard.js?v=20260219d"></script>
+    <script src="dashboard.js?v=20260219e"></script>
     <link rel="stylesheet" href="support-bot.css">
     <script src="support-bot.js"></script>
     <div id="maintenanceOverlay" style="display:none;position:fixed;inset:0;z-index:99999;background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
