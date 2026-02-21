@@ -8,23 +8,41 @@ const TIER_DEFAULTS = {
     predict: { lora: { price: 7.95, annual: 95.40 }, '4g': { price: 14.95, annual: 179.40 }, interval: '10 sec', data: '500 MB' }
 };
 
-const TIER_BASE = (() => {
-    try {
-        const stored = JSON.parse(localStorage.getItem('cargotrack_packages') || '{}');
-        const merged = JSON.parse(JSON.stringify(TIER_DEFAULTS));
-        Object.keys(merged).forEach(key => {
-            const pkg = stored[key];
-            if (!pkg) return;
-            if (pkg.priceLora)       merged[key].lora.price  = pkg.priceLora;
-            if (pkg.annualPriceLora)  merged[key].lora.annual = pkg.annualPriceLora;
-            if (pkg.price4g)         merged[key]['4g'].price  = pkg.price4g;
-            if (pkg.annualPrice4g)   merged[key]['4g'].annual = pkg.annualPrice4g;
-            if (pkg.interval)        merged[key].interval     = pkg.interval;
-            if (pkg.data)            merged[key].data         = pkg.data;
-        });
-        return merged;
-    } catch (_) { return TIER_DEFAULTS; }
-})();
+const TIER_BASE = JSON.parse(JSON.stringify(TIER_DEFAULTS));
+
+function applyPackagesToTiers(stored) {
+    if (!stored || typeof stored !== 'object') return;
+    Object.keys(TIER_BASE).forEach(key => {
+        const pkg = stored[key];
+        if (!pkg) return;
+        if (pkg.priceLora)       TIER_BASE[key].lora.price  = pkg.priceLora;
+        if (pkg.annualPriceLora)  TIER_BASE[key].lora.annual = pkg.annualPriceLora;
+        if (pkg.price4g)         TIER_BASE[key]['4g'].price  = pkg.price4g;
+        if (pkg.annualPrice4g)   TIER_BASE[key]['4g'].annual = pkg.annualPrice4g;
+        if (pkg.interval)        TIER_BASE[key].interval     = pkg.interval;
+        if (pkg.data)            TIER_BASE[key].data         = pkg.data;
+    });
+}
+
+function fetchAndApplyPackages() {
+    fetch('/api/packages')
+        .then(r => r.json())
+        .then(data => {
+            if (data && data.packages) {
+                applyPackagesToTiers(data.packages);
+                refreshAllPrices();
+            }
+        })
+        .catch(() => {});
+}
+
+function refreshAllPrices() {
+    const conn = selectedConnectivity || '4g';
+    updatePricingCards(conn);
+    updateTierSelectPrices(conn);
+    if (typeof updateRoiTierOptions === 'function') updateRoiTierOptions();
+    updateOrderSummary();
+}
 
 const TIER_ALIASES = {
     locate: 'track', manage: 'monitor', protect: 'predict',
@@ -471,6 +489,7 @@ function initLandingPage() {
     initializePackageSelection();
     initPricingCalculator();
     initRoiCalculator();
+    fetchAndApplyPackages();
 }
 
 if (document.readyState === 'loading') {

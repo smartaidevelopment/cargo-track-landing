@@ -2359,7 +2359,7 @@ function initDefaultPackages() {
                 active: true
             }
         };
-        localStorage.setItem(PACKAGES_KEY, JSON.stringify(defaultPackages));
+        savePackages(defaultPackages);
     }
 }
 
@@ -2435,10 +2435,16 @@ function getPackages() {
 
 function savePackages(packagesObj) {
     localStorage.setItem(PACKAGES_KEY, JSON.stringify(packagesObj));
-    // Also update the packages in script.js context if possible
-    if (typeof window !== 'undefined' && window.updatePackagesInOrderForm) {
-        window.updatePackagesInOrderForm(packagesObj);
-    }
+    syncPackagesToApi(packagesObj);
+}
+
+function syncPackagesToApi(packagesObj) {
+    const headers = Object.assign({ 'Content-Type': 'application/json' }, getApiAuthHeaders());
+    fetch('/api/packages', {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(packagesObj)
+    }).catch(() => {});
 }
 
 function loadPackages() {
