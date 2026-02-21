@@ -286,8 +286,11 @@ function initConnectivityToggle() {
             this.classList.add('active');
             selectedConnectivity = this.getAttribute('data-conn');
             updatePricingCards(selectedConnectivity);
+            updateRoiTierOptions();
             const connEl = document.getElementById('connectivity');
             if (connEl) connEl.value = selectedConnectivity;
+            const roiConn = document.getElementById('roiConnectivity');
+            if (roiConn) roiConn.value = selectedConnectivity;
             updateOrderSummary();
         });
     });
@@ -350,6 +353,22 @@ function initializePackageSelection() {
 
 // ── ROI Calculator (works across all industry pages) ──
 
+function updateRoiTierOptions() {
+    const tierSelect = document.getElementById('roiTier');
+    if (!tierSelect) return;
+    const conn = selectedConnectivity || '4g';
+    Array.from(tierSelect.options).forEach(opt => {
+        const tierKey = opt.getAttribute('data-tier-key');
+        if (!tierKey) return;
+        const base = getTierBase(tierKey);
+        if (!base) return;
+        const p = base[conn] || base['4g'];
+        opt.value = p.price.toFixed(2);
+        const label = opt.getAttribute('data-label') || tierKey;
+        opt.textContent = `${label} (\u20ac${p.price.toFixed(2)})`;
+    });
+}
+
 function initRoiCalculator() {
     const slider = document.getElementById('roiVehicles');
     const countEl = document.getElementById('roiCount');
@@ -358,6 +377,7 @@ function initRoiCalculator() {
     const fuelEl = document.getElementById('roiFuel');
     const netEl = document.getElementById('roiNet');
     const tierSelect = document.getElementById('roiTier');
+    const roiConnSelect = document.getElementById('roiConnectivity');
 
     if (!slider || !countEl || !costEl || !timeEl || !fuelEl || !netEl) return;
 
@@ -381,6 +401,24 @@ function initRoiCalculator() {
 
     slider.addEventListener('input', calculate);
     if (tierSelect) tierSelect.addEventListener('change', calculate);
+    if (roiConnSelect) {
+        roiConnSelect.addEventListener('change', () => {
+            selectedConnectivity = roiConnSelect.value;
+            updateRoiTierOptions();
+            updatePricingCards(selectedConnectivity);
+            const mainToggle = document.getElementById('connectivityToggle');
+            if (mainToggle) {
+                mainToggle.querySelectorAll('.conn-toggle-btn').forEach(b => {
+                    b.classList.toggle('active', b.getAttribute('data-conn') === selectedConnectivity);
+                });
+            }
+            const orderConn = document.getElementById('connectivity');
+            if (orderConn) orderConn.value = selectedConnectivity;
+            updateOrderSummary();
+            calculate();
+        });
+    }
+    updateRoiTierOptions();
     calculate();
 }
 
